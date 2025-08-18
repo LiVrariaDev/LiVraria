@@ -3,18 +3,29 @@ import pprint
 from datetime import datetime
 from mdutils.mdutils import MdUtils 
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+safety_settings = [types.SafetySetting(
+        category="HARM_CATEGORY_HATE_SPEECH",
+        threshold="BLOCK_ONLY_HIGH"
+    ), types.SafetySetting(
+        category="HARM_CATEGORY_DANGEROUS_CONTENT",
+        threshold="BLOCK_ONLY_HIGH"
+    ), types.SafetySetting(
+        category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        threshold="BLOCK_ONLY_HIGH"
+    ), types.SafetySetting(
+        category="HARM_CATEGORY_HARASSMENT",
+        threshold="BLOCK_ONLY_HIGH"
+    )]
 
-model = genai.GenerativeModel("gemini-2.0-flash")
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-chat = model.start_chat(history=[])
-
-prompt = """以下の内容を理解して従ってください. この内容は,会話内容が残っている限り有効です. 理解した場合,「はい」とだけ答えてください.
+prompt = """以下の内容を理解して従ってください. この内容は,会話内容が残っている限り有効です. 
 あなたは,図書館の司書です. ユーザーからの要求に対し,以下の条件を守って応答してください.
 条件:
 1. 必ず日本語で応答する.
@@ -26,9 +37,24 @@ prompt = """以下の内容を理解して従ってください. この内容は
 7. ユーザーから不適切な要求があった場合は, 丁寧に断る.
 """
 
-response = chat.send_message(prompt)
+configs = types.GenerateContentConfig(
+    temperature=0.5,
+    top_p=0.95,
+    max_output_tokens=512,
+    response_modalities=["text"],
+    safety_settings=safety_settings,
+    system_instruction=[types.Part(text=prompt)],
+)
 
-print("Response:", response.text)
+chat = client.chats.create(
+    model="gemini-2.0-flash",
+    config=configs,
+    history=[]
+)
+
+response = chat.send_message(
+    "プロンプトを理解した場合,「はい」とだけ答えてください."
+)
 
 if response.text.strip() != "はい":
     print("プロンプトの理解に失敗しました。プログラムを終了します。")
