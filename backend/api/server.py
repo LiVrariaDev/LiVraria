@@ -7,11 +7,14 @@ import uuid
 # Third Party
 from fastapi import FastAPI, HTTPException
 import uvicorn
+from pathlib import Path
 
 # user-defined
-from gemini import gemini_chat
+from .gemini import gemini_chat
 
 app = FastAPI()
+
+PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
 # セッション保存用
 sessions = {}
@@ -66,13 +69,19 @@ async def get_sessions(session_id: str = None):
 # query: message (str, required), session_id (str, optional)
 @app.post("/chat/default")
 async def chat_default(request: ChatRequest):
-    return chat_prompt(request, "api/prompts/default.md")
+    prompt_path = PROMPTS_DIR / "default.md"
+    if not prompt_path.exists():
+        raise HTTPException(status_code=500, detail=f"Prompt file not found: {prompt_path}")
+    return chat_prompt(request, str(prompt_path))
 
 # API EndPoints /chat/librarian - 図書館司書プロンプト
 # query: message (str, required), session_id (str, optional)
 @app.post("/chat/librarian")
 async def chat_librarian(request: ChatRequest):
-    return chat_prompt(request, "api/prompts/librarian.md")
+    prompt_path = PROMPTS_DIR / "librarian.md"
+    if not prompt_path.exists():
+        raise HTTPException(status_code=500, detail=f"Prompt file not found: {prompt_path}")
+    return chat_prompt(request, str(prompt_path))
 
 # API EndPoints /delete_session - セッション削除
 # query: session_id (str, required)
