@@ -67,7 +67,7 @@ def gemini_chat(prompt_file, message, history):
         max_output_tokens=512,
         response_modalities=["text"],
         safety_settings=safety_settings,
-        system_instruction=[types.Part(text=prompt)], # システム指示でpromptを与える]
+        system_instruction=[types.Part(text=prompt)], # システム指示でpromptを与える
         tools=[tools]
     )
 
@@ -89,24 +89,32 @@ def gemini_chat(prompt_file, message, history):
         print("Function call detected:\n")
         print(f"Function Name: {function_call_part.name}")
 
-        args = getattr(function_call_part, 'args', function_call_part.arguments)
-        print(f"Arguments: {pprint.pformat(args)}\n")
-
+        args = getattr(function_call_part, "args", None)
+        if args is None:
+            args = getattr(function_call_part, "arguments", None)
+        print("Arguments:")
+        pprint.pprint(args)
+ 
         if function_call_part.name == "search_books":
             try:
-                result = search_books(**args)
+                # args が JSON 文字列の場合はパースして dict にする
+                if isinstance(args, str):
+                    import json
+                    args_parsed = json.loads(args)
+                else:
+                    args_parsed = args or {}
+                result = search_books(**args_parsed)
                 print(f"Function call result:\n{pprint.pformat(result)}\n")
             except Exception as e:
                 print(f"Error occurred while calling function '{function_call_part.name}': {e}")
-
+ 
             function_response_part = types.Part.from_function_response(
                 name=function_call_part.name,
                 response={"result": result},
             )
-
+ 
             final_response = chat.send_message([function_response_part])
             response_text = final_response.text
-
     else:
         response_text = response.text
 
@@ -114,3 +122,40 @@ def gemini_chat(prompt_file, message, history):
 
     return response_text, new_history
 # end def
+
+if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+
+    print("Dry-run / debug for backend.api.gemini")
+
+    prompts_dir = Path(__file__).resolve().parent / "prompts"
+    default_prompt = prompts_dir / "debug.md"
+    print("PROMPTS_DIR:", prompts_dir)
+    print("default.md exists:", default_prompt.exists())
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        print("GEMINI_API_KEY not set — skipping live API call. Set env var to run full test.")
+        sys.exit(0)
+
+    # 簡易テスト入力
+    sample_message = "おすすめのPython入門書を教えてください。"
+    history = []
+
+    try:
+        print("Calling gemini_chat with prompt:", default_prompt)
+        response_text, new_history = gemini_chat(str(default_prompt), sample_message, history)
+        print("=== Response ===")
+        print(response_text)
+        print("=== New history (len) ===", len(new_history))
+        pprint.pprint(new_history[:4])
+    except Exception as e:
+        print("Exception during gemini_chat:")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+    print("Debug finished.")
+    sys.exit(0)
+# ...existing code...
