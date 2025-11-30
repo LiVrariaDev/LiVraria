@@ -38,9 +38,16 @@ def load_prompt_text(filepath):
     with open(filepath, "r", encoding="utf-8") as f:
         return f.read()
 
-def gemini_chat(prompt_file, message, history):
+def gemini_chat(prompt_file: str = None, message: str = "", history: list = None, ai_insight: str = None):
     # プロンプト読込 (markdownを推奨)
     prompt = load_prompt_text(prompt_file)
+    # ai_insight が与えられている場合はプロンプトに追記してモデルが文脈として使えるようにする
+    if ai_insight:
+        # 明示的にユーザー情報であることを示すセクションを追加
+        prompt += "\n\n---\nユーザー情報 (ai_insights):\n"
+        prompt += ai_insight
+    if history is None:
+        history = []
     
     # モデルのセーフティー設定
     safety_settings = [types.SafetySetting(
