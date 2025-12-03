@@ -1,1 +1,70 @@
-[]
+[
+  {
+    "_id": "test_user_1764746969",
+    "ai_insights": "",
+    "personal": {
+      "gender": "male",
+      "age": 25,
+      "live_pref": "東京都",
+      "live_city": "渋谷区"
+    },
+    "status": "logout",
+    "active_session": null,
+    "old_session": [
+      "3fc5286f-cc95-4c23-b0b7-db3f347bf955"
+    ],
+    "recommend_log": [],
+    "lastlogin": "2025-12-03 16:29:29.637157"
+  },
+  {
+    "_id": "test_user_1764747350",
+    "ai_insights": "",
+    "personal": {
+      "gender": "male",
+      "age": 25,
+      "live_pref": "東京都",
+      "live_city": "渋谷区"
+    },
+    "status": "logout",
+    "active_session": null,
+    "old_session": [
+      "1c4debd3-5c0a-42ab-8838-6ad725be0d34"
+    ],
+    "recommend_log": [],
+    "lastlogin": "2025-12-03 16:35:50.512702"
+  },
+  {
+    "_id": "test_user_1764747495",
+    "ai_insights": "既存のAI Insightsがないため、今回の会話要約から新規作成します。しかし、会話要約が提供されていないため、情報不足としてAI Insightsを生成します。\n\n```\n読書傾向:\n- 情報不足\n\n興味関心:\n- 情報不足\n\n読書スタイル:\n- 情報不足\n\nその他の特徴:\n- 情報不足\n```\n",
+    "personal": {
+      "gender": "male",
+      "age": 25,
+      "live_pref": "東京都",
+      "live_city": "渋谷区"
+    },
+    "status": "logout",
+    "active_session": null,
+    "old_session": [
+      "eca0da97-f9b9-4aa8-b033-7d7c3ad70e7e"
+    ],
+    "recommend_log": [],
+    "lastlogin": "2025-12-03 16:38:15.826840"
+  },
+  {
+    "_id": "test_user_1764747803",
+    "ai_insights": "```\n読書傾向:\n- 好きなジャンル: SF小説\n\n興味関心:\n- 現在興味を持っているトピック: おすすめのSF小説\n\n読書スタイル:\n- 読書の目的: 娯楽\n\nその他の特徴:\n- おすすめのSF小説を探している\n```",
+    "personal": {
+      "gender": "male",
+      "age": 25,
+      "live_pref": "東京都",
+      "live_city": "渋谷区"
+    },
+    "status": "logout",
+    "active_session": null,
+    "old_session": [
+      "7518c7d3-caca-4810-840b-1c4b311848d1"
+    ],
+    "recommend_log": [],
+    "lastlogin": "2025-12-03 16:43:23.950050"
+  }
+]
