@@ -150,5 +150,125 @@
       }
     ],
     "summary": "概要: ユーザーはSF小説が好きで、おすすめの本を探しています。\n\n主要ポイント:\n\n*   ユーザーはSF小説が好きである。\n*   アシスタントは、ユーザーの好みに合ったSF小説を見つけるために、最近読んだ面白いSF小説やSF小説の好きな要素を尋ねています。\n\n次のアクション:\n\n*   アシスタントは、ユーザーの好みをより詳しく聞き取り、おすすめの本を提案する。\n"
+  },
+  "c1786325-8844-4412-a4d2-b5a23eefae42": {
+    "_id": "c1786325-8844-4412-a4d2-b5a23eefae42",
+    "user_id": "test_pause_user_1764751346",
+    "status": "closed",
+    "messages": [
+      {
+        "role": "user",
+        "content": "parts=None role='user'"
+      },
+      {
+        "role": "model",
+        "content": "parts=None role='model'"
+      },
+      {
+        "role": "user",
+        "content": "parts=None role='user'"
+      },
+      {
+        "role": "model",
+        "content": "parts=None role='model'"
+      },
+      {
+        "role": "user",
+        "content": "ありがとうございます"
+      },
+      {
+        "role": "model",
+        "content": "どういたしまして。何かお手伝いできることはありますか？\n"
+      }
+    ],
+    "summary": "概要: ユーザーがお礼を述べ、アシスタントがそれに応答し、さらに支援を申し出ました。\n\n主要ポイント:\n- ユーザーがお礼を言った。\n- アシスタントがそれに応答し、追加の支援を申し出た。\n\n次のアクション: なし\n"
+  },
+  "b99dd7b1-13c9-4bcf-b115-3d6b2ce621c8": {
+    "_id": "b99dd7b1-13c9-4bcf-b115-3d6b2ce621c8",
+    "user_id": "test_pause_user_1764761310",
+    "status": "pause",
+    "messages": [
+      {
+        "role": "user",
+        "content": "こんにちは、今日はいい天気ですね"
+      },
+      {
+        "role": "model",
+        "content": "こんにちは！本当にいい天気ですね。こんな日は窓辺で読書でもしたい気分です。最近、何か面白い本に出会いましたか？\n"
+      },
+      {
+        "role": "user",
+        "content": "おすすめの本を教えてください"
+      },
+      {
+        "role": "model",
+        "content": "おすすめの本ですか、いいですね！どんなジャンルがお好きですか？最近読んだ本で面白かったものはありますか？もしあれば、好みに近いものをおすすめできるかもしれません。\n"
+      }
+    ],
+    "summary": null
+  },
+  "5b427389-083d-42c8-8715-7e7a92ce86f8": {
+    "_id": "5b427389-083d-42c8-8715-7e7a92ce86f8",
+    "user_id": "test_pause_user_1764761354",
+    "status": "closed",
+    "messages": [
+      {
+        "role": "user",
+        "content": "parts=None role='user'"
+      },
+      {
+        "role": "model",
+        "content": "parts=None role='model'"
+      },
+      {
+        "role": "user",
+        "content": "parts=None role='user'"
+      },
+      {
+        "role": "model",
+        "content": "parts=None role='model'"
+      },
+      {
+        "role": "user",
+        "content": "ありがとうございます"
+      },
+      {
+        "role": "model",
+        "content": "どういたしまして。何かお手伝いできることはありますか？最近、何か面白い本は読まれました？\n"
+      }
+    ],
+    "summary": "概要: ユーザーがアシスタントに感謝を述べ、アシスタントはさらなる支援の申し出と最近読んだ本の話題を提供しました。\n\n主要ポイント:\n\n*   ユーザーがアシスタントに感謝を述べた。\n*   アシスタントは追加の支援を申し出た。\n*   アシスタントは最近読んだ本について尋ね、会話を広げようとした。"
+  },
+  "56d9ac3a-61ed-4336-b46d-7a118ecb9e22": {
+    "_id": "56d9ac3a-61ed-4336-b46d-7a118ecb9e22",
+    "user_id": "test_pause_user_1764761464",
+    "status": "closed",
+    "messages": [
+      {
+        "role": "user",
+        "content": "parts=None role='user'"
+      },
+      {
+        "role": "model",
+        "content": "parts=None role='model'"
+      },
+      {
+        "role": "user",
+        "content": "parts=None role='user'"
+      },
+      {
+        "role": "model",
+        "content": "parts=None role='model'"
+      },
+      {
+        "role": "user",
+        "content": "ありがとうございます"
+      },
+      {
+        "role": "model",
+        "content": "どういたしまして。何かお手伝いできることはありますか？\n"
+      }
+    ],
+    "summary": "概要: ユーザーがお礼を述べ、アシスタントがそれに応答し、さらに支援を申し出ました。\n\n主要ポイント:\n- ユーザーがお礼を言った。\n- アシスタントがそれに応答し、追加の支援を申し出た。\n\n次のアクション: なし\n"
   }
 }
