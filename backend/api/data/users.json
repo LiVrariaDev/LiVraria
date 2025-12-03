@@ -66,5 +66,71 @@
     ],
     "recommend_log": [],
     "lastlogin": "2025-12-03 16:43:23.950050"
+  },
+  {
+    "_id": "test_pause_user_1764751346",
+    "ai_insights": "既存のAI Insightsが存在しないため、今回の会話要約からAI Insightsを新規作成します。ただし、会話要約からは読書傾向や興味関心に関する具体的な情報が得られないため、現時点で推測できる範囲で情報をまとめます。\n\n```\n読書傾向:\n- 情報不足\n\n興味関心:\n- 情報不足\n\n読書スタイル:\n- 情報不足\n\nその他の特徴:\n- 丁寧な言葉遣いを好む可能性がある。\n```",
+    "personal": {
+      "gender": "male",
+      "age": 30,
+      "live_pref": "東京都",
+      "live_city": "新宿区"
+    },
+    "status": "logout",
+    "active_session": null,
+    "old_session": [
+      "c1786325-8844-4412-a4d2-b5a23eefae42"
+    ],
+    "recommend_log": [],
+    "lastlogin": "2025-12-03 17:42:26.113416"
+  },
+  {
+    "_id": "test_pause_user_1764761310",
+    "ai_insights": "",
+    "personal": {
+      "gender": "male",
+      "age": 30,
+      "live_pref": "東京都",
+      "live_city": "新宿区"
+    },
+    "status": "chatting",
+    "active_session": "b99dd7b1-13c9-4bcf-b115-3d6b2ce621c8",
+    "old_session": [],
+    "recommend_log": [],
+    "lastlogin": "2025-12-03 20:28:30.243398"
+  },
+  {
+    "_id": "test_pause_user_1764761354",
+    "ai_insights": "AI Insights:\n\n読書傾向:\n- 情報不足\n\n興味関心:\n- 情報不足\n\n読書スタイル:\n- 情報不足\n\nその他の特徴:\n- アシスタントに感謝を述べるなど、友好的なコミュニケーションを好む。\n",
+    "personal": {
+      "gender": "male",
+      "age": 30,
+      "live_pref": "東京都",
+      "live_city": "新宿区"
+    },
+    "status": "logout",
+    "active_session": null,
+    "old_session": [
+      "5b427389-083d-42c8-8715-7e7a92ce86f8"
+    ],
+    "recommend_log": [],
+    "lastlogin": "2025-12-03 20:29:14.938952"
+  },
+  {
+    "_id": "test_pause_user_1764761464",
+    "ai_insights": "既存のAI Insightsが存在しないため、今回の会話要約に基づいて新規作成します。ただし、会話の内容が書籍の推薦や興味関心と直接関係がないため、現時点では情報不足として、今後の情報更新に備える形とします。\n\n```\n読書傾向:\n- 情報不足\n\n興味関心:\n- 情報不足\n\n読書スタイル:\n- 情報不足\n\nその他の特徴:\n- 情報不足\n```\n",
+    "personal": {
+      "gender": "male",
+      "age": 30,
+      "live_pref": "東京都",
+      "live_city": "新宿区"
+    },
+    "status": "logout",
+    "active_session": null,
+    "old_session": [
+      "56d9ac3a-61ed-4336-b46d-7a118ecb9e22"
+    ],
+    "recommend_log": [],
+    "lastlogin": "2025-12-03 20:31:05.008931"
   }
 ]
