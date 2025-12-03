@@ -48,6 +48,7 @@ class RecommendationLogEntry(BaseModel):
     book_data: BookData = Field(description="Recommended book data")
 
 class Personal(BaseModel):
+    name: str = Field(description="Name")
     gender: str = Field(description="Gender")
     age: int = Field(description="Age")
     live_pref: Optional[str] = Field(None, description="Living preference")
@@ -72,6 +73,8 @@ class Conversation(BaseModel):
     status: ChatStatus = Field(default=ChatStatus.active, description="Chat status")
     messages: List[Message] = Field(default_factory=list, description="Chat messages")
     summary: Optional[str] = Field(None, description="AI-generated summary at session end")
+    last_accessed: datetime = Field(default_factory=datetime.now, description="Last accessed time")
 
     class Config:
         populate_by_name = True
+
