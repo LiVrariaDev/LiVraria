@@ -14,184 +14,184 @@ project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 def test_session_timeout():
-    """セッションタイムアウトのテスト"""
-    print("\n" + "=" * 60)
-    print("  セッションタイムアウトテスト")
-    print("=" * 60)
-    
-    try:
-        from backend.api.datastore import DataStore, SESSION_TIMEOUT
-        from backend.api.models import Personal, ChatStatus
-        
-        # DataStore初期化
-        ds = DataStore()
-        
-        # テストユーザー作成
-        print("\n[TEST] ユーザー作成...")
-        user_id = "test_timeout_user_001"
-        personal = Personal(name="Timeout User", gender="male", age=25)
-        user = ds.create_user(user_id, personal)
-        print(f"[SUCCESS] ユーザー作成: {user_id}")
-        
-        # セッション作成
-        print("\n[TEST] セッション作成...")
-        session_id = ds.create_session(user_id)
-        assert session_id in ds.sessions
-        assert session_id in ds.conversations
-        conv = ds.conversations[session_id]
-        assert conv.status == ChatStatus.active
-        print(f"[SUCCESS] セッション作成: {session_id}")
-        print(f"  最終アクセス時刻: {conv.last_accessed}")
-        
-        # 最終アクセス時刻を古い時刻に設定（タイムアウトをシミュレート）
-        print("\n[TEST] 最終アクセス時刻を古い時刻に設定...")
-        old_time = datetime.now() - timedelta(seconds=SESSION_TIMEOUT + 100)
-        conv.last_accessed = old_time
-        print(f"  設定した時刻: {old_time}")
-        print(f"  タイムアウト閾値: {datetime.now() - timedelta(seconds=SESSION_TIMEOUT)}")
-        
-        # タイムアウトチェック
-        print("\n[TEST] タイムアウトチェック...")
-        timed_out = ds.check_session_timeout()
-        assert session_id in timed_out
-        assert session_id not in ds.sessions  # メモリから削除されている
-        assert session_id in ds.conversations  # 永続化されている
-        conv = ds.conversations[session_id]
-        assert conv.status == ChatStatus.pause  # pause状態になっている
-        print(f"[SUCCESS] セッションがタイムアウト: {session_id}")
-        print(f"  タイムアウトしたセッション数: {len(timed_out)}")
-        print(f"  セッションステータス: {conv.status}")
-        
-        # セッション再開
-        print("\n[TEST] セッション再開...")
-        ds.resume_session(session_id)
-        assert session_id in ds.sessions  # メモリに復元されている
-        conv = ds.conversations[session_id]
-        assert conv.status == ChatStatus.active  # active状態に戻っている
-        print(f"[SUCCESS] セッション再開: {session_id}")
-        print(f"  セッションステータス: {conv.status}")
-        print(f"  最終アクセス時刻: {conv.last_accessed}")
-        
-        return True
-    except Exception as e:
-        print(f"[ERROR] テストエラー: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+	"""セッションタイムアウトのテスト"""
+	print("\n" + "=" * 60)
+	print("  セッションタイムアウトテスト")
+	print("=" * 60)
+	
+	try:
+		from backend.api.datastore import DataStore, SESSION_TIMEOUT
+		from backend.api.models import Personal, ChatStatus
+		
+		# DataStore初期化
+		ds = DataStore()
+		
+		# テストユーザー作成
+		print("\n[TEST] ユーザー作成...")
+		user_id = "test_timeout_user_001"
+		personal = Personal(name="Timeout User", gender="male", age=25)
+		user = ds.create_user(user_id, personal)
+		print(f"[SUCCESS] ユーザー作成: {user_id}")
+		
+		# セッション作成
+		print("\n[TEST] セッション作成...")
+		session_id = ds.create_session(user_id)
+		assert session_id in ds.sessions
+		assert session_id in ds.conversations
+		conv = ds.conversations[session_id]
+		assert conv.status == ChatStatus.active
+		print(f"[SUCCESS] セッション作成: {session_id}")
+		print(f"  最終アクセス時刻: {conv.last_accessed}")
+		
+		# 最終アクセス時刻を古い時刻に設定（タイムアウトをシミュレート）
+		print("\n[TEST] 最終アクセス時刻を古い時刻に設定...")
+		old_time = datetime.now() - timedelta(seconds=SESSION_TIMEOUT + 100)
+		conv.last_accessed = old_time
+		print(f"  設定した時刻: {old_time}")
+		print(f"  タイムアウト閾値: {datetime.now() - timedelta(seconds=SESSION_TIMEOUT)}")
+		
+		# タイムアウトチェック
+		print("\n[TEST] タイムアウトチェック...")
+		timed_out = ds.check_session_timeout()
+		assert session_id in timed_out
+		assert session_id not in ds.sessions  # メモリから削除されている
+		assert session_id in ds.conversations  # 永続化されている
+		conv = ds.conversations[session_id]
+		assert conv.status == ChatStatus.pause  # pause状態になっている
+		print(f"[SUCCESS] セッションがタイムアウト: {session_id}")
+		print(f"  タイムアウトしたセッション数: {len(timed_out)}")
+		print(f"  セッションステータス: {conv.status}")
+		
+		# セッション再開
+		print("\n[TEST] セッション再開...")
+		ds.resume_session(session_id)
+		assert session_id in ds.sessions  # メモリに復元されている
+		conv = ds.conversations[session_id]
+		assert conv.status == ChatStatus.active  # active状態に戻っている
+		print(f"[SUCCESS] セッション再開: {session_id}")
+		print(f"  セッションステータス: {conv.status}")
+		print(f"  最終アクセス時刻: {conv.last_accessed}")
+		
+		return True
+	except Exception as e:
+		print(f"[ERROR] テストエラー: {e}")
+		import traceback
+		traceback.print_exc()
+		return False
 
 def test_last_accessed_update():
-    """最終アクセス時刻更新のテスト"""
-    print("\n" + "=" * 60)
-    print("  最終アクセス時刻更新テスト")
-    print("=" * 60)
-    
-    try:
-        from backend.api.datastore import DataStore
-        from backend.api.models import Personal
-        import time
-        
-        # DataStore初期化
-        ds = DataStore()
-        
-        # テストユーザー作成
-        print("\n[TEST] ユーザー作成...")
-        user_id = "test_access_user_001"
-        personal = Personal(name="Access User", gender="female", age=30)
-        user = ds.create_user(user_id, personal)
-        
-        # セッション作成
-        print("\n[TEST] セッション作成...")
-        session_id = ds.create_session(user_id)
-        conv = ds.conversations[session_id]
-        initial_time = conv.last_accessed
-        print(f"[SUCCESS] セッション作成: {session_id}")
-        print(f"  初期アクセス時刻: {initial_time}")
-        
-        # 少し待つ
-        time.sleep(1)
-        
-        # 履歴更新
-        print("\n[TEST] 履歴更新...")
-        ds.update_history(session_id, [{"role": "user", "content": "test"}])
-        conv = ds.conversations[session_id]
-        updated_time = conv.last_accessed
-        print(f"[SUCCESS] 履歴更新")
-        print(f"  更新後アクセス時刻: {updated_time}")
-        
-        # 最終アクセス時刻が更新されているか確認
-        assert updated_time > initial_time
-        print(f"[SUCCESS] 最終アクセス時刻が更新されました")
-        print(f"  時間差: {(updated_time - initial_time).total_seconds()}秒")
-        
-        return True
-    except Exception as e:
-        print(f"[ERROR] テストエラー: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+	"""最終アクセス時刻更新のテスト"""
+	print("\n" + "=" * 60)
+	print("  最終アクセス時刻更新テスト")
+	print("=" * 60)
+	
+	try:
+		from backend.api.datastore import DataStore
+		from backend.api.models import Personal
+		import time
+		
+		# DataStore初期化
+		ds = DataStore()
+		
+		# テストユーザー作成
+		print("\n[TEST] ユーザー作成...")
+		user_id = "test_access_user_001"
+		personal = Personal(name="Access User", gender="female", age=30)
+		user = ds.create_user(user_id, personal)
+		
+		# セッション作成
+		print("\n[TEST] セッション作成...")
+		session_id = ds.create_session(user_id)
+		conv = ds.conversations[session_id]
+		initial_time = conv.last_accessed
+		print(f"[SUCCESS] セッション作成: {session_id}")
+		print(f"  初期アクセス時刻: {initial_time}")
+		
+		# 少し待つ
+		time.sleep(1)
+		
+		# 履歴更新
+		print("\n[TEST] 履歴更新...")
+		ds.update_history(session_id, [{"role": "user", "content": "test"}])
+		conv = ds.conversations[session_id]
+		updated_time = conv.last_accessed
+		print(f"[SUCCESS] 履歴更新")
+		print(f"  更新後アクセス時刻: {updated_time}")
+		
+		# 最終アクセス時刻が更新されているか確認
+		assert updated_time > initial_time
+		print(f"[SUCCESS] 最終アクセス時刻が更新されました")
+		print(f"  時間差: {(updated_time - initial_time).total_seconds()}秒")
+		
+		return True
+	except Exception as e:
+		print(f"[ERROR] テストエラー: {e}")
+		import traceback
+		traceback.print_exc()
+		return False
 
 def test_timeout_settings():
-    """タイムアウト設定のテスト"""
-    print("\n" + "=" * 60)
-    print("  タイムアウト設定テスト")
-    print("=" * 60)
-    
-    try:
-        from backend.api.datastore import SESSION_TIMEOUT
-        
-        print("\n[TEST] タイムアウト設定確認...")
-        print(f"[SUCCESS] SESSION_TIMEOUT: {SESSION_TIMEOUT}秒")
-        print(f"  = {SESSION_TIMEOUT // 60}分")
-        
-        assert SESSION_TIMEOUT > 0
-        print(f"[SUCCESS] タイムアウト時間が正しく設定されています")
-        
-        return True
-    except Exception as e:
-        print(f"[ERROR] テストエラー: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+	"""タイムアウト設定のテスト"""
+	print("\n" + "=" * 60)
+	print("  タイムアウト設定テスト")
+	print("=" * 60)
+	
+	try:
+		from backend.api.datastore import SESSION_TIMEOUT
+		
+		print("\n[TEST] タイムアウト設定確認...")
+		print(f"[SUCCESS] SESSION_TIMEOUT: {SESSION_TIMEOUT}秒")
+		print(f"  = {SESSION_TIMEOUT // 60}分")
+		
+		assert SESSION_TIMEOUT > 0
+		print(f"[SUCCESS] タイムアウト時間が正しく設定されています")
+		
+		return True
+	except Exception as e:
+		print(f"[ERROR] テストエラー: {e}")
+		import traceback
+		traceback.print_exc()
+		return False
 
 def main():
-    """メインテスト"""
-    print("\n" + "🚀" * 30)
-    print("  セッションタイムアウト機能テスト開始")
-    print("🚀" * 30)
-    
-    results = []
-    
-    # テスト実行
-    results.append(("タイムアウト設定テスト", test_timeout_settings()))
-    results.append(("最終アクセス時刻更新テスト", test_last_accessed_update()))
-    results.append(("セッションタイムアウトテスト", test_session_timeout()))
-    
-    # 結果サマリー
-    print("\n" + "=" * 60)
-    print("  テスト結果サマリー")
-    print("=" * 60)
-    
-    passed = sum(1 for _, result in results if result)
-    total = len(results)
-    
-    for name, result in results:
-        status = "[PASS]" if result else "[FAIL]"
-        print(f"{status} {name}")
-    
-    print("\n" + "=" * 60)
-    print(f"  合計: {passed}/{total} テスト成功")
-    print("=" * 60)
-    
-    if passed == total:
-        print("\n" + "🎉" * 30)
-        print("  すべてのテストが成功しました！")
-        print("🎉" * 30)
-        return 0
-    else:
-        print("\n" + "❌" * 30)
-        print(f"  {total - passed}個のテストが失敗しました")
-        print("❌" * 30)
-        return 1
+	"""メインテスト"""
+	print("\n" + "🚀" * 30)
+	print("  セッションタイムアウト機能テスト開始")
+	print("🚀" * 30)
+	
+	results = []
+	
+	# テスト実行
+	results.append(("タイムアウト設定テスト", test_timeout_settings()))
+	results.append(("最終アクセス時刻更新テスト", test_last_accessed_update()))
+	results.append(("セッションタイムアウトテスト", test_session_timeout()))
+	
+	# 結果サマリー
+	print("\n" + "=" * 60)
+	print("  テスト結果サマリー")
+	print("=" * 60)
+	
+	passed = sum(1 for _, result in results if result)
+	total = len(results)
+	
+	for name, result in results:
+		status = "[PASS]" if result else "[FAIL]"
+		print(f"{status} {name}")
+	
+	print("\n" + "=" * 60)
+	print(f"  合計: {passed}/{total} テスト成功")
+	print("=" * 60)
+	
+	if passed == total:
+		print("\n" + "🎉" * 30)
+		print("  すべてのテストが成功しました！")
+		print("🎉" * 30)
+		return 0
+	else:
+		print("\n" + "❌" * 30)
+		print(f"  {total - passed}個のテストが失敗しました")
+		print("❌" * 30)
+		return 1
 
 if __name__ == "__main__":
-    sys.exit(main())
+	sys.exit(main())
