@@ -20,7 +20,6 @@ class UserStatus(str, Enum):
 class ChatRequest(BaseModel):
     message: str
     session_id: str = None
-    user_id: str = None
 
 class ChatResponse(BaseModel):
     response: str

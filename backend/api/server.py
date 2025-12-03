@@ -1,13 +1,22 @@
 # FastAPI Server for LiVraria
 
+from dotenv import load_dotenv
 import logging
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import os
 import uvicorn
 from pathlib import Path
 
 from .models import ChatRequest, ChatResponse, Personal
 from .datastore import DataStore
 from .gemini import gemini_chat
+
+# firebase import
+import firebase_admin
+from firebase_admin import credentials, auth
+
+load_dotenv()
 
 # ロガー設定
 logger = logging.getLogger("uvicorn.error")
@@ -17,6 +26,16 @@ app = FastAPI()
 
 # ファイルパス
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+
+# Firebase test
+FIREBASE_ACCOUNT_KEY_PATH = Path(__file__).resolve().parent / os.getenv("FIREBASE_ACCOUNT_KEY_PATH")
+
+try:
+    cred = credentials.Certificate(FIREBASE_ACCOUNT_KEY_PATH)
+    firebase_admin.initialize_app(cred)
+    logger.info("[SUCCESS] Firebase initialized successfully")
+except Exception as e:
+    logger.error(f"[ERROR] Firebase initialization failed: {e}")
 
 
 class Server:
