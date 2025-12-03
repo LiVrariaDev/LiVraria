@@ -264,3 +264,39 @@ Raspberry Pi環境での安定稼働を実現するため、以下のデプロ�
 * 通信の切り替え: WebSocketの唯一の目的は、ハードウェアレベルで取得したNFC IDを、サンドボックス化されたブラウザ環境へ安全に受け渡すことである。クライアントがこのIDを受信した後、WebSocket接続はその役割を終えたため切断される。以降の認証プロセスやチャット通信は、メインのバックエンドサーバーへの標準的かつセキュアなHTTPSクライアントサーバーモデルに準拠する。
 
 本仕様書で概説したアーキテクチャ、認証フロー、データモデル、そして非同期処理の設計は、AI司書「LiVraria」がユーザーにこれまでにない書籍との出会いを提供するというミッションを達成するための技術的な礎である。この設計に基づき、堅牢でインテリジェントなシステムを構築できることを確信している。
+
+7. セキュリティ強化：認証チェックの実装
+
+データアクセスエンドポイントにおけるセキュリティを強化するため、以下の認証チェックを実装した。
+
+7.1. 認証パラメータの必須化
+
+すべてのデータアクセスエンドポイント（`/sessions`, `/chat/default`, `/chat/librarian`, `/close_session`）において、`user_id`と`session_id`の両方を必須パラメータとした。これにより、`session_id`のみでデータにアクセスできる脆弱性を排除する。
+
+**実装例:**
+```python
+if user_id is None or session_id is None:
+    raise HTTPException(status_code=400, detail="User ID and Session ID are required")
+```
+
+7.2. 情報漏洩の防止
+
+認証に失敗した場合、`403 Forbidden`ではなく`404 Not Found`を返すことで、セッションの存在を第三者に漏らさないようにした。これは、攻撃者がセッションIDの有効性を確認することを防ぐためのセキュリティ対策である。
+
+**実装例:**
+```python
+# user_idとsession_idの組み合わせをチェック（403を避けて404を返す）
+if not self.data_store.has_user_session(user_id, session_id):
+    raise HTTPException(status_code=404, detail="Session not found")
+```
+
+7.3. 対象エンドポイント
+
+以下のエンドポイントで認証チェックを強化した:
+
+* `GET /sessions` - セッション情報取得
+* `POST /chat/default` - デフォルトプロンプトでチャット
+* `POST /chat/librarian` - 司書プロンプトでチャット
+* `POST /close_session` - セッション終了
+
+これらの実装により、ユーザーのプライバシーとデータの安全性を確保する。
