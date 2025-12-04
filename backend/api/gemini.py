@@ -1,6 +1,7 @@
 # Standard Library
 import os
 import pprint
+from pathlib import Path
 # Third Party
 from google import genai
 from google.genai import types
@@ -9,7 +10,9 @@ from dotenv import load_dotenv
 from backend.search.cinii_search import search_books
 # 実行する際は、ProjectRootで`python -m backend.api.gemini`
 
-load_dotenv()
+# .envをLiVrariaルートから読み込む
+env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 search_books_declaration = {
 	"name": "search_books",

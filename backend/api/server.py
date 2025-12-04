@@ -16,7 +16,9 @@ from .gemini import gemini_chat
 import firebase_admin
 from firebase_admin import credentials, auth
 
-load_dotenv()
+# .envをLiVrariaルートから読み込む
+env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 # ロガー設定
 logger = logging.getLogger("uvicorn.error")
