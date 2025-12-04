@@ -1,14 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from dotenv import load_dotenv
-from pathlib import Path
+import backend
 import os
 import requests
-
-# .envをLiVrariaルートから読み込む
-env_path = Path(__file__).resolve().parent.parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
 
 import pprint
 

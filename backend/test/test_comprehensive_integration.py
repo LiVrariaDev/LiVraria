@@ -18,31 +18,20 @@ from firebase_admin import credentials, auth
 BASE_URL = "http://localhost:8000"
 
 # Firebase初期化
-from dotenv import load_dotenv
+from backend import FIREBASE_ACCOUNT_KEY_PATH, CONVERSATIONS_FILE, USERS_FILE
 
-# .envをLiVrariaルートから読み込む
-env_path = Path(__file__).resolve().parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
-
-FIREBASE_KEY_PATH_ENV = os.getenv("FIREBASE_ACCOUNT_KEY_PATH", "firebase-key.json")
-FIREBASE_KEY_PATH = Path(__file__).resolve().parent.parent / "api" / FIREBASE_KEY_PATH_ENV
-
-# データファイルパス
-DATA_DIR = Path(__file__).resolve().parent.parent / "api" / "data"
-CONVERSATIONS_FILE = DATA_DIR / "conversations.json"
-USERS_FILE = DATA_DIR / "users.json"
 
 def init_firebase():
 	"""Firebase Admin SDKを初期化"""
-	if not FIREBASE_KEY_PATH.exists():
-		print(f"❌ Firebase key file not found: {FIREBASE_KEY_PATH}")
+	if not FIREBASE_ACCOUNT_KEY_PATH.exists():
+		print(f"❌ Firebase key file not found: {FIREBASE_ACCOUNT_KEY_PATH}")
 		return False
 	
 	try:
 		firebase_admin.get_app()
 		print("✅ Firebase already initialized")
 	except ValueError:
-		cred = credentials.Certificate(str(FIREBASE_KEY_PATH))
+		cred = credentials.Certificate(str(FIREBASE_ACCOUNT_KEY_PATH))
 		firebase_admin.initialize_app(cred)
 		print("✅ Firebase initialized")
 	

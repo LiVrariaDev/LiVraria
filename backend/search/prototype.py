@@ -1,3 +1,4 @@
+import backend
 import os
 import re
 import requests
@@ -5,9 +6,6 @@ import urllib.parse
 import pprint
 
 import google.generativeai as genai
-from dotenv import load_dotenv
-
-load_dotenv()
 
 def extract_keywords(article : str) -> list[str]:
     genai.configure(api_key=os.getenv("GEMINI_API_KEY"))

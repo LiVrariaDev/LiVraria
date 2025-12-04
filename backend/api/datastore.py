@@ -17,12 +17,8 @@ from .gemini import gemini_chat
 # ロガー設定
 logger = logging.getLogger("uvicorn.error")
 
-# ファイルパス
-PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
-DATA_DIR = Path(__file__).resolve().parent / "data"
-USERS_FILE = DATA_DIR / "users.json"
-CONV_FILE = DATA_DIR / "conversations.json"
-NFC_USERS_FILE = DATA_DIR / "nfc_users.json"
+# ファイルパス (DBへ移行するため, 一時的なもの. 本番はENVへまとめる)
+from backend import PROMPTS_DIR, DATA_DIR, USERS_FILE, CONVERSATIONS_FILE, NFC_USERS_FILE, PROMPT_SUMMARY, PROMPT_AI_INSIGHT
 
 # セッションタイムアウト時間（秒）
 SESSION_TIMEOUT = int(os.getenv("SESSION_TIMEOUT", "1800"))  # デフォルト30分
@@ -49,8 +45,8 @@ class DataStore:
 		"""
 		# conversationsファイルを読み込み
 		all_conversations = {}
-		if CONV_FILE.exists():
-			with open(CONV_FILE, "r", encoding="utf-8") as f:
+		if CONVERSATIONS_FILE.exists():
+			with open(CONVERSATIONS_FILE, "r", encoding="utf-8") as f:
 				try:
 					all_conversations = json.load(f)
 				except Exception:
@@ -121,7 +117,7 @@ class DataStore:
 		with open(USERS_FILE, 'w', encoding='utf-8') as f:
 			json.dump([v.model_dump(by_alias=True) for v in self.users.values()], f, indent=2, default=str, ensure_ascii=False)
 		
-		with open(CONV_FILE, 'w', encoding='utf-8') as f:
+		with open(CONVERSATIONS_FILE, 'w', encoding='utf-8') as f:
 			json.dump({k: v.model_dump(by_alias=True) for k, v in self.conversations.items()}, f, indent=2, default=str, ensure_ascii=False)
 		
 		# nfc_users.jsonへの保存
@@ -449,7 +445,7 @@ class DataStore:
 			
 			# summaryを生成
 			try:
-				summary_path = PROMPTS_DIR / "summary.md"
+				summary_path = PROMPT_SUMMARY
 				if summary_path.exists():
 					logger.info("[INFO] [BackgroundTask] Generating summary...")
 					# ユーザーの ai_insights を要約の文脈として渡す
@@ -479,7 +475,7 @@ class DataStore:
 			if user_id and user_id in self.users and conv.summary:
 				user = self.users[user_id]
 				try:
-					ai_insight_path = PROMPTS_DIR / "ai_insight.md"
+					ai_insight_path = PROMPT_AI_INSIGHT
 					if ai_insight_path.exists():
 						logger.info("[INFO] [BackgroundTask] Updating ai_insights...")
 						# 既存の ai_insights を取得

@@ -2,7 +2,7 @@
   "a22026e2-4420-4dd1-8736-8e5a5517a967": {
     "_id": "a22026e2-4420-4dd1-8736-8e5a5517a967",
     "user_id": "test_comprehensive_1764837650",
-    "status": "pause",
+    "status": "active",
     "messages": [
       {
         "role": "user",
@@ -14,6 +14,6 @@
       }
     ],
     "summary": null,
-    "last_accessed": "2025-12-04 17:40:53.357692"
+    "last_accessed": "2025-12-05 01:42:56.402361"
   }
 }

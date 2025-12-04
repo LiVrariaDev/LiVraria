@@ -1,12 +1,10 @@
+import backend
 import os
 import pprint
 import json
 
 from google import genai
 from google.genai import types
-from dotenv import load_dotenv
-
-load_dotenv()
 
 # 本検索用関数, 現在はダミー実装
 def search_books(keywords: list [str]) -> list:
