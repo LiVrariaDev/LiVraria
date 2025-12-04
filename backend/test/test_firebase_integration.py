@@ -19,8 +19,8 @@ BASE_URL = "http://localhost:8000"
 # Firebase初期化
 from dotenv import load_dotenv
 
-# .envはtestの親ディレクトリ（backend）にある
-env_path = Path(__file__).resolve().parent.parent / "api" / ".env"
+# .envをLiVrariaルートから読み込む
+env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
 FIREBASE_KEY_PATH_ENV = os.getenv("FIREBASE_ACCOUNT_KEY_PATH", "firebase-key.json")
