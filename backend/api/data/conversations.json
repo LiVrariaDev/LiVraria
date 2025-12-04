@@ -1,19 +1,51 @@
 {
-  "a22026e2-4420-4dd1-8736-8e5a5517a967": {
-    "_id": "a22026e2-4420-4dd1-8736-8e5a5517a967",
-    "user_id": "test_comprehensive_1764837650",
-    "status": "active",
+  "f847bf59-8adc-4a72-992e-db0993798504": {
+    "_id": "f847bf59-8adc-4a72-992e-db0993798504",
+    "user_id": "test_comprehensive_1764873088",
+    "status": "closed",
     "messages": [
       {
         "role": "user",
-        "content": "こんにちは、図書館司書さん"
+        "content": "parts=None role='user'"
       },
       {
         "role": "model",
-        "content": "こんにちは！いらっしゃいませ。今日は何かお探しですか？\n"
+        "content": "parts=None role='model'"
+      },
+      {
+        "role": "user",
+        "content": "parts=None role='user'"
+      },
+      {
+        "role": "model",
+        "content": "parts=None role='model'"
+      },
+      {
+        "role": "user",
+        "content": "parts=None role='user'"
+      },
+      {
+        "role": "model",
+        "content": "parts=None role='model'"
+      },
+      {
+        "role": "user",
+        "content": "ありがとうございます"
+      },
+      {
+        "role": "model",
+        "content": "どういたしまして。何かお手伝いできることはありますか？最近、何か面白い本に出会いましたか？もし何か読みたい気分でしたら、お気軽にお声かけくださいね。\n"
+      },
+      {
+        "role": "user",
+        "content": "その本を読んでみます"
+      },
+      {
+        "role": "model",
+        "content": "どんな本に興味がありますか？最近話題の本、それとも何か特定のジャンルにご興味がありますか？もし何かありましたら教えていただけると、おすすめしやすいです。\n"
       }
     ],
-    "summary": null,
-    "last_accessed": "2025-12-05 01:42:56.402361"
+    "summary": "概要: ユーザーが本を読むことに興味を示しており、おすすめの本を探している。\n\n主要ポイント:\n* ユーザーが本を読むことに興味を持っている。\n* ユーザーは具体的な本の希望をまだ示していない。\n\n次のアクション:\n* ユーザーに興味のあるジャンルや最近話題の本について尋ね、具体的なおすすめを提案する。\n",
+    "last_accessed": "2025-12-05 03:32:05.827561"
   }
 }

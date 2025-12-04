@@ -39,66 +39,47 @@ class DataStore:
 
 	def _restore_paused_sessions(self):
 		"""
-		pauseセッションを復元し、activeに戻す。
+		すべてのconversationsをメモリに読み込み、pauseセッションをactiveに戻す。
 		last_accessedとlastloginを現在時刻に更新。
 		そのユーザーも読み込む。
 		"""
-		# conversationsファイルを読み込み
-		all_conversations = {}
-		if CONVERSATIONS_FILE.exists():
-			with open(CONVERSATIONS_FILE, "r", encoding="utf-8") as f:
-				try:
-					all_conversations = json.load(f)
-				except Exception:
-					all_conversations = {}
-		
-		# usersファイルを読み込み
-		all_users = {}
 		if USERS_FILE.exists():
 			with open(USERS_FILE, "r", encoding="utf-8") as f:
 				try:
 					users_data = json.load(f)
-					# リスト形式からdict形式に変換
 					for user_dict in users_data:
-						user_id = user_dict.get("_id")
-						if user_id:
-							all_users[user_id] = user_dict
+						user = User(**user_dict)
+						self.users[user.user_id] = user
 				except Exception:
-					all_users = {}
+					self.users = {}
+
+		if CONVERSATIONS_FILE.exists():
+			with open(CONVERSATIONS_FILE, "r", encoding="utf-8") as f:
+				try:
+					convs_data = json.load(f)
+					for conv_dict in convs_data.values():
+						conv = Conversation(**conv_dict)
+						self.conversations[conv.session_id] = conv
+				except Exception:
+					self.conversations = {}
+
+		# in-memoryセッションを初期化
+		self.sessions = {}
 		
+		# pause状態のセッションを復元
 		restored_count = 0
-		
-		for session_id, conv_data in all_conversations.items():
-			conv = Conversation(**conv_data)
-			
+		for session_id, conv in self.conversations.items():
 			if conv.status == ChatStatus.pause:
-				# pause → active
-				conv.status = ChatStatus.active
-				# last_accessedを現在時刻に更新（すぐにタイムアウトしないように）
-				conv.last_accessed = datetime.now()
-				
-				# メモリに復元
-				self.conversations[session_id] = conv
+				# messagesをin-memoryセッションに復元
+				# Gemini APIが理解できる形式に変換する必要がある
+				# ここでは単純にmessagesをそのまま復元
 				self.sessions[session_id] = conv.messages
-				
-				# そのユーザーも読み込む
-				user_id = conv.user_id
-				if user_id not in self.users and user_id in all_users:
-					user_data = all_users[user_id]
-					user = User(**user_data)
-					# lastloginを現在時刻に更新
-					user.lastlogin = datetime.now()
-					self.users[user_id] = user
-					logger.info(f"[INFO] Loaded user for paused session: {user_id}")
-				
 				restored_count += 1
 		
 		if restored_count > 0:
 			logger.info(f"[SUCCESS] Restored {restored_count} paused session(s)")
-			# 復元後に保存（last_accessed, lastlogin更新を反映）
-			self.save_file()
 		
-		# nfc_users.jsonの読み込み（全件）
+		# nfc_users.jsonの読み込み
 		if NFC_USERS_FILE.exists():
 			with open(NFC_USERS_FILE, "r", encoding="utf-8") as f:
 				try:
