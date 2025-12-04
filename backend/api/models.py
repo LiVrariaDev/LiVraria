@@ -36,11 +36,7 @@ class NfcUser(BaseModel):
 
 class BookData(BaseModel):
 	isbn: str = Field(alias="_id", description="ISBN")
-	title: str
-	ncid: Optional[str] = Field(None, description="NCID")
-	author: Optional[str] = None
-	publisher: Optional[str] = None
-	pub_date: Optional[str] = None
+	title: str = Field(description="Book title")
 
 class RecommendationLogEntry(BaseModel):
 	reason: str = Field(description="Reason for recommendation")
