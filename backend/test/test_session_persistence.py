@@ -164,17 +164,18 @@ def main():
 	print_section("4. サーバー再起動")
 	print("⚠️ サーバーを再起動してください:")
 	print("   1. サーバーのターミナルで Ctrl+C を押す")
-	print("   2. shutdown イベントでセッションが保存されることを確認")
+	print("   2. shutdown イベントで active セッションが pause に変更されることを確認")
 	print("   3. 再度 'uvicorn backend.api.server:app --reload' で起動")
-	print("   4. 起動ログで pause セッションが復元されることを確認")
+	print("   4. 起動ログで pause セッションが active に復元されることを確認")
 	print("   5. Enter キーを押してテストを続行")
 	input("\nサーバーを再起動したら Enter キーを押してください...")
+
 	
 	# 5. conversations.json確認
 	print_section("5. conversations.json確認")
 	status = check_conversations_json(session_id)
 	if status == "pause":
-		print_result(True, "セッションが pause 状態で保存されています")
+		print_result(True, "セッションが pause 状態で保存されています（サーバー停止時）")
 	else:
 		print_result(False, f"セッションのステータスが pause ではありません: {status}")
 	

@@ -253,8 +253,8 @@ class Server:
 
 
 	async def chat_prompt(self, request: ChatRequest, prompt_file: str, user_id: str) -> ChatResponse:
-		# タイムアウトチェック
-		self.data_store.check_session_timeout()
+		# タイムアウトチェック（ユーザー単位）
+		self.data_store.check_user_timeout()
 		
 		# セッション確保
 		session_id = request.session_id
@@ -265,11 +265,6 @@ class Server:
 		else:
 			if not self.data_store.has_session(session_id):
 				raise HTTPException(status_code=404, detail="Session not found")
-			
-			# pause状態のセッションをactiveに戻す
-			conv = self.data_store.conversations.get(session_id)
-			if conv and conv.status == ChatStatus.pause:
-				self.data_store.resume_session(session_id)
 			
 			history = self.data_store.get_history(session_id)
 
@@ -295,5 +290,6 @@ data_store = DataStore()
 # Server を登録してルートを作成
 server = Server(app, data_store)
 
+# Run "uvicorn backend.api.server:app --reload" in LiVraria Root
 if __name__ == "__main__":
 	uvicorn.run(app, host="0.0.0.0", port=8000)

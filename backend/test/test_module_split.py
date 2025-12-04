@@ -186,8 +186,9 @@ def test_server_initialization():
 		print("\n[TEST] エンドポイントの確認...")
 		routes = [route.path for route in app.routes]
 		expected_routes = [
-			"/", "/users", "/sessions", 
-			"/chat/default", "/chat/librarian", "/close_session"
+			"/", "/users", "/users/{user_id}",
+			"/nfc/auth", "/nfc/register", "/nfc/unregister",
+			"/sessions/{session_id}", "/sessions/{session_id}/messages", "/sessions/{session_id}/close"
 		]
 		
 		for route in expected_routes:
