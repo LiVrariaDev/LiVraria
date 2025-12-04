@@ -11,7 +11,12 @@ LiVraria Backend Entry Point
 """
 import sys
 from pathlib import Path
-from backend import PROJECT_ROOT, DOTENV_ROOT
+
+# プロジェクトルートをPythonパスに追加（python backend/run.py で実行する場合に必要）
+project_root = Path(__file__).resolve().parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 import os
 
 # サーバーを起動
@@ -20,15 +25,16 @@ from backend.api.server import app
 
 if __name__ == "__main__":
     print(f"Starting LiVraria Backend Server...")
-    print(f"Project Root: {PROJECT_ROOT}")
-    print(f"ENV Path: {DOTENV_ROOT}")
-    print()
+    
+    # 環境変数から取得（デフォルト値付き）
+    host = os.getenv("BACKEND_HOST", "0.0.0.0")
+    port = int(os.getenv("BACKEND_PORT", "8000"))
     
     # Uvicornでサーバー起動（import string形式でreloadをサポート）
     uvicorn.run(
         "backend.api.server:app",  # import string形式
-        host=os.getenv("BACKEND_HOST"),
-        port=os.getenv("BACKEND_PORT"),
+        host=host,
+        port=port,
         reload=True,  # 開発時は自動リロード
         log_level="info"
     )

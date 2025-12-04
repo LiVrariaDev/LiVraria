@@ -54,8 +54,9 @@ pnpm install
 source venv/bin/activate
 
 # サーバー起動（推奨）
-python backend/run.py
+python -m backend.run
 ```
+backend/run.pyを実行すると、backend libraryが読み込めないので失敗する
 
 サーバーは `http://0.0.0.0:8000` で起動します（`.env`で変更可能）。
 
@@ -121,7 +122,7 @@ pytest backend/test/
 ### コード構成の原則
 - すべてのパス設定は`backend/__init__.py`に集約
 - 環境変数は`.env`で管理（`.env.template`を参照）
-- サーバー起動は`python backend/run.py`を使用
+- サーバー起動は`python -m backend.run`を使用
 - テストは`python -m backend.test.<test_name>`で実行
 
 ## 注意事項
