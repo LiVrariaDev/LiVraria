@@ -50,7 +50,7 @@ def search_books(keywords: list[str], pages: int = 1) -> list[dict]:
 			"著者/編者": author,
 			"出版社": publisher,
 			"出版年": pub_date,
-			"NCID": ncid,
+			"URL": ncid,
 			"ISBN": isbn
 		}
 		book_list.append(book_info)
