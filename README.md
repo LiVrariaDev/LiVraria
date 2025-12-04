@@ -44,8 +44,7 @@ pnpm install
 - Vite
 
 ### その他
-- cmake 3.16.3+（dlibのビルドに必要）
-- PostgreSQL 12.22+（将来的な移行用）
+- MongoDB (SQLは学習コストが高い！！！)
 
 ## サーバー起動
 
