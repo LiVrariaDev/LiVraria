@@ -31,52 +31,78 @@ SESSION_TIMEOUT = int(os.getenv("SESSION_TIMEOUT", "1800"))  # デフォルト30
 class DataStore:
 	def __init__(self):
 		DATA_DIR.mkdir(exist_ok=True)
-		self.users: Dict[str, User] = {}
-		self.conversations: Dict[str, Conversation] = {}
+		# メモリ上のデータ（最小限）
+		self.users: Dict[str, User] = {}  # pauseセッションのユーザーのみ
+		self.conversations: Dict[str, Conversation] = {}  # pauseのみ
 		# sessions は Gemini とやり取りする「history」をそのまま保持する辞書（メモリ上）
 		self.sessions: Dict[str, Any] = {}
-		# NFC認証用の辞書
+		# NFC認証用の辞書（全件）
 		self.nfc_users: Dict[str, NfcUser] = {}
-		self._load_from_files()
+		# pauseセッションとそのユーザーを復元
+		self._restore_paused_sessions()
 
-	def _load_from_files(self):
+	def _restore_paused_sessions(self):
+		"""
+		pauseセッションを復元し、activeに戻す。
+		last_accessedとlastloginを現在時刻に更新。
+		そのユーザーも読み込む。
+		"""
+		# conversationsファイルを読み込み
+		all_conversations = {}
+		if CONV_FILE.exists():
+			with open(CONV_FILE, "r", encoding="utf-8") as f:
+				try:
+					all_conversations = json.load(f)
+				except Exception:
+					all_conversations = {}
+		
+		# usersファイルを読み込み
+		all_users = {}
 		if USERS_FILE.exists():
 			with open(USERS_FILE, "r", encoding="utf-8") as f:
 				try:
 					users_data = json.load(f)
+					# リスト形式からdict形式に変換
 					for user_dict in users_data:
-						user = User(**user_dict)
-						self.users[user.user_id] = user
+						user_id = user_dict.get("_id")
+						if user_id:
+							all_users[user_id] = user_dict
 				except Exception:
-					self.users = {}
-
-		if CONV_FILE.exists():
-			with open(CONV_FILE, "r", encoding="utf-8") as f:
-				try:
-					convs_data = json.load(f)
-					for conv_dict in convs_data.values():
-						conv = Conversation(**conv_dict)
-						self.conversations[conv.session_id] = conv
-				except Exception:
-					self.conversations = {}
-
-		# in-memoryセッションを初期化
-		self.sessions = {}
+					all_users = {}
 		
-		# pause状態のセッションを復元
 		restored_count = 0
-		for session_id, conv in self.conversations.items():
+		
+		for session_id, conv_data in all_conversations.items():
+			conv = Conversation(**conv_data)
+			
 			if conv.status == ChatStatus.pause:
-				# messagesをin-memoryセッションに復元
-				# Gemini APIが理解できる形式に変換する必要がある
-				# ここでは単純にmessagesをそのまま復元
+				# pause → active
+				conv.status = ChatStatus.active
+				# last_accessedを現在時刻に更新（すぐにタイムアウトしないように）
+				conv.last_accessed = datetime.now()
+				
+				# メモリに復元
+				self.conversations[session_id] = conv
 				self.sessions[session_id] = conv.messages
+				
+				# そのユーザーも読み込む
+				user_id = conv.user_id
+				if user_id not in self.users and user_id in all_users:
+					user_data = all_users[user_id]
+					user = User(**user_data)
+					# lastloginを現在時刻に更新
+					user.lastlogin = datetime.now()
+					self.users[user_id] = user
+					logger.info(f"[INFO] Loaded user for paused session: {user_id}")
+				
 				restored_count += 1
 		
 		if restored_count > 0:
 			logger.info(f"[SUCCESS] Restored {restored_count} paused session(s)")
+			# 復元後に保存（last_accessed, lastlogin更新を反映）
+			self.save_file()
 		
-		# nfc_users.jsonの読み込み
+		# nfc_users.jsonの読み込み（全件）
 		if NFC_USERS_FILE.exists():
 			with open(NFC_USERS_FILE, "r", encoding="utf-8") as f:
 				try:
@@ -112,11 +138,45 @@ class DataStore:
 			})
 		return self.users[user_id]
 
+
 	def get_user(self, user_id: str) -> User:
-		if user_id not in self.users:
-			return None
-		else:
+		"""
+		ユーザーデータを取得する（遅延読み込み）。
+		既にメモリにある場合はそのまま返す。
+		ない場合はディスクから読み込む。
+		"""
+		if user_id in self.users:
+			# lastloginを更新
+			self.users[user_id].lastlogin = datetime.now()
 			return self.users[user_id]
+		
+		# ディスクから読み込み
+		if USERS_FILE.exists():
+			with open(USERS_FILE, "r", encoding="utf-8") as f:
+				try:
+					users_data = json.load(f)
+					# リスト形式からdict形式に変換
+					all_users = {}
+					for user_dict in users_data:
+						uid = user_dict.get("_id")
+						if uid:
+							all_users[uid] = user_dict
+					
+					if user_id in all_users:
+						user_data = all_users[user_id]
+						user = User(**user_data)
+						# lastloginを更新
+						user.lastlogin = datetime.now()
+						self.users[user_id] = user
+						logger.info(f"[INFO] Loaded user from disk: {user_id}")
+						# 更新を保存
+						self.save_file()
+						return user
+				except Exception as e:
+					logger.error(f"[ERROR] Failed to load user from disk: {e}")
+		
+		return None
+
 
 	def update_user(self, user_id: str, **kwargs) -> User:
 		"""
@@ -455,24 +515,39 @@ class DataStore:
 		except Exception as e:
 			logger.error(f"[ERROR] [BackgroundTask] Error: {e}", exc_info=True)
 	
-	def check_session_timeout(self) -> List[str]:
+	def check_user_timeout(self) -> List[str]:
 		"""
-		タイムアウトしたセッションをチェックし、pause状態で保存する。
+		非アクティブなユーザーのセッションをcloseする。
+		lastloginを基準に判定（SESSION_TIMEOUT秒）。
 		タイムアウトしたセッションIDのリストを返す。
 		"""
 		timeout_threshold = datetime.now() - timedelta(seconds=SESSION_TIMEOUT)
-		timed_out_sessions = []
+		closed_sessions = []
 		
-		for session_id in list(self.sessions.keys()):
-			conv = self.conversations.get(session_id)
-			if conv and conv.status == ChatStatus.active:
-				# 最終アクセス時刻がタイムアウト時間を超えているかチェック
-				if conv.last_accessed < timeout_threshold:
-					logger.info(f"[INFO] Session timeout: {session_id}")
-					self.pause_session(session_id)
-					timed_out_sessions.append(session_id)
+		for user_id, user in list(self.users.items()):
+			# lastloginがタイムアウトを超えている場合
+			if user.lastlogin < timeout_threshold:
+				# そのユーザーのアクティブセッションをすべてclose
+				for session_id, conv in list(self.conversations.items()):
+					if conv.user_id == user_id and conv.status == ChatStatus.active:
+						logger.info(f"[INFO] User timeout: {user_id}, closing session: {session_id}")
+						# active → closed
+						conv.status = ChatStatus.closed
+						# メモリから削除
+						if session_id in self.sessions:
+							del self.sessions[session_id]
+						closed_sessions.append(session_id)
+				
+				# ユーザーをメモリから削除
+				del self.users[user_id]
+				logger.info(f"[INFO] Unloaded inactive user: {user_id}")
 		
-		return timed_out_sessions
+		# 変更を保存
+		if closed_sessions:
+			self.save_file()
+		
+		return closed_sessions
+
 	
 	def resume_session(self, session_id: str) -> None:
 		"""

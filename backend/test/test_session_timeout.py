@@ -13,10 +13,10 @@ import time
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-def test_session_timeout():
-	"""セッションタイムアウトのテスト"""
+def test_user_timeout():
+	"""ユーザータイムアウトのテスト（ユーザー単位）"""
 	print("\n" + "=" * 60)
-	print("  セッションタイムアウトテスト")
+	print("  ユーザータイムアウトテスト")
 	print("=" * 60)
 	
 	try:
@@ -32,6 +32,7 @@ def test_session_timeout():
 		personal = Personal(name="Timeout User", gender="male", age=25)
 		user = ds.create_user(user_id, personal)
 		print(f"[SUCCESS] ユーザー作成: {user_id}")
+		print(f"  lastlogin: {user.lastlogin}")
 		
 		# セッション作成
 		print("\n[TEST] セッション作成...")
@@ -43,34 +44,26 @@ def test_session_timeout():
 		print(f"[SUCCESS] セッション作成: {session_id}")
 		print(f"  最終アクセス時刻: {conv.last_accessed}")
 		
-		# 最終アクセス時刻を古い時刻に設定（タイムアウトをシミュレート）
-		print("\n[TEST] 最終アクセス時刻を古い時刻に設定...")
+		# lastloginを古い時刻に設定（タイムアウトをシミュレート）
+		print("\n[TEST] lastloginを古い時刻に設定...")
 		old_time = datetime.now() - timedelta(seconds=SESSION_TIMEOUT + 100)
-		conv.last_accessed = old_time
+		user.lastlogin = old_time
 		print(f"  設定した時刻: {old_time}")
 		print(f"  タイムアウト閾値: {datetime.now() - timedelta(seconds=SESSION_TIMEOUT)}")
 		
-		# タイムアウトチェック
-		print("\n[TEST] タイムアウトチェック...")
-		timed_out = ds.check_session_timeout()
-		assert session_id in timed_out
+		# タイムアウトチェック（ユーザー単位）
+		print("\n[TEST] タイムアウトチェック（ユーザー単位）...")
+		closed_sessions = ds.check_user_timeout()
+		assert session_id in closed_sessions
 		assert session_id not in ds.sessions  # メモリから削除されている
-		assert session_id in ds.conversations  # 永続化されている
+		assert user_id not in ds.users  # ユーザーもメモリから削除されている
+		# conversationsには残っている（ディスクに保存）
+		assert session_id in ds.conversations
 		conv = ds.conversations[session_id]
-		assert conv.status == ChatStatus.pause  # pause状態になっている
-		print(f"[SUCCESS] セッションがタイムアウト: {session_id}")
-		print(f"  タイムアウトしたセッション数: {len(timed_out)}")
+		assert conv.status == ChatStatus.closed  # closed状態になっている
+		print(f"[SUCCESS] ユーザーがタイムアウト: {user_id}")
+		print(f"  クローズしたセッション数: {len(closed_sessions)}")
 		print(f"  セッションステータス: {conv.status}")
-		
-		# セッション再開
-		print("\n[TEST] セッション再開...")
-		ds.resume_session(session_id)
-		assert session_id in ds.sessions  # メモリに復元されている
-		conv = ds.conversations[session_id]
-		assert conv.status == ChatStatus.active  # active状態に戻っている
-		print(f"[SUCCESS] セッション再開: {session_id}")
-		print(f"  セッションステータス: {conv.status}")
-		print(f"  最終アクセス時刻: {conv.last_accessed}")
 		
 		return True
 	except Exception as e:
@@ -130,6 +123,52 @@ def test_last_accessed_update():
 		traceback.print_exc()
 		return False
 
+def test_lastlogin_update():
+	"""lastlogin更新のテスト"""
+	print("\n" + "=" * 60)
+	print("  lastlogin更新テスト")
+	print("=" * 60)
+	
+	try:
+		from backend.api.datastore import DataStore
+		from backend.api.models import Personal
+		import time
+		
+		# DataStore初期化
+		ds = DataStore()
+		
+		# テストユーザー作成
+		print("\n[TEST] ユーザー作成...")
+		user_id = "test_login_user_001"
+		personal = Personal(name="Login User", gender="female", age=30)
+		user = ds.create_user(user_id, personal)
+		initial_login = user.lastlogin
+		print(f"[SUCCESS] ユーザー作成: {user_id}")
+		print(f"  初期lastlogin: {initial_login}")
+		
+		# 少し待つ
+		time.sleep(1)
+		
+		# get_user()でlastloginが更新されることを確認
+		print("\n[TEST] get_user()でlastlogin更新...")
+		user = ds.get_user(user_id)
+		updated_login = user.lastlogin
+		print(f"[SUCCESS] get_user()実行")
+		print(f"  更新後lastlogin: {updated_login}")
+		
+		# lastloginが更新されているか確認
+		assert updated_login > initial_login
+		print(f"[SUCCESS] lastloginが更新されました")
+		print(f"  時間差: {(updated_login - initial_login).total_seconds()}秒")
+		
+		return True
+	except Exception as e:
+		print(f"[ERROR] テストエラー: {e}")
+		import traceback
+		traceback.print_exc()
+		return False
+
+
 def test_timeout_settings():
 	"""タイムアウト設定のテスト"""
 	print("\n" + "=" * 60)
@@ -156,15 +195,15 @@ def test_timeout_settings():
 def main():
 	"""メインテスト"""
 	print("\n" + "🚀" * 30)
-	print("  セッションタイムアウト機能テスト開始")
+	print("  ユーザータイムアウト機能テスト開始")
 	print("🚀" * 30)
 	
 	results = []
 	
 	# テスト実行
 	results.append(("タイムアウト設定テスト", test_timeout_settings()))
-	results.append(("最終アクセス時刻更新テスト", test_last_accessed_update()))
-	results.append(("セッションタイムアウトテスト", test_session_timeout()))
+	results.append(("lastlogin更新テスト", test_lastlogin_update()))
+	results.append(("ユーザータイムアウトテスト", test_user_timeout()))
 	
 	# 結果サマリー
 	print("\n" + "=" * 60)
