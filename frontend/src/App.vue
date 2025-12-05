@@ -25,8 +25,6 @@ let unsubscribe = null; // 監視を停止するための変数
 
 // コンポーネントがマウントされた時に実行
 onMounted(() => {
-  // onAuthStateChangedは、ログイン、ログアウト、またはページの初回読み込み時に
-  // ユーザーの認証状態をチェックするFirebaseの機能です
   unsubscribe = onAuthStateChanged(auth, (currentUser) => {
     user.value = currentUser; // ユーザー情報を更新
     isAuthReady.value = true; // 認証状態のチェックが完了したことを示す
@@ -35,7 +33,6 @@ onMounted(() => {
 
 // コンポーネントが破棄される時に実行
 onUnmounted(() => {
-  // メモリリークを防ぐために、onAuthStateChangedの監視を停止します
   if (unsubscribe) {
     unsubscribe();
   }
@@ -43,9 +40,6 @@ onUnmounted(() => {
 </script>
 
 <style>
-/* グローバルなスタイル（フォントなど）はここに残します。
-  MainApp.vue にもスタイルがありますが、Tailwindが重複を処理します。
-*/
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 body {
     font-family: 'Inter', 'Noto Sans JP', sans-serif;
