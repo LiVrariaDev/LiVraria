@@ -5,14 +5,11 @@ from pathlib import Path
 # Third Party
 from google import genai
 from google.genai import types
-from dotenv import load_dotenv
 # user-defined
+from backend import PROMPTS_DIR, PROMPT_DEBUG
 from backend.search.cinii_search import search_books
 # 実行する際は、ProjectRootで`python -m backend.api.gemini`
 
-# .envをLiVrariaルートから読み込む
-env_path = Path(__file__).resolve().parent.parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
 
 search_books_declaration = {
 	"name": "search_books",
@@ -182,9 +179,7 @@ if __name__ == "__main__":
 
 	print("Dry-run / debug for backend.api.gemini")
 
-	prompts_dir = Path(__file__).resolve().parent / "prompts"
-	default_prompt = prompts_dir / "debug.md"
-	print("PROMPTS_DIR:", prompts_dir)
+	default_prompt = PROMPT_DEBUG
 	print("default.md exists:", default_prompt.exists())
 
 	api_key = os.getenv("GEMINI_API_KEY")
