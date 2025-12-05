@@ -3,6 +3,7 @@
 from backend import PROMPTS_DIR, FIREBASE_ACCOUNT_KEY_PATH, DATA_DIR, USERS_FILE, CONVERSATIONS_FILE, NFC_USERS_FILE, PROMPT_DEFAULT, PROMPT_LIBRARIAN
 import logging
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
 import uvicorn
@@ -21,6 +22,20 @@ logger = logging.getLogger("uvicorn.error")
 
 # FastAPIアプリケーション
 app = FastAPI()
+
+# CORS設定（フロントエンドからのアクセスを許可）
+app.add_middleware(
+	CORSMiddleware,
+	allow_origins=[
+		"http://localhost:5173",  # Vite開発サーバー
+		"http://localhost:3000",  # 他の開発サーバー
+		"http://127.0.0.1:5173",
+		"http://127.0.0.1:3000",
+	],
+	allow_credentials=True,
+	allow_methods=["*"],
+	allow_headers=["*"],
+)
 
 # Firebase Auth
 try:
