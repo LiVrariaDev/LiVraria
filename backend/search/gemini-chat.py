@@ -1,3 +1,4 @@
+import backend
 import os
 import pprint
 from datetime import datetime
@@ -5,9 +6,6 @@ from mdutils.mdutils import MdUtils
 
 from google import genai
 from google.genai import types
-from dotenv import load_dotenv
-
-load_dotenv()
 
 safety_settings = [types.SafetySetting(
         category="HARM_CATEGORY_HATE_SPEECH",
