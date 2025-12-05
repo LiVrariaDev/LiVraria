@@ -11,20 +11,20 @@ PROJECT_ROOT = Path(DOTENV_ROOT).parent
 load_dotenv(dotenv_path=DOTENV_ROOT)
 
 # Directories
-PROMPTS_DIR = PROJECT_ROOT / os.getenv("PROMPTS_DIR")
-DATA_DIR = PROJECT_ROOT / os.getenv("DATA_DIR")
-FIREBASE_ACCOUNT_KEY_PATH = PROJECT_ROOT / os.getenv("FIREBASE_ACCOUNT_KEY_PATH")
+PROMPTS_DIR = Path(PROJECT_ROOT, os.getenv("PROMPTS_DIR"))
+DATA_DIR = Path(PROJECT_ROOT, os.getenv("DATA_DIR"))
+FIREBASE_ACCOUNT_KEY_PATH = Path(PROJECT_ROOT, os.getenv("FIREBASE_ACCOUNT_KEY_PATH"))
 
 # Data file path
-CONVERSATIONS_FILE = DATA_DIR / "conversations.json"
-USERS_FILE = DATA_DIR / "users.json"
-NFC_USERS_FILE = DATA_DIR / "nfc_users.json"
+CONVERSATIONS_FILE = Path(DATA_DIR, "conversations.json")
+USERS_FILE = Path(DATA_DIR, "users.json")
+NFC_USERS_FILE = Path(DATA_DIR, "nfc_users.json")
 
 # Prompt file paths
-PROMPT_DEFAULT = PROMPTS_DIR / os.getenv("PROMPT_DEFAULT", "default.md")
-PROMPT_LIBRARIAN = PROMPTS_DIR / os.getenv("PROMPT_LIBRARIAN", "librarian.md")
-PROMPT_SUMMARY = PROMPTS_DIR / os.getenv("PROMPT_SUMMARY", "summary.md")
-PROMPT_AI_INSIGHT = PROMPTS_DIR / os.getenv("PROMPT_AI_INSIGHT", "ai_insight.md")
-PROMPT_DEBUG = PROMPTS_DIR / os.getenv("PROMPT_DEBUG", "debug.md")
+PROMPT_DEFAULT = Path(PROMPTS_DIR, os.getenv("PROMPT_DEFAULT", "default.md"))
+PROMPT_LIBRARIAN = Path(PROMPTS_DIR, os.getenv("PROMPT_LIBRARIAN", "librarian.md"))
+PROMPT_SUMMARY = Path(PROMPTS_DIR, os.getenv("PROMPT_SUMMARY", "summary.md"))
+PROMPT_AI_INSIGHT = Path(PROMPTS_DIR, os.getenv("PROMPT_AI_INSIGHT", "ai_insight.md"))
+PROMPT_DEBUG = Path(PROMPTS_DIR, os.getenv("PROMPT_DEBUG", "debug.md"))
 
 
