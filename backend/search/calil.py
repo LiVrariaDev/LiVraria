@@ -1,10 +1,7 @@
+import backend
 import os
 import requests
 import urllib.parse
-
-from dotenv import load_dotenv
-
-load_dotenv()
 
 LIBRARY_END_POINT = "https://api.calil.jp/library"
 BOOK_END_POINT = "https://api.calil.jp/check"

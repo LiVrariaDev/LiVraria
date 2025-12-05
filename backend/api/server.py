@@ -1,6 +1,6 @@
 # FastAPI Server for LiVraria
 
-from dotenv import load_dotenv
+from backend import PROMPTS_DIR, FIREBASE_ACCOUNT_KEY_PATH, DATA_DIR, USERS_FILE, CONVERSATIONS_FILE, NFC_USERS_FILE, PROMPT_DEFAULT, PROMPT_LIBRARIAN
 import logging
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -16,23 +16,13 @@ from .gemini import gemini_chat
 import firebase_admin
 from firebase_admin import credentials, auth
 
-# .envをLiVrariaルートから読み込む
-env_path = Path(__file__).resolve().parent.parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
-
 # ロガー設定
 logger = logging.getLogger("uvicorn.error")
 
 # FastAPIアプリケーション
 app = FastAPI()
 
-# ファイルパス
-PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
-
 # Firebase Auth
-FIREBASE_KEY_PATH_ENV = os.getenv("FIREBASE_ACCOUNT_KEY_PATH", "firebase-key.json")
-FIREBASE_ACCOUNT_KEY_PATH = Path(__file__).resolve().parent / FIREBASE_KEY_PATH_ENV
-
 try:
 	if FIREBASE_ACCOUNT_KEY_PATH.exists():
 		cred = credentials.Certificate(FIREBASE_ACCOUNT_KEY_PATH)
@@ -218,9 +208,9 @@ class Server:
 			
 			# モードに応じたプロンプトファイルを選択
 			if mode == "librarian":
-				prompt_path = PROMPTS_DIR / "librarian.md"
+				prompt_path = PROMPT_LIBRARIAN
 			else:
-				prompt_path = PROMPTS_DIR / "default.md"
+				prompt_path = PROMPT_DEFAULT
 			
 			if not prompt_path.exists():
 				raise HTTPException(status_code=500, detail=f"Prompt file not found")
