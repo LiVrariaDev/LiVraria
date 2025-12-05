@@ -12,7 +12,7 @@ from .models import (
 	ChatStatus, UserStatus, User, Conversation, 
 	Message, Personal, BookData, RecommendationLogEntry, NfcUser
 )
-from .gemini import gemini_chat
+from .gemini import gemini_chat, gemini_summary
 
 # ロガー設定
 logger = logging.getLogger("uvicorn.error")
@@ -464,11 +464,10 @@ class DataStore:
 						content = msg.content if hasattr(msg, 'content') else msg.get('content', '')
 						conversation_text += f"{role}: {content}\n\n"
 					
-					# gemini_chat を使って要約を生成（履歴は空、会話内容はメッセージとして渡す）
-					summary_text, _ = gemini_chat(str(summary_path), conversation_text, [], ai_insight=user_insight)
-					conv.summary = summary_text
+					# gemini_summary を使って要約を生成（summary専用関数）
+					conv.summary = gemini_summary(str(summary_path), conversation_text, ai_insight=user_insight)
 					self.conversations[session_id] = conv
-					logger.info(f"[SUCCESS] [BackgroundTask] Summary generated: {len(summary_text)} characters")
+					logger.info(f"[SUCCESS] [BackgroundTask] Summary generated: {len(conv.summary)} characters")
 				else:
 					logger.warning(f"[WARNING] [BackgroundTask] summary.md not found: {summary_path}")
 			except Exception as e:
@@ -497,21 +496,18 @@ class DataStore:
 {conv.summary}
 ```
 """
-						# gemini_chat を使って新しい ai_insights を生成
-						new_insights, _ = gemini_chat(str(ai_insight_path), message, [], ai_insight=None)
-						
-						# ユーザーの ai_insights を更新
-						user.ai_insights = new_insights
-						logger.info(f"[SUCCESS] [BackgroundTask] ai_insights updated: {len(new_insights)} characters")
+						# gemini_summary を使って新しい ai_insights を生成（ai_insightはNone）
+						user.ai_insights = gemini_summary(str(ai_insight_path), message, ai_insight=None)
+						logger.info(f"[SUCCESS] [BackgroundTask] ai_insights updated: {len(user.ai_insights)} characters")
 					else:
 						logger.warning(f"[WARNING] [BackgroundTask] ai_insight.md not found: {ai_insight_path}")
 				except Exception as e:
 					logger.error(f"[ERROR] [BackgroundTask] ai_insights update failed: {e}", exc_info=True)
-			
-			# 永続化
-			logger.info("[INFO] [BackgroundTask] Saving data...")
-			self.save_file()
-			logger.info(f"[SUCCESS] [BackgroundTask] Completed: session_id={session_id}")
+				
+				# 永続化
+				logger.info("[INFO] [BackgroundTask] Saving data...")
+				self.save_file()
+				logger.info(f"[SUCCESS] [BackgroundTask] Completed: session_id={session_id}")
 		except Exception as e:
 			logger.error(f"[ERROR] [BackgroundTask] Error: {e}", exc_info=True)
 	
