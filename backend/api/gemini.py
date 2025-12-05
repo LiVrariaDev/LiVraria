@@ -37,6 +37,20 @@ search_books_declaration = {
 	},
 }
 
+safety_settings = [types.SafetySetting(
+	category="HARM_CATEGORY_HATE_SPEECH",
+	threshold="BLOCK_ONLY_HIGH"
+), types.SafetySetting(
+	category="HARM_CATEGORY_DANGEROUS_CONTENT",
+	threshold="BLOCK_ONLY_HIGH"
+), types.SafetySetting(
+	category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+	threshold="BLOCK_ONLY_HIGH"
+), types.SafetySetting(
+	category="HARM_CATEGORY_HARASSMENT",
+	threshold="BLOCK_ONLY_HIGH"
+)]
+
 def load_prompt_text(filepath):
 	with open(filepath, "r", encoding="utf-8") as f:
 		return f.read()
@@ -52,21 +66,6 @@ def gemini_chat(prompt_file: str = None, message: str = "", history: list = None
 	if history is None:
 		history = []
 	
-	# モデルのセーフティー設定
-	safety_settings = [types.SafetySetting(
-		category="HARM_CATEGORY_HATE_SPEECH",
-		threshold="BLOCK_ONLY_HIGH"
-	), types.SafetySetting(
-		category="HARM_CATEGORY_DANGEROUS_CONTENT",
-		threshold="BLOCK_ONLY_HIGH"
-	), types.SafetySetting(
-		category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
-		threshold="BLOCK_ONLY_HIGH"
-	), types.SafetySetting(
-		category="HARM_CATEGORY_HARASSMENT",
-		threshold="BLOCK_ONLY_HIGH"
-	)]
-
 	tools = types.Tool(function_declarations=[search_books_declaration])
 
 	client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -82,7 +81,7 @@ def gemini_chat(prompt_file: str = None, message: str = "", history: list = None
 	)
 
 	chat = client.chats.create(
-		model="gemini-2.0-flash",
+		model="gemini-2.5-flash-lite",
 		config=configs,
 		history=history
 	)
@@ -131,7 +130,51 @@ def gemini_chat(prompt_file: str = None, message: str = "", history: list = None
 	new_history = chat.get_history()
 
 	return response_text, new_history
-# end def
+
+def gemini_summary(prompt_file: str = None, message: str = "", ai_insight: str = None):
+	# プロンプト読込 (markdownを推奨)
+	prompt = load_prompt_text(prompt_file)
+	# ai_insight が与えられている場合はプロンプトに追記してモデルが文脈として使えるようにする
+	if ai_insight:
+		# 明示的にユーザー情報であることを示すセクションを追加
+		prompt += "\n\n---\nユーザー情報 (ai_insights):\n"
+		prompt += ai_insight
+	
+	# モデルのセーフティー設定
+	safety_settings = [types.SafetySetting(
+		category="HARM_CATEGORY_HATE_SPEECH",
+		threshold="BLOCK_ONLY_HIGH"
+	), types.SafetySetting(
+		category="HARM_CATEGORY_DANGEROUS_CONTENT",
+		threshold="BLOCK_ONLY_HIGH"
+	), types.SafetySetting(
+		category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+		threshold="BLOCK_ONLY_HIGH"
+	), types.SafetySetting(
+		category="HARM_CATEGORY_HARASSMENT",
+		threshold="BLOCK_ONLY_HIGH"
+	)]
+
+	client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+	configs = types.GenerateContentConfig(
+		temperature=0.5,
+		top_p=0.95,
+		max_output_tokens=512,
+		response_modalities=["text"],
+		safety_settings=safety_settings,
+		system_instruction=[types.Part(text=prompt)], # システム指示でpromptを与える
+	)
+
+	chat = client.chats.create(
+		model="gemini-2.5-flash",
+		config=configs,
+		history=[]
+	)
+
+	response = chat.send_message(message)
+
+	return response.text
 
 if __name__ == "__main__":
 	import sys
