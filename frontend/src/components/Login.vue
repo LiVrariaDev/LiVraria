@@ -1,11 +1,9 @@
 <template>
   <div class="flex items-center justify-center min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
-    <!-- 背景の装飾（ぼやけた円） -->
     <div class="absolute top-20 left-20 w-72 h-72 bg-white rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
     <div class="absolute top-40 right-20 w-72 h-72 bg-yellow-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
     <div class="absolute -bottom-8 left-40 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
 
-    <!-- ログインカード -->
     <div class="relative w-full max-w-md p-8 space-y-8 bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl">
       <div class="text-center">
         <h2 class="text-4xl font-extrabold text-gray-900 tracking-tight">Livraria</h2>
@@ -53,6 +51,7 @@
 import { ref } from 'vue';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from '../firebaseConfig'; 
+import { api } from '../services/api'; // APIサービスをインポート
 
 const email = ref('');
 const password = ref('');
@@ -61,9 +60,30 @@ const errorMessage = ref('');
 const signUp = async () => {
   errorMessage.value = '';
   try {
-    await createUserWithEmailAndPassword(auth, email.value, password.value);
+    // 1. Firebaseでユーザー作成
+    const userCredential = await createUserWithEmailAndPassword(auth, email.value, password.value);
+    const user = userCredential.user;
+    
+    // 2. IDトークンを取得
+    const token = await user.getIdToken();
+
+    // 3. Pythonバックエンドにユーザー情報を登録
+    // 仮のデータとして、メールアドレスの@前の部分を名前に設定します
+    const tempName = email.value.split('@')[0];
+    const initialUserData = {
+        name: tempName,
+        gender: 'unknown',
+        age: 20, // デフォルト値
+        live_pref: 'unknown',
+        live_city: 'unknown'
+    };
+
+    await api.createUser(initialUserData, token);
+    console.log('Backend user registration successful');
+
   } catch (error) {
-    errorMessage.value = getFirebaseErrorMessage(error.code);
+    console.error('Registration error:', error);
+    errorMessage.value = getFirebaseErrorMessage(error.code) || '登録処理中にエラーが発生しました。';
   }
 };
 
@@ -89,7 +109,6 @@ const getFirebaseErrorMessage = (errorCode) => {
 </script>
 
 <style scoped>
-/* 背景のアニメーション定義 */
 @keyframes blob {
   0% { transform: translate(0px, 0px) scale(1); }
   33% { transform: translate(30px, -50px) scale(1.1); }
