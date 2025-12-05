@@ -1,48 +1,75 @@
 import backend
 import os
 import requests
+import time
 import urllib.parse
 
 LIBRARY_END_POINT = "https://api.calil.jp/library"
 BOOK_END_POINT = "https://api.calil.jp/check"
 
 
-# Search libraries close to geocode
-def search_libraries(geocode: str, limit: int = 1) -> list[dict]:
-    headers = {}
+# Search libraries close to pref
+def search_libraries(pref: str, limit: int = 1) -> list[dict]:
+	headers = {}
 
-    params = {
-        'appkey': os.getenv("CALIL_API_KEY"),
-        'geocode': geocode,
-        'format': 'json',
-        'limit': limit,
-        'callback': ''
-    }
+	params = {
+		'appkey': os.getenv("CALIL_API_KEY"),
+		'pref': pref,
+		'format': 'json',
+		'limit': limit,
+		'callback': ''
+	}
 
-    response = requests.get(BOOK_END_POINT, headers=headers, params=params)
-    json_data = response.json()
+	response = requests.get(LIBRARY_END_POINT, headers=headers, params=params)
+	json_data = response.json()
 
-    library_list = []
-
-    return library_list
+	return json_data
 
 # Search books by ISBN, and library systemid
-# Polling i
-def search_books(isbn: list[str], systemid: str) -> dict:
-    headers = {}
+def search_books(isbn: str, systemid: str) -> dict:
+	headers = {}
 
-    params = {
-        'appkey': os.getenv("CALIL_API_KEY"),
-        'isbn': isbn,
-        'systemid': systemid,
-        'format': 'json',
-        'callback': 'no'
-    }
+	params = {
+		'appkey': os.getenv("CALIL_API_KEY"),
+		'isbn': isbn,
+		'systemid': systemid,
+		'format': 'json',
+		'callback': 'no'
+	}
 
-    response = requests.get(BOOK_END_POINT, headers=headers, params=params)
-    json_data = response.json()
+	response = requests.get(BOOK_END_POINT, headers=headers, params=params)
+	json_data = response.json()
 
-    if isbn in json_data:
-        return json_data[isbn]
-    else:
-        return {}
+	while json_data.get('continue', False):
+		param = {
+			'appkey': os.getenv("CALIL_API_KEY"),
+			'session': json_data.get('session'),
+			'format': 'json',
+		}
+		time.sleep(2) # required more than 2 sec interval
+		response = requests.get(BOOK_END_POINT, headers=headers, params=param)
+		json_data = response.json()
+	
+	return json_data
+
+if __name__ == "__main__":
+	# Example usage
+	pref = "静岡県"
+	libraries = search_libraries(pref, limit=3)
+	pprint.pprint(libraries)
+
+	# isbn = "9784065197280"
+	# systemid = "tokyo"
+	# book_info = search_books(isbn, systemid)
+	# print("Book Info:", book_info)
+	while json_data.get('continue', False):
+		param = {
+			'appkey': os.getenv("CALIL_API_KEY"),
+			'session': json_data.get('session'),
+			'format': 'json',
+		}
+		time.sleep(2) # required more than 2 sec interval
+		response = requests.get(BOOK_END_POINT, headers=headers, params=param)
+		json_data = response.json()
+	
+	return json_data
