@@ -1,10 +1,6 @@
-// Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-// 認証機能（getAuth）をインポートします
 import { getAuth } from "firebase/auth";
 
-// Your web app's Firebase configuration
-// ユーザー様の情報をここに貼り付けました
 const firebaseConfig = {
   apiKey: "AIzaSyAEOI57naDp3zP4jFKLqhpHrV0EmD2Hzdc",
   authDomain: "livraria-ffae4.firebaseapp.com",
