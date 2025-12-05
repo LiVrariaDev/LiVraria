@@ -1,4 +1,3 @@
-// src/services/api.js
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
 export const api = {
@@ -12,12 +11,14 @@ export const api = {
      * @param {string} idToken - Firebase ID Token
      */
     async createUser(userData, idToken) {
-        const params = new URLSearchParams(userData)
-        const response = await fetch(`${API_BASE_URL}/users?${params}`, {
+        // 修正：URLパラメータではなく、JSONボディとして送信する
+        const response = await fetch(`${API_BASE_URL}/users`, {
             method: 'POST',
             headers: {
+                'Content-Type': 'application/json',
                 'Authorization': `Bearer ${idToken}`
-            }
+            },
+            body: JSON.stringify(userData)
         })
 
         if (!response.ok) throw new Error('Failed to create user')
@@ -66,24 +67,25 @@ export const api = {
     // ========================================
 
     /*
-     * メッセージ送信（新規セッションまたは既存セッション）
-     * @param {string|null} sessionId - セッションID（初回はnull）
+     * メッセージ送信
+     * @param {string|null} sessionId - セッションID
      * @param {string} message - メッセージ内容
      * @param {string} idToken - Firebase ID Token
-     * @param {string} mode - チャットモード（"default" or "librarian"）
+     * @param {string} mode - チャットモード
      */
     async sendMessage(sessionId, message, idToken, mode = 'default') {
         const url = sessionId
             ? `${API_BASE_URL}/sessions/${sessionId}/messages`
             : `${API_BASE_URL}/sessions/new/messages`
 
-        const params = new URLSearchParams({ message, mode })
-
-        const response = await fetch(`${url}?${params}`, {
+        // 修正：JSONボディとして送信する
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
+                'Content-Type': 'application/json',
                 'Authorization': `Bearer ${idToken}`
-            }
+            },
+            body: JSON.stringify({ message, mode })
         })
 
         if (!response.ok) throw new Error('Failed to send message')
@@ -92,9 +94,6 @@ export const api = {
 
     /*
      * セッション情報取得
-     * @param {string} sessionId - セッションID
-     * @param {string} userId - ユーザーID
-     * @param {string} idToken - Firebase ID Token
      */
     async getSession(sessionId, userId, idToken) {
         const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}?user_id=${userId}`, {
@@ -110,16 +109,19 @@ export const api = {
 
     /*
      * セッションクローズ
-     * @param {string} sessionId - セッションID
-     * @param {string} userId - ユーザーID
-     * @param {string} idToken - Firebase ID Token
      */
     async closeSession(sessionId, userId, idToken) {
-        const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/close?user_id=${userId}`, {
+        // 修正：user_id もJSONボディに入れるのが一般的ですが、
+        // バックエンドの仕様に合わせてURLパラメータのままにするか、ボディにするか判断が必要です。
+        // ここでは安全のためボディにも含める形（または両方）にしておきますが、
+        // 一般的にはPOSTならボディが推奨されます。
+        const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/close`, {
             method: 'POST',
             headers: {
+                'Content-Type': 'application/json',
                 'Authorization': `Bearer ${idToken}`
-            }
+            },
+            body: JSON.stringify({ user_id: userId })
         })
 
         if (!response.ok) throw new Error('Failed to close session')
@@ -132,9 +134,6 @@ export const api = {
 
     /*
      * NFC登録
-     * @param {string} nfcId - NFC ID
-     * @param {string} userId - ユーザーID
-     * @param {string} idToken - Firebase ID Token
      */
     async registerNfc(nfcId, userId, idToken) {
         const response = await fetch(`${API_BASE_URL}/nfc/register`, {
@@ -152,7 +151,6 @@ export const api = {
 
     /*
      * NFC認証
-     * @param {string} nfcId - NFC ID
      */
     async authenticateNfc(nfcId) {
         const response = await fetch(`${API_BASE_URL}/nfc/auth`, {
@@ -169,8 +167,6 @@ export const api = {
 
     /*
      * NFC登録解除
-     * @param {string} nfcId - NFC ID
-     * @param {string} idToken - Firebase ID Token
      */
     async unregisterNfc(nfcId, idToken) {
         const response = await fetch(`${API_BASE_URL}/nfc/unregister`, {
@@ -183,15 +179,6 @@ export const api = {
         })
 
         if (!response.ok) throw new Error('Failed to unregister NFC')
-        return response.json()
-    },
-
-    /*
-     * サーバーヘルスチェック
-     */
-    async healthCheck() {
-        const response = await fetch(`${API_BASE_URL}/`)
-        if (!response.ok) throw new Error('Server is not healthy')
         return response.json()
     }
 }
