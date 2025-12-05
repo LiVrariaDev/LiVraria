@@ -74,18 +74,17 @@ export const api = {
      * @param {string} mode - チャットモード
      */
     async sendMessage(sessionId, message, idToken, mode = 'default') {
-        const url = sessionId
-            ? `${API_BASE_URL}/sessions/${sessionId}/messages`
-            : `${API_BASE_URL}/sessions/new/messages`
+        // 新規セッションの場合はsession_id="new"を使用
+        const effectiveSessionId = sessionId || 'new'
+        const url = `${API_BASE_URL}/sessions/${effectiveSessionId}/messages?mode=${mode}`
 
-        // 修正：JSONボディとして送信する
         const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${idToken}`
             },
-            body: JSON.stringify({ message, mode })
+            body: JSON.stringify({ message })
         })
 
         if (!response.ok) throw new Error('Failed to send message')

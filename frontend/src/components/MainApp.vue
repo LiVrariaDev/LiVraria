@@ -314,7 +314,7 @@ const sendHomeMessage = async () => {
         
         if (data.session_id) currentSessionId.value = data.session_id;
         
-        const aiResponse = data.reply;
+        const aiResponse = data.response;
         homeConversationText.value = aiResponse;
         speakText(aiResponse);
         
@@ -347,7 +347,7 @@ const sendChatMessage = async () => {
         
         if (data.session_id) currentSessionId.value = data.session_id;
         
-        const aiResponse = data.reply;
+        const aiResponse = data.response;
         chatHistory.value.push({ sender: 'ai', text: aiResponse });
         speakText(aiResponse);
         
@@ -383,7 +383,7 @@ const askAboutBook = async () => {
         
         if (data.session_id) currentSessionId.value = data.session_id;
         
-        const aiResponse = data.reply;
+        const aiResponse = data.response;
         chatHistory.value.push({ sender: 'ai', text: aiResponse });
         speakText(aiResponse);
 

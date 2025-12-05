@@ -32,5 +32,21 @@
     ],
     "recommend_log": [],
     "lastlogin": "2025-12-05 03:32:06.842931"
+  },
+  {
+    "_id": "",
+    "ai_insights": "",
+    "personal": {
+      "name": "Comprehensive Test User",
+      "gender": "male",
+      "age": 18,
+      "live_pref": "京都府",
+      "live_city": "京都市"
+    },
+    "status": "logout",
+    "active_session": null,
+    "old_session": [],
+    "recommend_log": [],
+    "lastlogin": "2025-12-05 03:32:06.842931"
   }
 ]
