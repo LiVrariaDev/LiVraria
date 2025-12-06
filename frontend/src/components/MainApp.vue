@@ -1,7 +1,8 @@
 <template>
     <div class="w-screen h-screen font-sans text-gray-800 bg-gray-900">
 
-        <!-- ===== 診断用 ===== -->
+        <!-- ===== 診断用（画面には表示されませんが、裏で画像をチェックします） ===== -->
+        <!-- 画像の読み込みに成功したらコンソールに表示、失敗したらアラートを出します -->
         <img 
             src="/bg.jpg" 
             style="display: none;" 
@@ -11,8 +12,10 @@
 
         <!-- ===== ホームページ表示 ===== -->
         <div v-if="currentPage === 'home'" class="relative flex w-full h-full overflow-hidden">
+            <!-- 背景画像エリア -->
+            <!-- 直接 public フォルダのパスを指定します -->
             <div class="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700"
-                 :style="{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('/bg.jpg?v=1')` }">
+                 :style="{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('/bg.jpg')` }">
             </div>
 
             <!-- 左側: アバターと会話エリア -->
@@ -191,62 +194,39 @@
 import { ref, onMounted, nextTick, onUnmounted } from 'vue';
 import { signOut, getIdToken } from "firebase/auth";
 import { auth } from '../firebaseConfig';
+import { api } from '../services/api'; 
+
+// 修正：画像のimportを削除し、エラーを回避します
+// import bgImage from '../assets/bg.jpg';
 
 // --- 診断用関数 ---
 const handleImageError = () => {
-    alert("【画像読み込みエラー】\n publicフォルダに 'bg.jpg' が見つかりません。");
+    alert("【画像読み込みエラー】\n publicフォルダに 'bg.jpg' が見つかりません。\nファイル名が 'bg.jpg.jpg' になっていないか、\nフォルダが間違っていないか確認してください。");
 };
 const handleImageLoad = () => {
     console.log("画像の読み込みに成功しました！");
 };
 // ----------------
 
-// --- 音声合成の実装（強化版：女性ボイス固定） ---
+// --- 音声合成の実装（女性ボイス固定） ---
 const isSpeechEnabled = ref(true);
 const selectedVoice = ref(null);
 
-// 利用可能な声をロードし、女性らしい高品質な声を厳選する関数
 const loadVoices = () => {
     const voices = window.speechSynthesis.getVoices();
-    
     if (voices.length > 0) {
         const jaVoices = voices.filter(voice => voice.lang.includes('ja'));
-        
         if (jaVoices.length > 0) {
-            // 優先順位リスト（上から順に探します）
-            // Chrome: Google 日本語 (女性)
-            // Edge: Nanami (女性), Haruka (女性)
-            // macOS: Kyoko (女性), O-Ren (女性)
-            const priorityNames = [
-                'Google 日本語', 
-                'Microsoft Nanami', 
-                'Kyoko', 
-                'O-Ren',
-                'Microsoft Haruka' 
-            ];
-
+            const priorityNames = ['Google 日本語', 'Microsoft Nanami', 'Kyoko', 'O-Ren', 'Microsoft Haruka'];
             let bestVoice = null;
-
-            // 優先リストの中から最初に見つかった声を採用
             for (const name of priorityNames) {
                 bestVoice = jaVoices.find(v => v.name.includes(name));
                 if (bestVoice) break;
             }
-
-            // 見つからなければ、「Natural」が含まれる声（Edgeの高音質版など）を探す
-            if (!bestVoice) {
-                bestVoice = jaVoices.find(v => v.name.includes('Natural'));
-            }
-
-            // それでもなければ、最初の日本語音声を使用
             selectedVoice.value = bestVoice || jaVoices[0];
-            
-            console.log("選択された音声:", selectedVoice.value.name);
         }
     }
 };
-
-// 声のリスト変更イベントを監視
 window.speechSynthesis.onvoiceschanged = loadVoices;
 
 const toggleSpeech = () => {
@@ -258,38 +238,24 @@ const toggleSpeech = () => {
 
 const speakText = (text) => {
     if (!isSpeechEnabled.value) return;
-    if (!window.speechSynthesis) {
-        console.warn("このブラウザは音声合成をサポートしていません。");
-        return;
-    }
-
-    // 音声リストがまだロードされていない場合はロードを試みる
-    if (!selectedVoice.value) {
-        loadVoices();
-    }
+    if (!window.speechSynthesis) return;
+    if (!selectedVoice.value) loadVoices();
 
     const plainText = text.replace(/<[^>]+>/g, '');
     const utterance = new SpeechSynthesisUtterance(plainText);
-    
-    // 選択された声をセット（声がロードされていない場合はデフォルトになる）
-    if (selectedVoice.value) {
-        utterance.voice = selectedVoice.value;
-    }
-
+    if (selectedVoice.value) utterance.voice = selectedVoice.value;
     utterance.lang = 'ja-JP';
     utterance.rate = 1.0;
     utterance.pitch = 1.0; 
     utterance.volume = 1.0;
-
     window.speechSynthesis.speak(utterance);
 };
 // ---------------------
 
-// SVGアイコン
 const icons = {
     search: `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>`,
     chat: `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>`,
-    grid: `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>`,
+    grid: `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>`,
     star: `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>`
 };
 
@@ -298,6 +264,7 @@ const userInput = ref('');
 const isLoading = ref(false);
 const secondaryWindow = ref(null);
 const homeConversationText = ref('AI司書に接続中...');
+const currentSessionId = ref(null); 
 const mainButtons = ref([ 
     { id: 1, text: '書籍検索', action: 'search', icon: 'search' }, 
     { id: 2, text: '会話集中モード', action: 'focus_chat', icon: 'chat' }, 
@@ -306,8 +273,7 @@ const mainButtons = ref([
 ]);
 const utilityButtons = ref([ { id: 6, text: 'オプション', action: 'options' } ]); 
 const chatHistory = ref([ 
-    { sender: 'ai', text: 'こんにちは！ここでは、より詳しくお話を伺いながら、あなたにぴったりの本を探すお手伝いをします。' }, 
-    { sender: 'ai', text: '最近、何か心に残った出来事はありましたか？あるいは、今の気分を教えてください。' } 
+    { sender: 'ai', text: 'こんにちは！AI司書です。本日はどのようなご用件でしょうか？' }
 ]);
 const suggestedBooks = ref(Array.from({ length: 6 }, (_, i) => ({ id: i + 1, title: `未来の図書館 ${i + 1}`, cover: `https://placehold.co/150x220/3b82f6/ffffff?text=Book${i+1}` })));
 const selectedBook = ref(null);
@@ -333,49 +299,64 @@ const handleHomeButtonClick = (action) => {
 const sendHomeMessage = async () => {
     const user = auth.currentUser;
     if (!user) {
-        const msg = 'エラー：ログインしてください。';
-        homeConversationText.value = msg;
-        speakText(msg);
+        homeConversationText.value = 'エラー：ログインしてください。';
         return;
     }
+    const message = userInput.value;
+    userInput.value = '';
+    
+    isLoading.value = true;
+
     try {
         const token = await getIdToken(user);
-        console.log("Token:", token);
-        const response = `「${userInput.value}」ですね。<br>API連携後に応答します。`;
-        homeConversationText.value = response;
-        speakText(response);
-        userInput.value = '';
+        
+        const data = await api.sendMessage(currentSessionId.value, message, token, 'default');
+        
+        if (data.session_id) currentSessionId.value = data.session_id;
+        
+        const aiResponse = data.response;
+        homeConversationText.value = aiResponse;
+        speakText(aiResponse);
+        
     } catch (error) {
         console.error(error);
-        const msg = 'エラーが発生しました。';
-        homeConversationText.value = msg;
-        speakText(msg);
+        homeConversationText.value = 'エラーが発生しました。';
+        speakText('エラーが発生しました。');
+    } finally {
+        isLoading.value = false;
     }
 };
 
 const sendChatMessage = async () => {
     if (!userInput.value.trim()) return;
-    const userMessage = userInput.value;
-    chatHistory.value.push({ sender: 'user', text: userMessage });
-    userInput.value = '';
-    scrollToBottom();
-
+    
     const user = auth.currentUser;
     if (!user) return;
 
+    const message = userInput.value;
+    userInput.value = '';
+    
+    chatHistory.value.push({ sender: 'user', text: message });
+    scrollToBottom();
     isLoading.value = true;
+
     try {
         const token = await getIdToken(user);
-        console.log("Chat Token:", token);
-        setTimeout(() => {
-            const aiResponse = `「${userMessage}」についてですね。承知いたしました。`;
-            chatHistory.value.push({ sender: 'ai', text: aiResponse });
-            speakText(aiResponse);
-            isLoading.value = false;
-            scrollToBottom();
-        }, 1000);
+        
+        const data = await api.sendMessage(currentSessionId.value, message, token, 'default');
+        
+        if (data.session_id) currentSessionId.value = data.session_id;
+        
+        const aiResponse = data.response;
+        chatHistory.value.push({ sender: 'ai', text: aiResponse });
+        speakText(aiResponse);
+        
     } catch (error) {
+        console.error(error);
+        chatHistory.value.push({ sender: 'ai', text: 'エラーが発生しました。' });
+    } finally {
         isLoading.value = false;
+        scrollToBottom();
     }
 };
 
@@ -386,14 +367,33 @@ const selectBook = (bookId) => {
 const askAboutBook = async () => {
     if (!selectedBook.value) return;
     const question = `「${selectedBook.value.title}」について教えてください。`;
+    
     chatHistory.value.push({ sender: 'user', text: question });
     scrollToBottom();
-    setTimeout(() => {
-        const response = '詳細情報を取得しました。';
-        chatHistory.value.push({ sender: 'ai', text: response });
-        speakText(response);
+    
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    isLoading.value = true;
+
+    try {
+        const token = await getIdToken(user);
+        
+        const data = await api.sendMessage(currentSessionId.value, question, token, 'default');
+        
+        if (data.session_id) currentSessionId.value = data.session_id;
+        
+        const aiResponse = data.response;
+        chatHistory.value.push({ sender: 'ai', text: aiResponse });
+        speakText(aiResponse);
+
+    } catch (error) {
+        console.error(error);
+        chatHistory.value.push({ sender: 'ai', text: 'エラーが発生しました。' });
+    } finally {
+        isLoading.value = false;
         scrollToBottom();
-    }, 1000);
+    }
 };
 
 const scrollToBottom = async () => {
@@ -405,19 +405,19 @@ const logout = () => {
   signOut(auth).catch(error => console.error('Logout failed', error));
 };
 
-// 修正：挨拶時にも声がロードされているか確認して発話
 const fetchUserGreeting = async () => {
     const user = auth.currentUser;
-    if (!user) {
-        homeConversationText.value = 'こんにちは！';
-        return;
-    }
+    if (!user) return;
+    
     try {
-        const greeting = `ようこそ、${user.email}さん！<br>今日はどんな物語に触れたいですか？`;
+        const token = await getIdToken(user);
+        
+        const userData = await api.getUser(user.uid, token);
+        
+        const greeting = `ようこそ、${userData.name || user.email}さん！<br>今日はどんな本をお探しですか？`;
         homeConversationText.value = greeting;
         isLoading.value = false;
         
-        // 声のロードを待ってから発話（最大1秒待機）
         let attempts = 0;
         const speakGreeting = () => {
             if (selectedVoice.value || attempts > 10) {
@@ -430,6 +430,7 @@ const fetchUserGreeting = async () => {
         speakGreeting();
 
     } catch (error) {
+        console.error('挨拶情報の取得に失敗しました:', error);
         homeConversationText.value = '接続エラー';
         isLoading.value = false;
     }
@@ -486,7 +487,6 @@ onMounted(() => {
     openSecondaryDisplay();
     fetchUserGreeting();
     loadVoices();
-    // 一部のブラウザではvoiceschangedイベントが発火しないことがあるため、念のため手動でも試行
     setTimeout(loadVoices, 500);
 });
 

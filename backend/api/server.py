@@ -81,11 +81,10 @@ class Server:
 
 		# User Endpoints
 		@self.app.post("/users", status_code=201)
-		async def create_user(user_id: str = Depends(get_current_user_id), name: str = None, gender: str = None, age: int = None, live_pref: str = None, live_city: str = None):
+		async def create_user(personal: Personal, user_id: str = Depends(get_current_user_id)):
 			"""
 			ユーザーを作成する（RESTful）。
 			"""
-			personal = Personal(name=name, gender=gender, age=age, live_pref=live_pref, live_city=live_city)
 			user = self.data_store.create_user(user_id, personal)
 			return {"detail": "User created successfully", "user": user}
 		
@@ -213,14 +212,6 @@ class Server:
 			session_id="new"の場合は新規セッション作成。
 			mode: "default" または "librarian"
 			"""
-			# 新規セッション作成
-			if session_id == "new":
-				session_id = self.data_store.create_session(user_id)
-			else:
-				# 既存セッションの認証チェック
-				if not self.data_store.has_user_session(user_id, session_id):
-					raise HTTPException(status_code=404, detail="Session not found")
-			
 			# モードに応じたプロンプトファイルを選択
 			if mode == "librarian":
 				prompt_path = PROMPT_LIBRARIAN
@@ -230,8 +221,15 @@ class Server:
 			if not prompt_path.exists():
 				raise HTTPException(status_code=500, detail=f"Prompt file not found")
 			
-			# ChatRequestにsession_idを設定
-			request.session_id = session_id
+			# 新規セッション作成の場合
+			if session_id == "new":
+				request.session_id = None  # chat_promptで新規作成させる
+			else:
+				# 既存セッションの認証チェック
+				if not self.data_store.has_user_session(user_id, session_id):
+					raise HTTPException(status_code=404, detail="Session not found")
+				request.session_id = session_id
+			
 			return await self.chat_prompt(request, str(prompt_path), user_id)
 
 		@self.app.put("/sessions/{session_id}/close")
@@ -265,9 +263,11 @@ class Server:
 		
 		# セッション確保
 		session_id = request.session_id
-		if not session_id:
+		logger.info(f"[DEBUG] chat_prompt: request.session_id = {session_id}")
+		if session_id is None:
 			# user_id を渡して active_session を in-memory 更新する
 			session_id = self.data_store.create_session(user_id)
+			logger.info(f"[DEBUG] chat_prompt: created session_id = {session_id}")
 			history = []
 		else:
 			if not self.data_store.has_session(session_id):
@@ -287,7 +287,8 @@ class Server:
 
 		# メモリ上の履歴を更新（ディスク書き込みは close_session 時に行う）
 		self.data_store.update_history(session_id, new_history)
-
+		
+		logger.info(f"[DEBUG] chat_prompt returning session_id: {session_id}")
 		return ChatResponse(response=response_text, session_id=session_id)
 
 

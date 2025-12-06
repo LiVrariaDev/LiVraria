@@ -219,8 +219,11 @@ class DataStore:
 		新しいセッションをメモリ上に作成する。ユーザーIDが与えられれば
 		in-memory で User.active_session を更新する（永続化は close 時）。
 		"""
+		# ユーザーがメモリにない場合はロード
 		if user_id not in self.users:
-			return None
+			user = self.get_user(user_id)
+			if not user:
+				return None
 
 		session_id = str(uuid.uuid4())
 		conv = Conversation(**{"_id": session_id, "user_id": user_id, "messages": []})
