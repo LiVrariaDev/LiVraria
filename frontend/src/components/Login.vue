@@ -1,47 +1,107 @@
 <template>
-  <div class="flex items-center justify-center min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500">
-    <!-- 背景の装飾（ぼやけた円） -->
+  <div class="flex items-center justify-center min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 font-sans">
+    <!-- 背景装飾 -->
     <div class="absolute top-20 left-20 w-72 h-72 bg-white rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
     <div class="absolute top-40 right-20 w-72 h-72 bg-yellow-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
     <div class="absolute -bottom-8 left-40 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
 
-    <!-- ログインカード -->
-    <div class="relative w-full max-w-md p-8 space-y-8 bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl">
-      <div class="text-center">
+    <!-- カードコンテナ -->
+    <div class="relative w-full max-w-lg p-8 bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl transition-all duration-500">
+      
+      <!-- ヘッダー -->
+      <div class="text-center mb-8">
         <h2 class="text-4xl font-extrabold text-gray-900 tracking-tight">Livraria</h2>
-        <p class="mt-2 text-sm text-gray-600">AI司書との対話で、新しい本の世界へ</p>
+        <p class="mt-2 text-sm text-gray-600">
+          {{ isRegisterMode ? 'アカウントを作成して始める' : 'AI司書との対話へようこそ' }}
+        </p>
       </div>
       
-      <div v-if="errorMessage" class="p-4 text-sm text-red-700 bg-red-100 border-l-4 border-red-500 rounded" role="alert">
+      <!-- エラーメッセージ -->
+      <div v-if="errorMessage" class="mb-6 p-4 text-sm text-red-700 bg-red-100 border-l-4 border-red-500 rounded" role="alert">
         <p class="font-bold">エラー</p>
         <p>{{ errorMessage }}</p>
       </div>
 
-      <form class="space-y-6" @submit.prevent>
-        <div class="space-y-1">
-          <label for="email" class="block text-sm font-medium text-gray-700">メールアドレス</label>
-          <input v-model="email" id="email" type="email" required placeholder="name@example.com"
-                 class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none">
+      <!-- フォーム -->
+      <form @submit.prevent="handleSubmit" class="space-y-5">
+        
+        <!-- ログイン/登録 共通項目 -->
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
+            <input v-model="email" type="email" required placeholder="name@example.com"
+                   class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">パスワード</label>
+            <input v-model="password" type="password" required placeholder="••••••••"
+                   class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none">
+          </div>
         </div>
 
-        <div class="space-y-1">
-          <label for="password" class="block text-sm font-medium text-gray-700">パスワード</label>
-          <input v-model="password" id="password" type="password" required placeholder="••••••••"
-                 class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none">
+        <!-- 新規登録モードのみ表示する追加項目 -->
+        <div v-if="isRegisterMode" class="space-y-4 pt-2 animate-fade-in">
+          <div class="border-t border-gray-200 pt-4">
+            <p class="text-xs text-gray-500 mb-4 text-center">- プロフィール情報 -</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">お名前 (ニックネーム可)</label>
+            <input v-model="profile.name" type="text" required placeholder="例: 読書 太郎"
+                   class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none">
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">性別</label>
+              <select v-model="profile.gender" required class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none">
+                <option value="" disabled>選択してください</option>
+                <option value="male">男性</option>
+                <option value="female">女性</option>
+                <option value="other">その他</option>
+                <option value="none">回答しない</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">年齢</label>
+              <input v-model="profile.age" type="number" required min="0" max="120" placeholder="20"
+                     class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">お住まいの都道府県</label>
+              <select v-model="profile.live_pref" required class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none">
+                <option value="" disabled>選択</option>
+                <option v-for="pref in prefectures" :key="pref" :value="pref">{{ pref }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">市区町村 (任意)</label>
+              <input v-model="profile.live_city" type="text" placeholder="例: 千代田区"
+                     class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all outline-none">
+            </div>
+          </div>
         </div>
 
-        <div class="pt-4 flex flex-col space-y-4">
-          <button @click="signIn"
-                  class="w-full px-4 py-3 text-lg font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transform hover:-translate-y-0.5 transition-all duration-200 shadow-lg hover:shadow-indigo-500/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-            ログイン
+        <!-- アクションボタン -->
+        <div class="pt-6 flex flex-col space-y-4">
+          <button type="submit" 
+                  :disabled="isLoading"
+                  class="w-full px-4 py-3 text-lg font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transform hover:-translate-y-0.5 transition-all duration-200 shadow-lg hover:shadow-indigo-500/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+            <span v-if="isLoading">処理中...</span>
+            <span v-else>{{ isRegisterMode ? '登録してはじめる' : 'ログイン' }}</span>
           </button>
+          
           <div class="relative flex items-center justify-center">
-            <span class="absolute px-3 bg-white/90 text-gray-500 text-sm">または</span>
             <div class="w-full border-t border-gray-300"></div>
           </div>
-          <button @click="signUp"
-                  class="w-full px-4 py-3 text-lg font-bold text-indigo-700 bg-indigo-50 border-2 border-indigo-100 rounded-lg hover:bg-indigo-100 hover:border-indigo-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-            新規アカウント作成
+
+          <!-- モード切替ボタン -->
+          <button type="button" @click="toggleMode"
+                  class="text-sm text-indigo-600 hover:text-indigo-800 font-semibold focus:outline-none underline">
+            {{ isRegisterMode ? 'すでにアカウントをお持ちの方はログイン' : 'アカウントをお持ちでない方は新規登録' }}
           </button>
         </div>
       </form>
@@ -50,29 +110,110 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, reactive } from 'vue';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from '../firebaseConfig'; 
+import { api } from '../services/api'; 
 
-const email = ref('');
-const password = ref('');
+const isRegisterMode = ref(false); // ログイン/登録モード切替フラグ
+const isLoading = ref(false);
 const errorMessage = ref('');
 
-const signUp = async () => {
+// 認証情報
+const email = ref('');
+const password = ref('');
+
+// プロフィール情報（新規登録用）
+const profile = reactive({
+  name: '',
+  gender: '',
+  age: null,
+  live_pref: '',
+  live_city: ''
+});
+
+// 都道府県リスト
+const prefectures = [
+  "北海道","青森県","岩手県","宮城県","秋田県","山形県","福島県",
+  "茨城県","栃木県","群馬県","埼玉県","千葉県","東京都","神奈川県",
+  "新潟県","富山県","石川県","福井県","山梨県","長野県","岐阜県",
+  "静岡県","愛知県","三重県","滋賀県","京都府","大阪府","兵庫県",
+  "奈良県","和歌山県","鳥取県","島根県","岡山県","広島県","山口県",
+  "徳島県","香川県","愛媛県","高知県","福岡県","佐賀県","長崎県",
+  "熊本県","大分県","宮崎県","鹿児島県","沖縄県"
+];
+
+// モード切替処理
+const toggleMode = () => {
+  isRegisterMode.value = !isRegisterMode.value;
   errorMessage.value = '';
-  try {
-    await createUserWithEmailAndPassword(auth, email.value, password.value);
-  } catch (error) {
-    errorMessage.value = getFirebaseErrorMessage(error.code);
+  // フォームリセット等の処理が必要ならここに追加
+};
+
+// フォーム送信時の処理振り分け
+const handleSubmit = async () => {
+  if (isRegisterMode.value) {
+    await signUp();
+  } else {
+    await signIn();
   }
 };
 
+// 新規登録処理
+const signUp = async () => {
+  errorMessage.value = '';
+  isLoading.value = true;
+  
+  try {
+    // 1. Firebaseで認証ユーザー作成
+    const userCredential = await createUserWithEmailAndPassword(auth, email.value, password.value);
+    const user = userCredential.user;
+    
+    // 2. IDトークンを取得
+    const token = await user.getIdToken();
+
+    // 3. Pythonバックエンドにユーザー詳細情報を登録
+    // 入力されたプロフィール情報を使用
+    const userData = {
+        name: profile.name,
+        gender: profile.gender,
+        age: profile.age,
+        live_pref: profile.live_pref,
+        live_city: profile.live_city || 'unknown' // 任意項目は空ならunknown
+    };
+
+    console.log("バックエンドに送信するデータ:", userData);
+    
+    await api.createUser(userData, token);
+    console.log('ユーザー登録完了');
+    
+    // 成功するとApp.vueのリスナーが反応して画面遷移します
+
+  } catch (error) {
+    console.error('Registration error:', error);
+    // エラーハンドリング
+    if (error.message.includes('Failed to create user')) {
+        errorMessage.value = '認証には成功しましたが、プロフィールの保存に失敗しました。';
+        // 必要に応じてFirebaseユーザーを削除するロールバック処理などを検討
+    } else {
+        errorMessage.value = getFirebaseErrorMessage(error.code);
+    }
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+// ログイン処理
 const signIn = async () => {
   errorMessage.value = '';
+  isLoading.value = true;
   try {
     await signInWithEmailAndPassword(auth, email.value, password.value);
+    console.log('ログイン完了');
   } catch (error) {
     errorMessage.value = getFirebaseErrorMessage(error.code);
+  } finally {
+    isLoading.value = false;
   }
 };
 
@@ -83,13 +224,12 @@ const getFirebaseErrorMessage = (errorCode) => {
     case 'auth/wrong-password': return 'メールアドレスまたはパスワードが間違っています。';
     case 'auth/email-already-in-use': return 'このメールアドレスは既に使用されています。';
     case 'auth/weak-password': return 'パスワードは6文字以上で入力してください。';
-    default: return 'エラーが発生しました。もう一度お試しください。';
+    default: return `エラーが発生しました。(${errorCode})`;
   }
 };
 </script>
 
 <style scoped>
-/* 背景のアニメーション定義 */
 @keyframes blob {
   0% { transform: translate(0px, 0px) scale(1); }
   33% { transform: translate(30px, -50px) scale(1.1); }
@@ -104,5 +244,14 @@ const getFirebaseErrorMessage = (errorCode) => {
 }
 .animation-delay-4000 {
   animation-delay: 4s;
+}
+
+/* フェードインアニメーション */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
 }
 </style>
