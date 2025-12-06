@@ -4,9 +4,9 @@ import requests
 import time
 import urllib.parse
 
-LIBRARY_END_POINT = "https://api.calil.jp/library"
-BOOK_END_POINT = "https://api.calil.jp/check"
-
+# Calil API endpoints
+CALIL_LIBRARY_ENDPOINT = "https://api.calil.jp/library"
+CALIL_BOOK_ENDPOINT = "https://api.calil.jp/check"
 
 # Search libraries close to pref
 def search_libraries(pref: str, limit: int = 1) -> list[dict]:
@@ -20,7 +20,7 @@ def search_libraries(pref: str, limit: int = 1) -> list[dict]:
 		'callback': ''
 	}
 
-	response = requests.get(LIBRARY_END_POINT, headers=headers, params=params)
+	response = requests.get(CALIL_LIBRARY_ENDPOINT, headers=headers, params=params)
 	json_data = response.json()
 
 	return json_data
@@ -37,7 +37,7 @@ def search_books(isbn: str, systemid: str) -> dict:
 		'callback': 'no'
 	}
 
-	response = requests.get(BOOK_END_POINT, headers=headers, params=params)
+	response = requests.get(CALIL_BOOK_ENDPOINT, headers=headers, params=params)
 	json_data = response.json()
 
 	while json_data.get('continue', False):
@@ -47,7 +47,7 @@ def search_books(isbn: str, systemid: str) -> dict:
 			'format': 'json',
 		}
 		time.sleep(2) # required more than 2 sec interval
-		response = requests.get(BOOK_END_POINT, headers=headers, params=param)
+		response = requests.get(CALIL_BOOK_ENDPOINT, headers=headers, params=param)
 		json_data = response.json()
 	
 	return json_data
@@ -69,7 +69,7 @@ if __name__ == "__main__":
 			'format': 'json',
 		}
 		time.sleep(2) # required more than 2 sec interval
-		response = requests.get(BOOK_END_POINT, headers=headers, params=param)
+		response = requests.get(CALIL_BOOK_ENDPOINT, headers=headers, params=param)
 		json_data = response.json()
 	
 	return json_data
