@@ -1,52 +1,22 @@
 [
   {
-    "_id": "test_comprehensive_1764871978",
+    "_id": "otKLM9rs8bPAPhdrm3JBwPgyMUB2",
     "ai_insights": "",
     "personal": {
-      "name": "Comprehensive Test User",
-      "gender": "female",
-      "age": 28,
-      "live_pref": "大阪府",
-      "live_city": "大阪市"
-    },
-    "status": "chatting",
-    "active_session": "515e23b0-ca8b-4307-b135-9366b020f3a8",
-    "old_session": [],
-    "recommend_log": [],
-    "lastlogin": "2025-12-05 03:14:38.208256"
-  },
-  {
-    "_id": "test_comprehensive_1764873088",
-    "ai_insights": "```\n読書傾向:\n- 好きなジャンル: 情報不足\n- 好きな作家・著者: 情報不足\n- 避けたいジャンルやテーマ: 情報不足\n\n興味関心:\n- 現在興味を持っているトピック: 読書\n- 過去に興味を示したトピック: なし\n\n読書スタイル:\n- 好みの本の長さや難易度: 情報不足\n- 読書の目的: 情報不足\n\nその他の特徴:\n- おすすめの本を探している\n```",
-    "personal": {
-      "name": "Comprehensive Test User",
-      "gender": "female",
-      "age": 28,
-      "live_pref": "京都府",
-      "live_city": "京都市"
-    },
-    "status": "logout",
-    "active_session": null,
-    "old_session": [
-      "f847bf59-8adc-4a72-992e-db0993798504"
-    ],
-    "recommend_log": [],
-    "lastlogin": "2025-12-05 03:32:06.842931"
-  },
-  {
-    "_id": "",
-    "ai_insights": "",
-    "personal": {
-      "name": "Comprehensive Test User",
+      "name": "amber",
       "gender": "male",
       "age": 18,
-      "live_pref": "京都府",
-      "live_city": "京都市"
+      "live_pref": "静岡県",
+      "live_city": "unknown"
     },
-    "status": "logout",
-    "active_session": null,
-    "old_session": [],
+    "status": "chatting",
+    "active_session": "f19bd428-671b-45cb-99ec-11b4c3617379",
+    "old_session": [
+      "7abaa235-a636-4255-ac08-e864d44e9846",
+      "5913efd4-9460-4fb8-bd85-b0268b260d6c",
+      "08da48b3-51bb-4996-afa3-b81959822987"
+    ],
     "recommend_log": [],
-    "lastlogin": "2025-12-05 03:32:06.842931"
+    "lastlogin": "2025-12-05 16:17:03.891251"
   }
 ]
