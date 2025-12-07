@@ -7,27 +7,58 @@ from google import genai
 from google.genai import types
 # user-defined
 from backend import PROMPTS_DIR, PROMPT_DEBUG
-from backend.search.cinii_search import search_books
+from backend.search.google_books import google_search_books
 # 実行する際は、ProjectRootで`python -m backend.api.gemini`
+
+def search_books(keywords: list[list[str]], count: int = 4) -> list[dict]:
+	integrated_results = {
+		"search_result": []
+	}
+	seen_ids = set()
+	for i, item in enumerate(keywords):
+		books = google_search_books(item, count)
+		current_context_result = {
+			"context_query": ", ".join(item),
+			"books": []
+		}
+
+		for j, book in enumerate(books):
+			book_id = book.get("isbn")
+			if book_id not in seen_ids:
+				seen_ids.add(book_id)
+				index = {
+					"index": i*100 + j
+				}
+				book.update(index)
+				current_context_result["books"].append(book)
+
+		if current_context_result["books"]:
+			integrated_results["search_result"].append(current_context_result)
+
+	return integrated_results
+
 
 
 search_books_declaration = {
 	"name": "search_books",
-	"description": "CiNii APIを用いて、指定されたキーワードで書籍や資料を検索し、タイトル、著者、出版社、出版年などの情報を取得します。キーワードはAND検索されます。",
+	"description": "Google Books APIを用いて、指定されたキーワードで書籍や資料を検索し、タイトル、著者、出版社、出版年などの情報を取得します。",
 	"parameters": {
 		"type": "object",
 		"properties": {
 			"keywords": {
 				"type": "array",
 				"items": {
-					"type": "string"
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
 				},
-				"description": "検索に使用するキーワードのリスト。例: ['Python', '機械学習'] これらのキーワードはAND検索されます。"
+				"description": "検索クエリのリスト。各内部リストのキーワードはAND検索され、それぞれの検索結果を統合して返します。例: [['Python', '機械学習'], ['Python', '人工知能']] → 'Python AND 機械学習'と'Python AND 人工知能'の両方を検索して結果を統合"
 			},
-			"pages": {
+			"count": {
 				"type": "integer",
-				"description": "検索結果のページ番号。結果をページ送りにしたい場合に使用します。デフォルトは1です。",
-				"default": 1
+				"description": "検索結果の数。デフォルトは4です。",
+				"default": 4
 			},
 		},
 		"required": ["keywords"],
@@ -122,7 +153,8 @@ def gemini_chat(prompt_file: str = None, message: str = "", history: list = None
 			final_response = chat.send_message([function_response_part])
 			response_text = final_response.text
 	else:
-		response_text = response.text
+		response_text = re.sub(r'<thought>.*?</thought>', '', response.text, flags=re.DOTALL).strip()
+		
 
 	new_history = chat.get_history()
 
@@ -174,36 +206,8 @@ def gemini_summary(prompt_file: str = None, message: str = "", ai_insight: str =
 	return response.text
 
 if __name__ == "__main__":
-	import sys
-	from pathlib import Path
+	import json
+	test_query_sets = [["ミステリー", "傑作"], ["感動", "泣ける"]]
 
-	print("Dry-run / debug for backend.api.gemini")
-
-	default_prompt = PROMPT_DEBUG
-	print("default.md exists:", default_prompt.exists())
-
-	api_key = os.getenv("GEMINI_API_KEY")
-	if not api_key:
-		print("GEMINI_API_KEY not set — skipping live API call. Set env var to run full test.")
-		sys.exit(0)
-
-	# 簡易テスト入力
-	sample_message = "おすすめのPython入門書を教えてください。"
-	history = []
-
-	try:
-		print("Calling gemini_chat with prompt:", default_prompt)
-		response_text, new_history = gemini_chat(str(default_prompt), sample_message, history)
-		print("=== Response ===")
-		print(response_text)
-		print("=== New history (len) ===", len(new_history))
-		pprint.pprint(new_history[:4])
-	except Exception as e:
-		print("Exception during gemini_chat:")
-		import traceback
-		traceback.print_exc()
-		sys.exit(1)
-
-	print("Debug finished.")
-	sys.exit(0)
-# ...existing code...
+	data = search_books(test_query_sets)
+	pprint.pprint(data)
