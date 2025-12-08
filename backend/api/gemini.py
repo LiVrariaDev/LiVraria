@@ -42,7 +42,7 @@ def search_books(keywords: list[list[str]], count: int = 4) -> list[dict]:
 
 search_books_declaration = {
 	"name": "search_books",
-	"description": "Google Books APIを用いて、指定されたキーワードで書籍や資料を検索し、タイトル、著者、出版社、出版年などの情報を取得します。",
+	"description": "Rakuten Books APIを用いて、指定されたキーワードで書籍や資料を検索し、タイトル、著者、出版社、出版年、レビュー、レビュー数、ジャンルなどの情報を取得します。",
 	"parameters": {
 		"type": "object",
 		"properties": {
@@ -79,6 +79,56 @@ safety_settings = [types.SafetySetting(
 	category="HARM_CATEGORY_HARASSMENT",
 	threshold="BLOCK_ONLY_HIGH"
 )]
+
+def remove_markdown_formatting(text: str) -> str:
+	"""
+	Markdown記号を除去してプレーンテキストに変換
+	
+	Args:
+		text: Markdown形式のテキスト
+		
+	Returns:
+		プレーンテキスト
+	"""
+	if not text:
+		return text
+	
+	# コードブロックを除去（```で囲まれた部分）
+	text = re.sub(r'```[a-z]*\n.*?\n```', '', text, flags=re.DOTALL)
+	
+	# インラインコードを除去（`で囲まれた部分）
+	text = re.sub(r'`([^`]+)`', r'\1', text)
+	
+	# 太字を除去（**または__で囲まれた部分）
+	text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+	text = re.sub(r'__([^_]+)__', r'\1', text)
+	
+	# イタリックを除去（*または_で囲まれた部分）
+	text = re.sub(r'\*([^*]+)\*', r'\1', text)
+	text = re.sub(r'_([^_]+)_', r'\1', text)
+	
+	# 見出し記号を除去（#で始まる行）
+	text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
+	
+	# リンクを除去（[テキスト](URL)形式）
+	text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+	
+	# リストマーカーを除去（-、*、+で始まる行）
+	text = re.sub(r'^[\-\*\+]\s+', '', text, flags=re.MULTILINE)
+	
+	# 番号付きリストマーカーを除去（1.で始まる行）
+	text = re.sub(r'^\d+\.\s+', '', text, flags=re.MULTILINE)
+	
+	# 引用記号を除去（>で始まる行）
+	text = re.sub(r'^>\s+', '', text, flags=re.MULTILINE)
+	
+	# 水平線を除去（---または***）
+	text = re.sub(r'^[\-\*]{3,}$', '', text, flags=re.MULTILINE)
+	
+	# 余分な空行を削除
+	text = re.sub(r'\n{3,}', '\n\n', text)
+	
+	return text.strip()
 
 def load_prompt_text(filepath):
 	with open(filepath, "r", encoding="utf-8") as f:
@@ -152,9 +202,10 @@ def gemini_chat(prompt_file: str = None, message: str = "", history: list = None
 			)
  
 			final_response = chat.send_message([function_response_part])
-			response_text = final_response.text
+			response_text = remove_markdown_formatting(final_response.text)
 	else:
 		response_text = re.sub(r'<thought>.*?</thought>', '', response.text, flags=re.DOTALL).strip()
+		response_text = remove_markdown_formatting(response_text)
 		
 
 	new_history = chat.get_history()
@@ -204,7 +255,8 @@ def gemini_summary(prompt_file: str = None, message: str = "", ai_insight: str =
 
 	response = chat.send_message(message)
 
-	return response.text
+	response_text = remove_markdown_formatting(response.text)
+	return response_text
 
 if __name__ == "__main__":
 	import json
