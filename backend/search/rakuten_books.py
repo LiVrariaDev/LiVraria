@@ -13,6 +13,8 @@ RAKUTEN_BOOK_GENRE_FLATLIST = Path(PROJECT_ROOT, "backend", "search", "rakuten_b
 RAKUTEN_BOOK_GENRE_TREELIST = Path(PROJECT_ROOT, "backend", "search", "rakuten_books_genre", "rakuten_genres_hierarchy.json")
 
 def genreid_to_genre(genre_id: str) -> str:
+    genre_id = genre_id[0:-3]
+
     with open(RAKUTEN_BOOK_GENRE_FLATLIST, "r") as f:
         genre_list = json.load(f)
         for genre in genre_list:
@@ -82,11 +84,11 @@ def rakuten_search_info(isbn: str) -> dict:
     category = item.get("booksGenreId")  # ジャンルID
     review = item.get("reviewAverage")  # レビュー平均
     review_count = item.get("reviewCount")  # レビュー数
-    thumbnail_url = item.get("largeImageUrl")  # 画像URL
+    thumbnail_url = item.get("mediumImageUrl")  # 画像URL
     preview_url = item.get("itemUrl")  # 商品ページURL
     
     info_data = {
-        "category": category,
+        "category": genreid_to_genre(category),
         "review": review,
         "review_count": review_count,
         "thumbnail_url": thumbnail_url,
@@ -96,6 +98,6 @@ def rakuten_search_info(isbn: str) -> dict:
     return info_data
 
 if __name__ == "__main__":
-    books = rakuten_search_books(["鬼滅の刃"])
+    books = rakuten_search_info("9784088807232")
     pprint.pprint(books)
     

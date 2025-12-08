@@ -2,12 +2,13 @@
 import os
 import pprint
 from pathlib import Path
+import re
 # Third Party
 from google import genai
 from google.genai import types
 # user-defined
 from backend import PROMPTS_DIR, PROMPT_DEBUG
-from backend.search.google_books import google_search_books
+from backend.search.rakuten_books import rakuten_search_books
 # 実行する際は、ProjectRootで`python -m backend.api.gemini`
 
 def search_books(keywords: list[list[str]], count: int = 4) -> list[dict]:
@@ -16,7 +17,7 @@ def search_books(keywords: list[list[str]], count: int = 4) -> list[dict]:
 	}
 	seen_ids = set()
 	for i, item in enumerate(keywords):
-		books = google_search_books(item, count)
+		books = rakuten_search_books(item, count)
 		current_context_result = {
 			"context_query": ", ".join(item),
 			"books": []
