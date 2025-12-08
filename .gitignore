@@ -1,5 +1,6 @@
 # Other
 *.jpg
+!frontend/public/*.jpg
 *-firebase-adminsdk-*.json
 
 # Chat history
