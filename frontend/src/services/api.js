@@ -109,18 +109,13 @@ export const api = {
     /*
      * セッションクローズ
      */
-    async closeSession(sessionId, userId, idToken) {
-        // 修正：user_id もJSONボディに入れるのが一般的ですが、
-        // バックエンドの仕様に合わせてURLパラメータのままにするか、ボディにするか判断が必要です。
-        // ここでは安全のためボディにも含める形（または両方）にしておきますが、
-        // 一般的にはPOSTならボディが推奨されます。
+    async closeSession(sessionId, idToken) {
         const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/close`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${idToken}`
-            },
-            body: JSON.stringify({ user_id: userId })
+            }
         })
 
         if (!response.ok) throw new Error('Failed to close session')
