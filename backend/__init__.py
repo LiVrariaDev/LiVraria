@@ -21,10 +21,18 @@ USERS_FILE = Path(DATA_DIR, "users.json")
 NFC_USERS_FILE = Path(DATA_DIR, "nfc_users.json")
 
 # Prompt file paths
-PROMPT_DEFAULT = Path(PROMPTS_DIR, os.getenv("PROMPT_DEFAULT", "default.md"))
+# LLMバックエンドに応じてdefaultプロンプトを切り替え
+LLM_BACKEND = os.getenv("LLM_BACKEND", "gemini")
+if LLM_BACKEND == "ollama":
+	PROMPT_DEFAULT = Path(PROMPTS_DIR, os.getenv("PROMPT_DEFAULT", "default_llama.md"))
+	PROMPT_SUMMARY = Path(PROMPTS_DIR, os.getenv("PROMPT_SUMMARY", "summary_llama.md"))
+	PROMPT_AI_INSIGHT = Path(PROMPTS_DIR, os.getenv("PROMPT_AI_INSIGHT", "ai_insight_llama.md"))
+else:
+	PROMPT_DEFAULT = Path(PROMPTS_DIR, os.getenv("PROMPT_DEFAULT", "default.md"))
+	PROMPT_SUMMARY = Path(PROMPTS_DIR, os.getenv("PROMPT_SUMMARY", "summary.md"))
+	PROMPT_AI_INSIGHT = Path(PROMPTS_DIR, os.getenv("PROMPT_AI_INSIGHT", "ai_insight.md"))
+
 PROMPT_LIBRARIAN = Path(PROMPTS_DIR, os.getenv("PROMPT_LIBRARIAN", "librarian.md"))
-PROMPT_SUMMARY = Path(PROMPTS_DIR, os.getenv("PROMPT_SUMMARY", "summary.md"))
-PROMPT_AI_INSIGHT = Path(PROMPTS_DIR, os.getenv("PROMPT_AI_INSIGHT", "ai_insight.md"))
 PROMPT_DEBUG = Path(PROMPTS_DIR, os.getenv("PROMPT_DEBUG", "debug.md"))
 
 
