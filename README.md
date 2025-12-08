@@ -42,6 +42,10 @@ pnpm install
 - Node.js v22.14.0
 - pnpm 10.8.1（推奨）
 - Vite
+- **TailwindCSS v4** (`@tailwindcss/postcss`を使用)
+
+> **重要**: TailwindCSS v4を使用しています。`postcss.config.js`では`'@tailwindcss/postcss': {}`を指定してください。
+> v3の`tailwindcss: {}`は使用しないでください。
 
 ### その他
 - MongoDB (SQLは学習コストが高い！！！)
