@@ -3,13 +3,46 @@ import os
 import pprint
 from pathlib import Path
 import re
+import threading
 # Third Party
 from google import genai
 from google.genai import types
 # user-defined
-from backend import PROMPTS_DIR, PROMPT_DEBUG
+from backend import PROMPTS_DIR, PROMPT_DEBUG, GEMINI_API_KEY_RATE
 from backend.search.rakuten_books import rakuten_search_books
 # 実行する際は、ProjectRootで`python -m backend.api.gemini`
+
+_chat_lock = threading.Lock()
+API_KEY_NUMBER = 1
+API_KEY_USES = 0
+def api_key_chat():
+	global API_KEY_USES, API_KEY_NUMBER
+	with _chat_lock:
+		API_KEY_USES += 1
+		if API_KEY_USES > GEMINI_API_KEY_RATE:
+			API_KEY_NUMBER += 1
+			API_KEY_USES = 0
+		API_KEY = os.getenv(f"GEMINI_API_KEY_{API_KEY_NUMBER}", "none")
+		if API_KEY == "none":
+			logger.error("API Key not found")
+			exit()
+		return API_KEY
+
+_summary_lock = threading.Lock()
+API_KEY_SUMMARY_NUMBER = 1
+API_KEY_SUMMARY_USES = 0
+def api_key_summary():
+	global API_KEY_SUMMARY_USES, API_KEY_SUMMARY_NUMBER
+	with _summary_lock:
+		API_KEY_SUMMARY_USES += 1
+		if API_KEY_SUMMARY_USES > GEMINI_API_KEY_RATE:
+			API_KEY_SUMMARY_NUMBER += 1
+			API_KEY_SUMMARY_USES = 0
+		API_KEY = os.getenv(f"GEMINI_API_KEY_{API_KEY_SUMMARY_NUMBER}", "none")
+		if API_KEY == "none":
+			logger.error("API Key not found")
+			exit()
+		return API_KEY
 
 def search_books(keywords: list[list[str]], count: int = 4) -> list[dict]:
 	integrated_results = {
@@ -147,7 +180,7 @@ def gemini_chat(prompt_file: str = None, message: str = "", history: list = None
 	
 	tools = types.Tool(function_declarations=[search_books_declaration])
 
-	client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+	client = genai.Client(api_key=api_key_chat())
 
 	configs = types.GenerateContentConfig(
 		temperature=0.5,
@@ -236,7 +269,7 @@ def gemini_summary(prompt_file: str = None, message: str = "", ai_insight: str =
 		threshold="BLOCK_ONLY_HIGH"
 	)]
 
-	client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+	client = genai.Client(api_key=api_key_summary())
 
 	configs = types.GenerateContentConfig(
 		temperature=0.5,
