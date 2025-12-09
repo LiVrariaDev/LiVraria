@@ -10,6 +10,9 @@ PROJECT_ROOT = Path(DOTENV_ROOT).parent
 # .envの読み込み
 load_dotenv(dotenv_path=DOTENV_ROOT)
 
+# API KEY RATE
+GEMINI_API_KEY_RATE = os.getenv("GEMINI_API_KEY_RATE", 15)
+
 # Directories
 PROMPTS_DIR = Path(PROJECT_ROOT, os.getenv("PROMPTS_DIR"))
 DATA_DIR = Path(PROJECT_ROOT, os.getenv("DATA_DIR"))

@@ -56,7 +56,9 @@ pnpm install
 ```bash
 # 仮想環境を有効化
 source venv/bin/activate
-
+pip install -r backend/requirements.txt
+# requirementsから読み込めないライブラリ群
+pip install python-dotenv uvicorn fastapi google-genai firebase-admin
 # サーバー起動（推奨）
 python -m backend.run
 ```
