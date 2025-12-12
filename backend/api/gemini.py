@@ -2,32 +2,101 @@
 import os
 import pprint
 from pathlib import Path
+import re
+import threading
 # Third Party
 from google import genai
 from google.genai import types
+import logging
+# module logger (use uvicorn.error for consistency with server logging)
+logger = logging.getLogger("uvicorn.error")
 # user-defined
-from backend import PROMPTS_DIR, PROMPT_DEBUG
-from backend.search.cinii_search import search_books
+from backend import PROMPTS_DIR, PROMPT_DEBUG, GEMINI_API_KEY_RATE
+from backend.search.rakuten_books import rakuten_search_books
 # 実行する際は、ProjectRootで`python -m backend.api.gemini`
+
+_chat_lock = threading.Lock()
+API_KEY_NUMBER = 1
+API_KEY_USES = 0
+def api_key_chat():
+	global API_KEY_USES, API_KEY_NUMBER
+	with _chat_lock:
+		API_KEY_USES += 1
+		if API_KEY_USES > GEMINI_API_KEY_RATE:
+			API_KEY_NUMBER += 1
+			API_KEY_USES = 0
+		logger.info(f"Using Gemini API Key number: GEMINI_API_KEY{API_KEY_NUMBER}")
+		API_KEY = os.getenv(f"GEMINI_API_KEY{API_KEY_NUMBER}", "none")
+		if API_KEY == "none":
+			logger.error("API Key not found")
+			exit()
+		return API_KEY
+
+_summary_lock = threading.Lock()
+API_KEY_SUMMARY_NUMBER = 1
+API_KEY_SUMMARY_USES = 0
+def api_key_summary():
+	global API_KEY_SUMMARY_USES, API_KEY_SUMMARY_NUMBER
+	with _summary_lock:
+		API_KEY_SUMMARY_USES += 1
+		if API_KEY_SUMMARY_USES > GEMINI_API_KEY_RATE:
+			API_KEY_SUMMARY_NUMBER += 1
+			API_KEY_SUMMARY_USES = 0
+		API_KEY = os.getenv(f"GEMINI_API_KEY{API_KEY_SUMMARY_NUMBER}", "none")
+		if API_KEY == "none":
+			logger.error("API Key not found")
+			exit()
+		return API_KEY
+
+def search_books(keywords: list[list[str]], count: int = 4) -> list[dict]:
+	integrated_results = {
+		"search_result": []
+	}
+	seen_ids = set()
+	for i, item in enumerate(keywords):
+		books = rakuten_search_books(item, count)
+		current_context_result = {
+			"context_query": ", ".join(item),
+			"books": []
+		}
+
+		for j, book in enumerate(books):
+			book_id = book.get("isbn")
+			if book_id not in seen_ids:
+				seen_ids.add(book_id)
+				index = {
+					"index": i*100 + j
+				}
+				book.update(index)
+				current_context_result["books"].append(book)
+
+		if current_context_result["books"]:
+			integrated_results["search_result"].append(current_context_result)
+
+	return integrated_results
+
 
 
 search_books_declaration = {
 	"name": "search_books",
-	"description": "CiNii APIを用いて、指定されたキーワードで書籍や資料を検索し、タイトル、著者、出版社、出版年などの情報を取得します。キーワードはAND検索されます。",
+	"description": "Rakuten Books APIを用いて、指定されたキーワードで書籍や資料を検索し、タイトル、著者、出版社、出版年、レビュー、レビュー数、ジャンルなどの情報を取得します。",
 	"parameters": {
 		"type": "object",
 		"properties": {
 			"keywords": {
 				"type": "array",
 				"items": {
-					"type": "string"
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
 				},
-				"description": "検索に使用するキーワードのリスト。例: ['Python', '機械学習'] これらのキーワードはAND検索されます。"
+				"description": "検索クエリのリスト。各内部リストのキーワードはAND検索され、それぞれの検索結果を統合して返します。例: [['Python', '機械学習'], ['Python', '人工知能']] → 'Python AND 機械学習'と'Python AND 人工知能'の両方を検索して結果を統合"
 			},
-			"pages": {
+			"count": {
 				"type": "integer",
-				"description": "検索結果のページ番号。結果をページ送りにしたい場合に使用します。デフォルトは1です。",
-				"default": 1
+				"description": "検索結果の数。デフォルトは4です。",
+				"default": 4
 			},
 		},
 		"required": ["keywords"],
@@ -48,6 +117,56 @@ safety_settings = [types.SafetySetting(
 	threshold="BLOCK_ONLY_HIGH"
 )]
 
+def remove_markdown_formatting(text: str) -> str:
+	"""
+	Markdown記号を除去してプレーンテキストに変換
+	
+	Args:
+		text: Markdown形式のテキスト
+		
+	Returns:
+		プレーンテキスト
+	"""
+	if not text:
+		return text
+	
+	# コードブロックを除去（```で囲まれた部分）
+	text = re.sub(r'```[a-z]*\n.*?\n```', '', text, flags=re.DOTALL)
+	
+	# インラインコードを除去（`で囲まれた部分）
+	text = re.sub(r'`([^`]+)`', r'\1', text)
+	
+	# 太字を除去（**または__で囲まれた部分）
+	text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+	text = re.sub(r'__([^_]+)__', r'\1', text)
+	
+	# イタリックを除去（*または_で囲まれた部分）
+	text = re.sub(r'\*([^*]+)\*', r'\1', text)
+	text = re.sub(r'_([^_]+)_', r'\1', text)
+	
+	# 見出し記号を除去（#で始まる行）
+	text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
+	
+	# リンクを除去（[テキスト](URL)形式）
+	text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+	
+	# リストマーカーを除去（-、*、+で始まる行）
+	text = re.sub(r'^[\-\*\+]\s+', '', text, flags=re.MULTILINE)
+	
+	# 番号付きリストマーカーを除去（1.で始まる行）
+	text = re.sub(r'^\d+\.\s+', '', text, flags=re.MULTILINE)
+	
+	# 引用記号を除去（>で始まる行）
+	text = re.sub(r'^>\s+', '', text, flags=re.MULTILINE)
+	
+	# 水平線を除去（---または***）
+	text = re.sub(r'^[\-\*]{3,}$', '', text, flags=re.MULTILINE)
+	
+	# 余分な空行を削除
+	text = re.sub(r'\n{3,}', '\n\n', text)
+	
+	return text.strip()
+
 def load_prompt_text(filepath):
 	with open(filepath, "r", encoding="utf-8") as f:
 		return f.read()
@@ -65,7 +184,7 @@ def gemini_chat(prompt_file: str = None, message: str = "", history: list = None
 	
 	tools = types.Tool(function_declarations=[search_books_declaration])
 
-	client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+	client = genai.Client(api_key=api_key_chat())
 
 	configs = types.GenerateContentConfig(
 		temperature=0.5,
@@ -85,23 +204,58 @@ def gemini_chat(prompt_file: str = None, message: str = "", history: list = None
 
 	response = chat.send_message(message)
 
+	# response.candidates[0].content.parts は複数のパーツ（テキストパーツや function_call パーツ）を含む場合がある。
+	# そのためすべてのパーツを走査してテキストを連結し、function_call があれば保持する。
 	function_call_part = None
-	if response.candidates and response.candidates[0].content.parts:
-		function_call_part = response.candidates[0].content.parts[0].function_call
-
 	response_text = ""
+	try:
+		parts = []
+		if response.candidates:
+			content = getattr(response.candidates[0], 'content', None)
+			if content is not None:
+				parts = getattr(content, 'parts', []) or []
 
+		for part in parts:
+			# part が function_call を持つ場合
+			fc = getattr(part, 'function_call', None)
+			if fc:
+				function_call_part = fc
+
+			# part がテキストコンテンツを持つ場合に収集
+			text = None
+			# common attribute names to try
+			for attr in ('text', 'content', 'plain_text'):
+				text = getattr(part, attr, None)
+				if text:
+					break
+			# 最後のfallback: part が dict-like なら 'text' キーを確認
+			if not text:
+				try:
+					if hasattr(part, 'to_dict'):
+						d = part.to_dict()
+						text = d.get('text') or d.get('content')
+				except Exception:
+					text = None
+
+			if text:
+				response_text += str(text)
+
+	except Exception:
+		# 予期せぬ構造の場合は従来の response.text を使う
+		response_text = getattr(response, 'text', '') or ''
+
+	# function_call があれば関数呼び出し処理を行う
 	if function_call_part:
 		print("Function call detected:\n")
-		print(f"Function Name: {function_call_part.name}")
+		print(f"Function Name: {getattr(function_call_part, 'name', '<unknown>')}")
 
 		args = getattr(function_call_part, "args", None)
 		if args is None:
 			args = getattr(function_call_part, "arguments", None)
 		print("Arguments:")
 		pprint.pprint(args)
- 
-		if function_call_part.name == "search_books":
+
+		if getattr(function_call_part, 'name', None) == "search_books":
 			try:
 				# args が JSON 文字列の場合はパースして dict にする
 				if isinstance(args, str):
@@ -112,17 +266,21 @@ def gemini_chat(prompt_file: str = None, message: str = "", history: list = None
 				result = search_books(**args_parsed)
 				print(f"Function call result:\n{pprint.pformat(result)}\n")
 			except Exception as e:
-				print(f"Error occurred while calling function '{function_call_part.name}': {e}")
- 
+				print(f"Error occurred while calling function '{getattr(function_call_part, 'name', '<unknown>')}': {e}")
+
 			function_response_part = types.Part.from_function_response(
-				name=function_call_part.name,
+				name=getattr(function_call_part, 'name', None),
 				response={"result": result},
 			)
- 
+
 			final_response = chat.send_message([function_response_part])
-			response_text = final_response.text
+			response_text = remove_markdown_formatting(getattr(final_response, 'text', '') or '')
 	else:
-		response_text = response.text
+		# parts が空または function_call が無い場合、上で収集した response_text を使う
+		if not response_text:
+			response_text = re.sub(r'<thought>.*?</thought>', '', getattr(response, 'text', '') or '', flags=re.DOTALL).strip()
+		response_text = remove_markdown_formatting(response_text)
+		
 
 	new_history = chat.get_history()
 
@@ -152,7 +310,7 @@ def gemini_summary(prompt_file: str = None, message: str = "", ai_insight: str =
 		threshold="BLOCK_ONLY_HIGH"
 	)]
 
-	client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+	client = genai.Client(api_key=api_key_summary())
 
 	configs = types.GenerateContentConfig(
 		temperature=0.5,
@@ -171,39 +329,12 @@ def gemini_summary(prompt_file: str = None, message: str = "", ai_insight: str =
 
 	response = chat.send_message(message)
 
-	return response.text
+	response_text = remove_markdown_formatting(response.text)
+	return response_text
 
 if __name__ == "__main__":
-	import sys
-	from pathlib import Path
+	import json
+	test_query_sets = [["ミステリー", "傑作"], ["感動", "泣ける"]]
 
-	print("Dry-run / debug for backend.api.gemini")
-
-	default_prompt = PROMPT_DEBUG
-	print("default.md exists:", default_prompt.exists())
-
-	api_key = os.getenv("GEMINI_API_KEY")
-	if not api_key:
-		print("GEMINI_API_KEY not set — skipping live API call. Set env var to run full test.")
-		sys.exit(0)
-
-	# 簡易テスト入力
-	sample_message = "おすすめのPython入門書を教えてください。"
-	history = []
-
-	try:
-		print("Calling gemini_chat with prompt:", default_prompt)
-		response_text, new_history = gemini_chat(str(default_prompt), sample_message, history)
-		print("=== Response ===")
-		print(response_text)
-		print("=== New history (len) ===", len(new_history))
-		pprint.pprint(new_history[:4])
-	except Exception as e:
-		print("Exception during gemini_chat:")
-		import traceback
-		traceback.print_exc()
-		sys.exit(1)
-
-	print("Debug finished.")
-	sys.exit(0)
-# ...existing code...
+	data = search_books(test_query_sets)
+	pprint.pprint(data)
