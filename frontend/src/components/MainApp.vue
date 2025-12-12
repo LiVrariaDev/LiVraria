@@ -401,8 +401,23 @@ const scrollToBottom = async () => {
     if(chatHistoryEl.value) chatHistoryEl.value.scrollTop = chatHistoryEl.value.scrollHeight;
 };
 
-const logout = () => {
-  signOut(auth).catch(error => console.error('Logout failed', error));
+const logout = async () => {
+    // アクティブセッションがあればクローズ
+    if (currentSessionId.value) {
+        try {
+            const user = auth.currentUser;
+            if (user) {
+                const token = await getIdToken(user);
+                await api.closeSession(currentSessionId.value, token);
+                console.log('セッションをクローズしました');
+            }
+        } catch (error) {
+            console.error('セッションクローズ失敗:', error);
+        }
+    }
+    
+    // Firebase ログアウト
+    signOut(auth).catch(error => console.error('Logout failed', error));
 };
 
 const fetchUserGreeting = async () => {

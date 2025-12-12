@@ -445,9 +445,13 @@ class DataStore:
 						conversation_text += f"{role}: {content}\n\n"
 					
 					# gemini_summary を使って要約を生成（summary専用関数）
-					conv.summary = gemini_summary(str(summary_path), conversation_text, ai_insight=user_insight)
-					self.conversations[session_id] = conv
-					logger.info(f"[SUCCESS] [BackgroundTask] Summary generated: {len(conv.summary)} characters")
+					summary_text = gemini_summary(str(summary_path), conversation_text, ai_insight=user_insight)
+					if summary_text:
+						conv.summary = summary_text
+						self.conversations[session_id] = conv
+						logger.info(f"[SUCCESS] [BackgroundTask] Summary generated: {len(summary_text)} characters")
+					else:
+						logger.warning(f"[WARNING] [BackgroundTask] Summary generation returned None")
 				else:
 					logger.warning(f"[WARNING] [BackgroundTask] summary.md not found: {summary_path}")
 			except Exception as e:

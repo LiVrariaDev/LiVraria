@@ -11,7 +11,7 @@ from pathlib import Path
 
 from .models import ChatRequest, ChatResponse, Personal, ChatStatus
 from .datastore import DataStore
-from .gemini import gemini_chat
+from . import chat_function, LLM_BACKEND
 
 # firebase import
 import firebase_admin
@@ -23,6 +23,15 @@ logger = logging.getLogger("uvicorn.error")
 # FastAPIアプリケーション
 app = FastAPI()
 
+# 起動時イベント
+@app.on_event("startup")
+async def startup_event():
+	"""サーバー起動時にLLMバックエンド情報を表示"""
+	if LLM_BACKEND == "ollama":
+		logger.info(f"🤖 [LLM Backend] Using Ollama (model: {os.getenv('OLLAMA_MODEL', 'llama3.2')})")
+	else:
+		logger.info("🤖 [LLM Backend] Using Gemini API")
+
 # CORS設定（フロントエンドからのアクセスを許可）
 app.add_middleware(
 	CORSMiddleware,
@@ -32,6 +41,9 @@ app.add_middleware(
 		"http://127.0.0.1:5173",
 		"http://127.0.0.1:3000",
 	],
+	# allow_origin_regex を使ってローカルのプライベートIP（例: 172.x.x.x）からの接続を許可
+	# 例: http://172.20.10.5:5173 のようなオリジンを許可します
+	allow_origin_regex=r"^https?://172\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$",
 	allow_credentials=True,
 	allow_methods=["*"],
 	allow_headers=["*"],
@@ -232,7 +244,7 @@ class Server:
 			
 			return await self.chat_prompt(request, str(prompt_path), user_id)
 
-		@self.app.put("/sessions/{session_id}/close")
+		@self.app.post("/sessions/{session_id}/close")
 		async def close_session(
 			session_id: str,
 			background_tasks: BackgroundTasks,
@@ -275,15 +287,34 @@ class Server:
 			
 			history = self.data_store.get_history(session_id)
 
-		# ユーザーの ai_insights を取得して Gemini に渡す
+		# ユーザーの ai_insights と personal 情報を取得して LLM に渡す
 		ai_insight = ""
 		if user_id:
 			user = self.data_store.get_user(user_id)
 			if user:
-				ai_insight = getattr(user, "ai_insights", "") or ""
+				# Personal情報を追加（ニックネーム、年齢、性別）
+				personal_info = []
+				if user.personal:
+					# ニックネームがあれば追加
+					if hasattr(user.personal, 'name') and user.personal.name:
+						personal_info.append(f"ニックネーム: {user.personal.name}さん（会話の中で親しみを込めて呼びかけてください）")
+					personal_info.append(f"性別: {user.personal.gender}")
+					personal_info.append(f"年齢: {user.personal.age}歳")
+				
+				# AI Insightsを追加
+				ai_insights_text = getattr(user, "ai_insights", "") or ""
+				
+				# 統合
+				if personal_info:
+					ai_insight = "## ユーザー情報\n" + "\n".join(personal_info)
+				if ai_insights_text:
+					if ai_insight:
+						ai_insight += "\n\n## AI Insights（過去の会話から学習）\n" + ai_insights_text
+					else:
+						ai_insight = ai_insights_text
 
-		# gemini_chat(prompt_file, message, history, ai_insight=None)
-		response_text, new_history = gemini_chat(prompt_file, request.message, history, ai_insight=ai_insight)
+		# LLMバックエンドを使用してチャット
+		response_text, new_history = chat_function(prompt_file, request.message, history, ai_insight=ai_insight)
 
 		# メモリ上の履歴を更新（ディスク書き込みは close_session 時に行う）
 		self.data_store.update_history(session_id, new_history)

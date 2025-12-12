@@ -147,7 +147,7 @@ def main():
 	# 1. ユーザー作成
 	# ========================================
 	print_section("1. ユーザー作成")
-	params = {
+	personal_data = {
 		"name": "Comprehensive Test User",
 		"gender": "female",
 		"age": 28,
@@ -156,10 +156,10 @@ def main():
 	}
 	
 	try:
-		response = requests.post(f"{BASE_URL}/users", params=params, headers=headers)
+		response = requests.post(f"{BASE_URL}/users", json=personal_data, headers=headers)
 		response.raise_for_status()
 		print(f"ユーザーID: {user_id}")
-		print(f"名前: {params['name']}")
+		print(f"名前: {personal_data['name']}")
 		print_result(True, "ユーザー作成成功")
 	except Exception as e:
 		print_result(False, f"ユーザー作成失敗: {e}")

@@ -1,16 +1,13 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 import backend
 import os
 import requests
 
 import pprint
 
-END_POINT = "https://ci.nii.ac.jp/books/opensearch/search"
-BOOK_COUNT = 4
+CINII_ENDPOINT = "https://ci.nii.ac.jp/books/opensearch/search"
 
-def search_books(keywords: list[str], pages: int = 1) -> list[dict]:
+def cinii_search_books(keywords: list[str], count: int = 4) -> list[dict]:
+
 	headers = {}
 
 	# CiNii APIを使って検索
@@ -21,11 +18,11 @@ def search_books(keywords: list[str], pages: int = 1) -> list[dict]:
 		"api_key": os.getenv("CINII_API_KEY"),
 		"q": query,
 		"format": "json",
-		"count" : BOOK_COUNT,
-		"p": pages
+		"count" : count,
+		"p": 1
 	}
 
-	response = requests.get(END_POINT, headers=headers, params=params)
+	response = requests.get(CINII_ENDPOINT, headers=headers, params=params)
 	json_data = response.json()
 
 	# 書籍情報の抽出
