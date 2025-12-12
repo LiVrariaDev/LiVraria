@@ -44,7 +44,8 @@ pnpm install
 - Vite
 - **TailwindCSS v4** (`@tailwindcss/postcss`を使用)
 
-> **重要**: TailwindCSS v4を使用しています。`postcss.config.js`では`'@tailwindcss/postcss': {}`を指定してください。
+> [!IMPORTANT]
+>  TailwindCSS v4を使用しています。`postcss.config.js`では  `'@tailwindcss/postcss': {}`を指定してください。  
 > v3の`tailwindcss: {}`は使用しないでください。
 
 ### その他
