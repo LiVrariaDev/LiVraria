@@ -7,6 +7,9 @@ import threading
 # Third Party
 from google import genai
 from google.genai import types
+import logging
+# module logger (use uvicorn.error for consistency with server logging)
+logger = logging.getLogger("uvicorn.error")
 # user-defined
 from backend import PROMPTS_DIR, PROMPT_DEBUG, GEMINI_API_KEY_RATE
 from backend.search.rakuten_books import rakuten_search_books
@@ -22,7 +25,8 @@ def api_key_chat():
 		if API_KEY_USES > GEMINI_API_KEY_RATE:
 			API_KEY_NUMBER += 1
 			API_KEY_USES = 0
-		API_KEY = os.getenv(f"GEMINI_API_KEY_{API_KEY_NUMBER}", "none")
+		logger.info(f"Using Gemini API Key number: GEMINI_API_KEY{API_KEY_NUMBER}")
+		API_KEY = os.getenv(f"GEMINI_API_KEY{API_KEY_NUMBER}", "none")
 		if API_KEY == "none":
 			logger.error("API Key not found")
 			exit()
@@ -38,7 +42,7 @@ def api_key_summary():
 		if API_KEY_SUMMARY_USES > GEMINI_API_KEY_RATE:
 			API_KEY_SUMMARY_NUMBER += 1
 			API_KEY_SUMMARY_USES = 0
-		API_KEY = os.getenv(f"GEMINI_API_KEY_{API_KEY_SUMMARY_NUMBER}", "none")
+		API_KEY = os.getenv(f"GEMINI_API_KEY{API_KEY_SUMMARY_NUMBER}", "none")
 		if API_KEY == "none":
 			logger.error("API Key not found")
 			exit()
@@ -200,23 +204,58 @@ def gemini_chat(prompt_file: str = None, message: str = "", history: list = None
 
 	response = chat.send_message(message)
 
+	# response.candidates[0].content.parts は複数のパーツ（テキストパーツや function_call パーツ）を含む場合がある。
+	# そのためすべてのパーツを走査してテキストを連結し、function_call があれば保持する。
 	function_call_part = None
-	if response.candidates and response.candidates[0].content.parts:
-		function_call_part = response.candidates[0].content.parts[0].function_call
-
 	response_text = ""
+	try:
+		parts = []
+		if response.candidates:
+			content = getattr(response.candidates[0], 'content', None)
+			if content is not None:
+				parts = getattr(content, 'parts', []) or []
 
+		for part in parts:
+			# part が function_call を持つ場合
+			fc = getattr(part, 'function_call', None)
+			if fc:
+				function_call_part = fc
+
+			# part がテキストコンテンツを持つ場合に収集
+			text = None
+			# common attribute names to try
+			for attr in ('text', 'content', 'plain_text'):
+				text = getattr(part, attr, None)
+				if text:
+					break
+			# 最後のfallback: part が dict-like なら 'text' キーを確認
+			if not text:
+				try:
+					if hasattr(part, 'to_dict'):
+						d = part.to_dict()
+						text = d.get('text') or d.get('content')
+				except Exception:
+					text = None
+
+			if text:
+				response_text += str(text)
+
+	except Exception:
+		# 予期せぬ構造の場合は従来の response.text を使う
+		response_text = getattr(response, 'text', '') or ''
+
+	# function_call があれば関数呼び出し処理を行う
 	if function_call_part:
 		print("Function call detected:\n")
-		print(f"Function Name: {function_call_part.name}")
+		print(f"Function Name: {getattr(function_call_part, 'name', '<unknown>')}")
 
 		args = getattr(function_call_part, "args", None)
 		if args is None:
 			args = getattr(function_call_part, "arguments", None)
 		print("Arguments:")
 		pprint.pprint(args)
- 
-		if function_call_part.name == "search_books":
+
+		if getattr(function_call_part, 'name', None) == "search_books":
 			try:
 				# args が JSON 文字列の場合はパースして dict にする
 				if isinstance(args, str):
@@ -227,17 +266,19 @@ def gemini_chat(prompt_file: str = None, message: str = "", history: list = None
 				result = search_books(**args_parsed)
 				print(f"Function call result:\n{pprint.pformat(result)}\n")
 			except Exception as e:
-				print(f"Error occurred while calling function '{function_call_part.name}': {e}")
- 
+				print(f"Error occurred while calling function '{getattr(function_call_part, 'name', '<unknown>')}': {e}")
+
 			function_response_part = types.Part.from_function_response(
-				name=function_call_part.name,
+				name=getattr(function_call_part, 'name', None),
 				response={"result": result},
 			)
- 
+
 			final_response = chat.send_message([function_response_part])
-			response_text = remove_markdown_formatting(final_response.text)
+			response_text = remove_markdown_formatting(getattr(final_response, 'text', '') or '')
 	else:
-		response_text = re.sub(r'<thought>.*?</thought>', '', response.text, flags=re.DOTALL).strip()
+		# parts が空または function_call が無い場合、上で収集した response_text を使う
+		if not response_text:
+			response_text = re.sub(r'<thought>.*?</thought>', '', getattr(response, 'text', '') or '', flags=re.DOTALL).strip()
 		response_text = remove_markdown_formatting(response_text)
 		
 

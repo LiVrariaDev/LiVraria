@@ -41,6 +41,9 @@ app.add_middleware(
 		"http://127.0.0.1:5173",
 		"http://127.0.0.1:3000",
 	],
+	# allow_origin_regex を使ってローカルのプライベートIP（例: 172.x.x.x）からの接続を許可
+	# 例: http://172.20.10.5:5173 のようなオリジンを許可します
+	allow_origin_regex=r"^https?://172\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$",
 	allow_credentials=True,
 	allow_methods=["*"],
 	allow_headers=["*"],
