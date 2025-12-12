@@ -5,9 +5,8 @@ import requests
 import pprint
 
 CINII_ENDPOINT = "https://ci.nii.ac.jp/books/opensearch/search"
-CINII_BOOK_COUNT = 4
 
-def search_books(keywords: list[str], pages: int = 1) -> list[dict]:
+def cinii_search_books(keywords: list[str], count: int = 4) -> list[dict]:
 
 	headers = {}
 
@@ -19,8 +18,8 @@ def search_books(keywords: list[str], pages: int = 1) -> list[dict]:
 		"api_key": os.getenv("CINII_API_KEY"),
 		"q": query,
 		"format": "json",
-		"count" : CINII_BOOK_COUNT,
-		"p": pages
+		"count" : count,
+		"p": 1
 	}
 
 	response = requests.get(CINII_ENDPOINT, headers=headers, params=params)

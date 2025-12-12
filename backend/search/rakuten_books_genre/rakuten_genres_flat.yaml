@@ -1,0 +1,1430 @@
+- booksGenreId: '001'
+  booksGenreName: 本
+  fullPath: 本
+  genreLevel: 1
+  itemCount: 0
+- booksGenreId: '001001'
+  booksGenreName: 漫画（コミック）
+  fullPath: 本 > 漫画（コミック）
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001001001'
+  booksGenreName: 少年
+  fullPath: 本 > 漫画（コミック） > 少年
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001001002'
+  booksGenreName: 少女
+  fullPath: 本 > 漫画（コミック） > 少女
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001001003'
+  booksGenreName: 青年
+  fullPath: 本 > 漫画（コミック） > 青年
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001001004'
+  booksGenreName: レディース
+  fullPath: 本 > 漫画（コミック） > レディース
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001001006'
+  booksGenreName: 文庫
+  fullPath: 本 > 漫画（コミック） > 文庫
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001001012'
+  booksGenreName: その他
+  fullPath: 本 > 漫画（コミック） > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001002'
+  booksGenreName: 語学・学習参考書
+  fullPath: 本 > 語学・学習参考書
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001002001'
+  booksGenreName: 語学学習
+  fullPath: 本 > 語学・学習参考書 > 語学学習
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001002002'
+  booksGenreName: 語学辞書
+  fullPath: 本 > 語学・学習参考書 > 語学辞書
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001002003'
+  booksGenreName: 辞典
+  fullPath: 本 > 語学・学習参考書 > 辞典
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001002005'
+  booksGenreName: 語学関係資格
+  fullPath: 本 > 語学・学習参考書 > 語学関係資格
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001002006'
+  booksGenreName: 学習参考書・問題集
+  fullPath: 本 > 語学・学習参考書 > 学習参考書・問題集
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001002007'
+  booksGenreName: その他
+  fullPath: 本 > 語学・学習参考書 > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001002008
+  booksGenreName: 図鑑・資料集
+  fullPath: 本 > 語学・学習参考書 > 図鑑・資料集
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001003'
+  booksGenreName: 絵本・児童書・図鑑
+  fullPath: 本 > 絵本・児童書・図鑑
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001003001'
+  booksGenreName: 児童書
+  fullPath: 本 > 絵本・児童書・図鑑 > 児童書
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001003002'
+  booksGenreName: 児童文庫
+  fullPath: 本 > 絵本・児童書・図鑑 > 児童文庫
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001003003'
+  booksGenreName: 絵本
+  fullPath: 本 > 絵本・児童書・図鑑 > 絵本
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001003004'
+  booksGenreName: 民話・むかし話
+  fullPath: 本 > 絵本・児童書・図鑑 > 民話・むかし話
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001003005'
+  booksGenreName: しかけ絵本
+  fullPath: 本 > 絵本・児童書・図鑑 > しかけ絵本
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001003006'
+  booksGenreName: 図鑑・ちしき
+  fullPath: 本 > 絵本・児童書・図鑑 > 図鑑・ちしき
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001003007'
+  booksGenreName: その他
+  fullPath: 本 > 絵本・児童書・図鑑 > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001004'
+  booksGenreName: 小説・エッセイ
+  fullPath: 本 > 小説・エッセイ
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001004001'
+  booksGenreName: ミステリー・サスペンス
+  fullPath: 本 > 小説・エッセイ > ミステリー・サスペンス
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001004002'
+  booksGenreName: SF・ホラー
+  fullPath: 本 > 小説・エッセイ > SF・ホラー
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001004003'
+  booksGenreName: エッセイ
+  fullPath: 本 > 小説・エッセイ > エッセイ
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001004004'
+  booksGenreName: ノンフィクション
+  fullPath: 本 > 小説・エッセイ > ノンフィクション
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001004008
+  booksGenreName: 日本の小説
+  fullPath: 本 > 小説・エッセイ > 日本の小説
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001004009
+  booksGenreName: 外国の小説
+  fullPath: 本 > 小説・エッセイ > 外国の小説
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001004015'
+  booksGenreName: その他
+  fullPath: 本 > 小説・エッセイ > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001004016'
+  booksGenreName: ロマンス
+  fullPath: 本 > 小説・エッセイ > ロマンス
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001005'
+  booksGenreName: パソコン・システム開発
+  fullPath: 本 > パソコン・システム開発
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001005001'
+  booksGenreName: ハードウェア
+  fullPath: 本 > パソコン・システム開発 > ハードウェア
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001005002'
+  booksGenreName: 入門書
+  fullPath: 本 > パソコン・システム開発 > 入門書
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001005003'
+  booksGenreName: インターネット・WEBデザイン
+  fullPath: 本 > パソコン・システム開発 > インターネット・WEBデザイン
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001005004'
+  booksGenreName: ネットワーク
+  fullPath: 本 > パソコン・システム開発 > ネットワーク
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001005005'
+  booksGenreName: プログラミング
+  fullPath: 本 > パソコン・システム開発 > プログラミング
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001005006'
+  booksGenreName: アプリケーション
+  fullPath: 本 > パソコン・システム開発 > アプリケーション
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001005007'
+  booksGenreName: OS
+  fullPath: 本 > パソコン・システム開発 > OS
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001005008
+  booksGenreName: デザイン・グラフィックス
+  fullPath: 本 > パソコン・システム開発 > デザイン・グラフィックス
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001005009
+  booksGenreName: ITパスポート
+  fullPath: 本 > パソコン・システム開発 > ITパスポート
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001005010'
+  booksGenreName: MOUS・MOT
+  fullPath: 本 > パソコン・システム開発 > MOUS・MOT
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001005011'
+  booksGenreName: パソコン検定
+  fullPath: 本 > パソコン・システム開発 > パソコン検定
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001005013'
+  booksGenreName: IT・eコマース
+  fullPath: 本 > パソコン・システム開発 > IT・eコマース
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001005017'
+  booksGenreName: その他
+  fullPath: 本 > パソコン・システム開発 > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001006'
+  booksGenreName: ビジネス・経済・就職
+  fullPath: 本 > ビジネス・経済・就職
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001006001'
+  booksGenreName: 経済・財政
+  fullPath: 本 > ビジネス・経済・就職 > 経済・財政
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001006002'
+  booksGenreName: 流通
+  fullPath: 本 > ビジネス・経済・就職 > 流通
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001006003'
+  booksGenreName: IT・eコマース
+  fullPath: 本 > ビジネス・経済・就職 > IT・eコマース
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001006004'
+  booksGenreName: マーケティング・セールス
+  fullPath: 本 > ビジネス・経済・就職 > マーケティング・セールス
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001006005'
+  booksGenreName: 投資・株・資産運用
+  fullPath: 本 > ビジネス・経済・就職 > 投資・株・資産運用
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001006006'
+  booksGenreName: マネープラン
+  fullPath: 本 > ビジネス・経済・就職 > マネープラン
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001006007'
+  booksGenreName: マネジメント・人材管理
+  fullPath: 本 > ビジネス・経済・就職 > マネジメント・人材管理
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001006008
+  booksGenreName: 経理
+  fullPath: 本 > ビジネス・経済・就職 > 経理
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001006009
+  booksGenreName: 自己啓発
+  fullPath: 本 > ビジネス・経済・就職 > 自己啓発
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001006010'
+  booksGenreName: 就職・転職
+  fullPath: 本 > ビジネス・経済・就職 > 就職・転職
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001006011'
+  booksGenreName: MBA
+  fullPath: 本 > ビジネス・経済・就職 > MBA
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001006013'
+  booksGenreName: 証券アナリスト
+  fullPath: 本 > ビジネス・経済・就職 > 証券アナリスト
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001006014'
+  booksGenreName: 税理士・公認会計士・ファイナンシャルプランナー
+  fullPath: 本 > ビジネス・経済・就職 > 税理士・公認会計士・ファイナンシャルプランナー
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001006015'
+  booksGenreName: 簿記検定
+  fullPath: 本 > ビジネス・経済・就職 > 簿記検定
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001006016'
+  booksGenreName: 銀行・金融検定
+  fullPath: 本 > ビジネス・経済・就職 > 銀行・金融検定
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001006018
+  booksGenreName: 経営
+  fullPath: 本 > ビジネス・経済・就職 > 経営
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001006019
+  booksGenreName: 産業
+  fullPath: 本 > ビジネス・経済・就職 > 産業
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001006021'
+  booksGenreName: その他
+  fullPath: 本 > ビジネス・経済・就職 > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001006022'
+  booksGenreName: アフィリエイト
+  fullPath: 本 > ビジネス・経済・就職 > アフィリエイト
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001006023'
+  booksGenreName: ビジネスマナー
+  fullPath: 本 > ビジネス・経済・就職 > ビジネスマナー
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001006024'
+  booksGenreName: 金融
+  fullPath: 本 > ビジネス・経済・就職 > 金融
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001007'
+  booksGenreName: 旅行・留学・アウトドア
+  fullPath: 本 > 旅行・留学・アウトドア
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001007001'
+  booksGenreName: 旅行
+  fullPath: 本 > 旅行・留学・アウトドア > 旅行
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001007003'
+  booksGenreName: 温泉
+  fullPath: 本 > 旅行・留学・アウトドア > 温泉
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001007004'
+  booksGenreName: 鉄道の旅
+  fullPath: 本 > 旅行・留学・アウトドア > 鉄道の旅
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001007005'
+  booksGenreName: テーマパーク
+  fullPath: 本 > 旅行・留学・アウトドア > テーマパーク
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001007006'
+  booksGenreName: ガイドブック
+  fullPath: 本 > 旅行・留学・アウトドア > ガイドブック
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001007007'
+  booksGenreName: 地図
+  fullPath: 本 > 旅行・留学・アウトドア > 地図
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001007008
+  booksGenreName: 留学・海外赴任
+  fullPath: 本 > 旅行・留学・アウトドア > 留学・海外赴任
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001007010'
+  booksGenreName: 旅行主任者
+  fullPath: 本 > 旅行・留学・アウトドア > 旅行主任者
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001007011'
+  booksGenreName: 紀行・旅行エッセイ
+  fullPath: 本 > 旅行・留学・アウトドア > 紀行・旅行エッセイ
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001007012'
+  booksGenreName: 釣り
+  fullPath: 本 > 旅行・留学・アウトドア > 釣り
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001007013'
+  booksGenreName: その他
+  fullPath: 本 > 旅行・留学・アウトドア > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001007014'
+  booksGenreName: キャンプ
+  fullPath: 本 > 旅行・留学・アウトドア > キャンプ
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001008
+  booksGenreName: 人文・思想・社会
+  fullPath: 本 > 人文・思想・社会
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: 001008001
+  booksGenreName: 雑学・出版・ジャーナリズム
+  fullPath: 本 > 人文・思想・社会 > 雑学・出版・ジャーナリズム
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001008002
+  booksGenreName: 哲学・思想
+  fullPath: 本 > 人文・思想・社会 > 哲学・思想
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001008003
+  booksGenreName: 心理学
+  fullPath: 本 > 人文・思想・社会 > 心理学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001008004
+  booksGenreName: 宗教・倫理
+  fullPath: 本 > 人文・思想・社会 > 宗教・倫理
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001008005
+  booksGenreName: 歴史
+  fullPath: 本 > 人文・思想・社会 > 歴史
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001008006
+  booksGenreName: 地理
+  fullPath: 本 > 人文・思想・社会 > 地理
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001008008
+  booksGenreName: 社会科学
+  fullPath: 本 > 人文・思想・社会 > 社会科学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001008009
+  booksGenreName: 法律
+  fullPath: 本 > 人文・思想・社会 > 法律
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001008010
+  booksGenreName: 政治
+  fullPath: 本 > 人文・思想・社会 > 政治
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001008011
+  booksGenreName: 社会
+  fullPath: 本 > 人文・思想・社会 > 社会
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001008012
+  booksGenreName: 教育・福祉
+  fullPath: 本 > 人文・思想・社会 > 教育・福祉
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001008015
+  booksGenreName: 民俗
+  fullPath: 本 > 人文・思想・社会 > 民俗
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001008016
+  booksGenreName: 軍事
+  fullPath: 本 > 人文・思想・社会 > 軍事
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001008017
+  booksGenreName: ノンフィクション
+  fullPath: 本 > 人文・思想・社会 > ノンフィクション
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001008018
+  booksGenreName: 言語学
+  fullPath: 本 > 人文・思想・社会 > 言語学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001008022
+  booksGenreName: 文学
+  fullPath: 本 > 人文・思想・社会 > 文学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001008027
+  booksGenreName: その他
+  fullPath: 本 > 人文・思想・社会 > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001009
+  booksGenreName: ホビー・スポーツ・美術
+  fullPath: 本 > ホビー・スポーツ・美術
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: 001009001
+  booksGenreName: スポーツ
+  fullPath: 本 > ホビー・スポーツ・美術 > スポーツ
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001009002
+  booksGenreName: 格闘技
+  fullPath: 本 > ホビー・スポーツ・美術 > 格闘技
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001009003
+  booksGenreName: 車・バイク
+  fullPath: 本 > ホビー・スポーツ・美術 > 車・バイク
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001009004
+  booksGenreName: 鉄道
+  fullPath: 本 > ホビー・スポーツ・美術 > 鉄道
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001009005
+  booksGenreName: 登山・アウトドア・釣り
+  fullPath: 本 > ホビー・スポーツ・美術 > 登山・アウトドア・釣り
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001009006
+  booksGenreName: カメラ・写真
+  fullPath: 本 > ホビー・スポーツ・美術 > カメラ・写真
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001009007
+  booksGenreName: 囲碁・将棋・クイズ
+  fullPath: 本 > ホビー・スポーツ・美術 > 囲碁・将棋・クイズ
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001009008
+  booksGenreName: ギャンブル
+  fullPath: 本 > ホビー・スポーツ・美術 > ギャンブル
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001009009
+  booksGenreName: 美術
+  fullPath: 本 > ホビー・スポーツ・美術 > 美術
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001009010
+  booksGenreName: 工芸・工作
+  fullPath: 本 > ホビー・スポーツ・美術 > 工芸・工作
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001009011
+  booksGenreName: 茶道・香道・華道
+  fullPath: 本 > ホビー・スポーツ・美術 > 茶道・香道・華道
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001009012
+  booksGenreName: ミリタリー
+  fullPath: 本 > ホビー・スポーツ・美術 > ミリタリー
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001009013
+  booksGenreName: トレーディングカード
+  fullPath: 本 > ホビー・スポーツ・美術 > トレーディングカード
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001009014
+  booksGenreName: その他
+  fullPath: 本 > ホビー・スポーツ・美術 > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001009015
+  booksGenreName: 自転車
+  fullPath: 本 > ホビー・スポーツ・美術 > 自転車
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001010'
+  booksGenreName: 美容・暮らし・健康・料理
+  fullPath: 本 > 美容・暮らし・健康・料理
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001010001'
+  booksGenreName: 恋愛
+  fullPath: 本 > 美容・暮らし・健康・料理 > 恋愛
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001010002'
+  booksGenreName: 妊娠・出産・子育て
+  fullPath: 本 > 美容・暮らし・健康・料理 > 妊娠・出産・子育て
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001010003'
+  booksGenreName: ペット
+  fullPath: 本 > 美容・暮らし・健康・料理 > ペット
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001010004'
+  booksGenreName: 住まい・インテリア
+  fullPath: 本 > 美容・暮らし・健康・料理 > 住まい・インテリア
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001010005'
+  booksGenreName: ガーデニング・フラワー
+  fullPath: 本 > 美容・暮らし・健康・料理 > ガーデニング・フラワー
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001010006'
+  booksGenreName: 生活の知識
+  fullPath: 本 > 美容・暮らし・健康・料理 > 生活の知識
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001010007'
+  booksGenreName: 占い
+  fullPath: 本 > 美容・暮らし・健康・料理 > 占い
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001010008
+  booksGenreName: 冠婚葬祭・マナー
+  fullPath: 本 > 美容・暮らし・健康・料理 > 冠婚葬祭・マナー
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001010009
+  booksGenreName: 手芸
+  fullPath: 本 > 美容・暮らし・健康・料理 > 手芸
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001010010'
+  booksGenreName: 健康
+  fullPath: 本 > 美容・暮らし・健康・料理 > 健康
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001010011'
+  booksGenreName: 料理
+  fullPath: 本 > 美容・暮らし・健康・料理 > 料理
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001010012'
+  booksGenreName: ドリンク・お酒
+  fullPath: 本 > 美容・暮らし・健康・料理 > ドリンク・お酒
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001010013'
+  booksGenreName: 生き方・リラクゼーション
+  fullPath: 本 > 美容・暮らし・健康・料理 > 生き方・リラクゼーション
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001010014'
+  booksGenreName: ファッション・美容
+  fullPath: 本 > 美容・暮らし・健康・料理 > ファッション・美容
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001010015'
+  booksGenreName: その他
+  fullPath: 本 > 美容・暮らし・健康・料理 > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001010016'
+  booksGenreName: 雑貨
+  fullPath: 本 > 美容・暮らし・健康・料理 > 雑貨
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001011'
+  booksGenreName: エンタメ・ゲーム
+  fullPath: 本 > エンタメ・ゲーム
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001011001'
+  booksGenreName: テレビ関連本
+  fullPath: 本 > エンタメ・ゲーム > テレビ関連本
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001011002'
+  booksGenreName: 映画
+  fullPath: 本 > エンタメ・ゲーム > 映画
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001011003'
+  booksGenreName: 音楽
+  fullPath: 本 > エンタメ・ゲーム > 音楽
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001011005'
+  booksGenreName: ゲーム
+  fullPath: 本 > エンタメ・ゲーム > ゲーム
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001011006'
+  booksGenreName: 演劇・舞踊
+  fullPath: 本 > エンタメ・ゲーム > 演劇・舞踊
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001011007'
+  booksGenreName: 演芸
+  fullPath: 本 > エンタメ・ゲーム > 演芸
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001011009
+  booksGenreName: アニメーション
+  fullPath: 本 > エンタメ・ゲーム > アニメーション
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001011010'
+  booksGenreName: フィギュア
+  fullPath: 本 > エンタメ・ゲーム > フィギュア
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001011011'
+  booksGenreName: サブカルチャー
+  fullPath: 本 > エンタメ・ゲーム > サブカルチャー
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001011012'
+  booksGenreName: その他
+  fullPath: 本 > エンタメ・ゲーム > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001011013'
+  booksGenreName: タレント関連本
+  fullPath: 本 > エンタメ・ゲーム > タレント関連本
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001012'
+  booksGenreName: 科学・技術
+  fullPath: 本 > 科学・技術
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001012001'
+  booksGenreName: 自然科学全般
+  fullPath: 本 > 科学・技術 > 自然科学全般
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001012002'
+  booksGenreName: 数学
+  fullPath: 本 > 科学・技術 > 数学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001012003'
+  booksGenreName: 物理学
+  fullPath: 本 > 科学・技術 > 物理学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001012004'
+  booksGenreName: 化学
+  fullPath: 本 > 科学・技術 > 化学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001012005'
+  booksGenreName: 地学・天文学
+  fullPath: 本 > 科学・技術 > 地学・天文学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001012006'
+  booksGenreName: 生物学
+  fullPath: 本 > 科学・技術 > 生物学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001012007'
+  booksGenreName: 植物学
+  fullPath: 本 > 科学・技術 > 植物学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001012008
+  booksGenreName: 動物学
+  fullPath: 本 > 科学・技術 > 動物学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001012010'
+  booksGenreName: 工学
+  fullPath: 本 > 科学・技術 > 工学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001012011'
+  booksGenreName: 建築学
+  fullPath: 本 > 科学・技術 > 建築学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001012016'
+  booksGenreName: その他
+  fullPath: 本 > 科学・技術 > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001013'
+  booksGenreName: 写真集・タレント
+  fullPath: 本 > 写真集・タレント
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001013001'
+  booksGenreName: グラビアアイドル・タレント写真集
+  fullPath: 本 > 写真集・タレント > グラビアアイドル・タレント写真集
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001013002'
+  booksGenreName: その他
+  fullPath: 本 > 写真集・タレント > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001013003'
+  booksGenreName: 動物・自然
+  fullPath: 本 > 写真集・タレント > 動物・自然
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001016'
+  booksGenreName: 資格・検定
+  fullPath: 本 > 資格・検定
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001016001'
+  booksGenreName: 看護・医療関係資格
+  fullPath: 本 > 資格・検定 > 看護・医療関係資格
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001016002'
+  booksGenreName: 法律関係資格
+  fullPath: 本 > 資格・検定 > 法律関係資格
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001016003'
+  booksGenreName: ビジネス関係資格
+  fullPath: 本 > 資格・検定 > ビジネス関係資格
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001016004'
+  booksGenreName: 宅建・不動産関係資格
+  fullPath: 本 > 資格・検定 > 宅建・不動産関係資格
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001016005'
+  booksGenreName: 食品・調理関係資格
+  fullPath: 本 > 資格・検定 > 食品・調理関係資格
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001016006'
+  booksGenreName: 教育・心理関係資格
+  fullPath: 本 > 資格・検定 > 教育・心理関係資格
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001016007'
+  booksGenreName: インテリア関係資格
+  fullPath: 本 > 資格・検定 > インテリア関係資格
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001016008
+  booksGenreName: 介護・福祉関係資格
+  fullPath: 本 > 資格・検定 > 介護・福祉関係資格
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001016009
+  booksGenreName: 技術・建築関係資格
+  fullPath: 本 > 資格・検定 > 技術・建築関係資格
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001016010'
+  booksGenreName: 語学関係資格
+  fullPath: 本 > 資格・検定 > 語学関係資格
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001016011'
+  booksGenreName: パソコン関係資格
+  fullPath: 本 > 資格・検定 > パソコン関係資格
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001016012'
+  booksGenreName: 旅行主任者
+  fullPath: 本 > 資格・検定 > 旅行主任者
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001016013'
+  booksGenreName: カラーコーディネーター・色彩検定
+  fullPath: 本 > 資格・検定 > カラーコーディネーター・色彩検定
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001016014'
+  booksGenreName: 数学検定
+  fullPath: 本 > 資格・検定 > 数学検定
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001016015'
+  booksGenreName: 公務員試験
+  fullPath: 本 > 資格・検定 > 公務員試験
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001016016'
+  booksGenreName: 自動車免許
+  fullPath: 本 > 資格・検定 > 自動車免許
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001016017'
+  booksGenreName: その他
+  fullPath: 本 > 資格・検定 > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001017'
+  booksGenreName: ライトノベル
+  fullPath: 本 > ライトノベル
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001017004'
+  booksGenreName: その他
+  fullPath: 本 > ライトノベル > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001017005'
+  booksGenreName: 少年
+  fullPath: 本 > ライトノベル > 少年
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001017006'
+  booksGenreName: 少女
+  fullPath: 本 > ライトノベル > 少女
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001018
+  booksGenreName: 楽譜
+  fullPath: 本 > 楽譜
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: 001018002
+  booksGenreName: ピアノ
+  fullPath: 本 > 楽譜 > ピアノ
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001018003
+  booksGenreName: ギター
+  fullPath: 本 > 楽譜 > ギター
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001018004
+  booksGenreName: 管・打楽器
+  fullPath: 本 > 楽譜 > 管・打楽器
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001018005
+  booksGenreName: 吹奏楽・アンサンブル・ミニチュアスコア
+  fullPath: 本 > 楽譜 > 吹奏楽・アンサンブル・ミニチュアスコア
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001018006
+  booksGenreName: バイオリン・チェロ・コントラバス
+  fullPath: 本 > 楽譜 > バイオリン・チェロ・コントラバス
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001018007
+  booksGenreName: その他楽器
+  fullPath: 本 > 楽譜 > その他楽器
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001018008
+  booksGenreName: LM（ライトミュージック）楽器教本
+  fullPath: 本 > 楽譜 > LM（ライトミュージック）楽器教本
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001018009
+  booksGenreName: バンドスコア
+  fullPath: 本 > 楽譜 > バンドスコア
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001018010
+  booksGenreName: 合唱
+  fullPath: 本 > 楽譜 > 合唱
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001018011
+  booksGenreName: 声楽
+  fullPath: 本 > 楽譜 > 声楽
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001018012
+  booksGenreName: その他
+  fullPath: 本 > 楽譜 > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001018013
+  booksGenreName: ダウンロード楽譜
+  fullPath: 本 > 楽譜 > ダウンロード楽譜
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001019
+  booksGenreName: 文庫
+  fullPath: 本 > 文庫
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: 001019001
+  booksGenreName: 小説・エッセイ
+  fullPath: 本 > 文庫 > 小説・エッセイ
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001019002
+  booksGenreName: 美容・暮らし・健康・料理
+  fullPath: 本 > 文庫 > 美容・暮らし・健康・料理
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001019003
+  booksGenreName: ホビー・スポーツ・美術
+  fullPath: 本 > 文庫 > ホビー・スポーツ・美術
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001019005
+  booksGenreName: 語学・学習参考書
+  fullPath: 本 > 文庫 > 語学・学習参考書
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001019006
+  booksGenreName: 旅行・留学・アウトドア
+  fullPath: 本 > 文庫 > 旅行・留学・アウトドア
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001019007
+  booksGenreName: 人文・思想・社会
+  fullPath: 本 > 文庫 > 人文・思想・社会
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001019008
+  booksGenreName: ビジネス・経済・就職
+  fullPath: 本 > 文庫 > ビジネス・経済・就職
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001019009
+  booksGenreName: パソコン・システム開発
+  fullPath: 本 > 文庫 > パソコン・システム開発
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001019010
+  booksGenreName: 科学・医学・技術
+  fullPath: 本 > 文庫 > 科学・医学・技術
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001019011
+  booksGenreName: 漫画（コミック）
+  fullPath: 本 > 文庫 > 漫画（コミック）
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001019012
+  booksGenreName: ライトノベル
+  fullPath: 本 > 文庫 > ライトノベル
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001019013
+  booksGenreName: エンタメ
+  fullPath: 本 > 文庫 > エンタメ
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001019014
+  booksGenreName: 写真集・タレント
+  fullPath: 本 > 文庫 > 写真集・タレント
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001019015
+  booksGenreName: その他
+  fullPath: 本 > 文庫 > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001020'
+  booksGenreName: 新書
+  fullPath: 本 > 新書
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001020001'
+  booksGenreName: 小説・エッセイ
+  fullPath: 本 > 新書 > 小説・エッセイ
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001020002'
+  booksGenreName: 美容・暮らし・健康・料理
+  fullPath: 本 > 新書 > 美容・暮らし・健康・料理
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001020003'
+  booksGenreName: ホビー・スポーツ・美術
+  fullPath: 本 > 新書 > ホビー・スポーツ・美術
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001020004'
+  booksGenreName: 絵本・児童書・図鑑
+  fullPath: 本 > 新書 > 絵本・児童書・図鑑
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001020005'
+  booksGenreName: 語学・学習参考書
+  fullPath: 本 > 新書 > 語学・学習参考書
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001020006'
+  booksGenreName: 旅行・留学・アウトドア
+  fullPath: 本 > 新書 > 旅行・留学・アウトドア
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001020007'
+  booksGenreName: 人文・思想・社会
+  fullPath: 本 > 新書 > 人文・思想・社会
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001020008
+  booksGenreName: ビジネス・経済・就職
+  fullPath: 本 > 新書 > ビジネス・経済・就職
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001020009
+  booksGenreName: パソコン・システム開発
+  fullPath: 本 > 新書 > パソコン・システム開発
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001020010'
+  booksGenreName: 科学・医学・技術
+  fullPath: 本 > 新書 > 科学・医学・技術
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001020011'
+  booksGenreName: エンタメ
+  fullPath: 本 > 新書 > エンタメ
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001020014'
+  booksGenreName: その他
+  fullPath: 本 > 新書 > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001021'
+  booksGenreName: ボーイズラブ（BL）
+  fullPath: 本 > ボーイズラブ（BL）
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001021001'
+  booksGenreName: 小説
+  fullPath: 本 > ボーイズラブ（BL） > 小説
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001021002'
+  booksGenreName: コミック
+  fullPath: 本 > ボーイズラブ（BL） > コミック
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001021003'
+  booksGenreName: その他
+  fullPath: 本 > ボーイズラブ（BL） > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001022'
+  booksGenreName: 付録付き
+  fullPath: 本 > 付録付き
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001022001'
+  booksGenreName: 付録付き
+  fullPath: 本 > 付録付き > 付録付き
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001023'
+  booksGenreName: バーゲン本
+  fullPath: 本 > バーゲン本
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001023001'
+  booksGenreName: 美容・暮らし・健康・料理
+  fullPath: 本 > バーゲン本 > 美容・暮らし・健康・料理
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001023002'
+  booksGenreName: 絵本・児童書・図鑑
+  fullPath: 本 > バーゲン本 > 絵本・児童書・図鑑
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001023003'
+  booksGenreName: 語学・学習参考書
+  fullPath: 本 > バーゲン本 > 語学・学習参考書
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001023004'
+  booksGenreName: 'ビジネス・経済・就職 '
+  fullPath: '本 > バーゲン本 > ビジネス・経済・就職 '
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001023005'
+  booksGenreName: '旅行・留学・アウトドア '
+  fullPath: '本 > バーゲン本 > 旅行・留学・アウトドア '
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001023006'
+  booksGenreName: 'ホビー・スポーツ・美術 '
+  fullPath: '本 > バーゲン本 > ホビー・スポーツ・美術 '
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001023007'
+  booksGenreName: 科学・医学・技術
+  fullPath: 本 > バーゲン本 > 科学・医学・技術
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001023008
+  booksGenreName: '人文・思想・社会 '
+  fullPath: '本 > バーゲン本 > 人文・思想・社会 '
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001023009
+  booksGenreName: '小説・エッセイ '
+  fullPath: '本 > バーゲン本 > 小説・エッセイ '
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001023012'
+  booksGenreName: その他
+  fullPath: 本 > バーゲン本 > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001025'
+  booksGenreName: セット本
+  fullPath: 本 > セット本
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001025001'
+  booksGenreName: コミックセット
+  fullPath: 本 > セット本 > コミックセット
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001025002'
+  booksGenreName: その他
+  fullPath: 本 > セット本 > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001026'
+  booksGenreName: カレンダー・手帳・家計簿
+  fullPath: 本 > カレンダー・手帳・家計簿
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001026001'
+  booksGenreName: カレンダー
+  fullPath: 本 > カレンダー・手帳・家計簿 > カレンダー
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001026002'
+  booksGenreName: 手帳
+  fullPath: 本 > カレンダー・手帳・家計簿 > 手帳
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001026003'
+  booksGenreName: 家計簿
+  fullPath: 本 > カレンダー・手帳・家計簿 > 家計簿
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001027'
+  booksGenreName: 文具・雑貨
+  fullPath: 本 > 文具・雑貨
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: '001027001'
+  booksGenreName: 筆記具
+  fullPath: 本 > 文具・雑貨 > 筆記具
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001027002'
+  booksGenreName: 筆記補助用品
+  fullPath: 本 > 文具・雑貨 > 筆記補助用品
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001027003'
+  booksGenreName: ノート
+  fullPath: 本 > 文具・雑貨 > ノート
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001027004'
+  booksGenreName: 学用品
+  fullPath: 本 > 文具・雑貨 > 学用品
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001027005'
+  booksGenreName: 手紙・はがき・便箋
+  fullPath: 本 > 文具・雑貨 > 手紙・はがき・便箋
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001027006'
+  booksGenreName: 手芸・書道・アート
+  fullPath: 本 > 文具・雑貨 > 手芸・書道・アート
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001027007'
+  booksGenreName: ブックカバー・しおり
+  fullPath: 本 > 文具・雑貨 > ブックカバー・しおり
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001027008
+  booksGenreName: ファイル・収納用品
+  fullPath: 本 > 文具・雑貨 > ファイル・収納用品
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001027009
+  booksGenreName: 事務・OA用品
+  fullPath: 本 > 文具・雑貨 > 事務・OA用品
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001027010'
+  booksGenreName: キャラクターグッズ
+  fullPath: 本 > 文具・雑貨 > キャラクターグッズ
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001027011'
+  booksGenreName: デザイン文具
+  fullPath: 本 > 文具・雑貨 > デザイン文具
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001027012'
+  booksGenreName: シーズナル
+  fullPath: 本 > 文具・雑貨 > シーズナル
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001027013'
+  booksGenreName: 高級ステーショナリー
+  fullPath: 本 > 文具・雑貨 > 高級ステーショナリー
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: '001027014'
+  booksGenreName: その他
+  fullPath: 本 > 文具・雑貨 > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028
+  booksGenreName: 医学・薬学・看護学・歯科学
+  fullPath: 本 > 医学・薬学・看護学・歯科学
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: 001028001
+  booksGenreName: 基礎医学
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 基礎医学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028002
+  booksGenreName: 臨床医学一般
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 臨床医学一般
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028003
+  booksGenreName: 臨床医学内科系
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 臨床医学内科系
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028004
+  booksGenreName: 臨床医学外科系
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 臨床医学外科系
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028005
+  booksGenreName: 臨床医学専門科別
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 臨床医学専門科別
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028006
+  booksGenreName: 医学一般・社会医学
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 医学一般・社会医学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028007
+  booksGenreName: 基礎看護学
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 基礎看護学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028008
+  booksGenreName: 臨床成人看護
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 臨床成人看護
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028009
+  booksGenreName: 臨床看護専門科別
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 臨床看護専門科別
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028010
+  booksGenreName: 臨床看護一般
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 臨床看護一般
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028011
+  booksGenreName: 看護学生向け
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 看護学生向け
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028012
+  booksGenreName: 保健・助産
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 保健・助産
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028013
+  booksGenreName: 医療関連科学・技術
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 医療関連科学・技術
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028014
+  booksGenreName: 伝統医学・東洋医学
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 伝統医学・東洋医学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028015
+  booksGenreName: 薬学
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 薬学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028016
+  booksGenreName: 歯科医学
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 歯科医学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028017
+  booksGenreName: 試験対策(資格試験別)
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 試験対策(資格試験別)
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028018
+  booksGenreName: 辞事典・白書・語学
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > 辞事典・白書・語学
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001028019
+  booksGenreName: その他
+  fullPath: 本 > 医学・薬学・看護学・歯科学 > その他
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001029
+  booksGenreName: ティーンズラブ（TL）
+  fullPath: 本 > ティーンズラブ（TL）
+  genreLevel: 2
+  itemCount: 0
+- booksGenreId: 001029001
+  booksGenreName: 小説
+  fullPath: 本 > ティーンズラブ（TL） > 小説
+  genreLevel: 3
+  itemCount: 0
+- booksGenreId: 001029002
+  booksGenreName: コミック
+  fullPath: 本 > ティーンズラブ（TL） > コミック
+  genreLevel: 3
+  itemCount: 0
