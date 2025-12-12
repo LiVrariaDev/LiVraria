@@ -16,6 +16,11 @@ GEMINI_API_KEY_RATE = int(os.getenv("GEMINI_API_KEY_RATE", "15"))
 # Directories
 PROMPTS_DIR = Path(PROJECT_ROOT, os.getenv("PROMPTS_DIR"))
 DATA_DIR = Path(PROJECT_ROOT, os.getenv("DATA_DIR"))
+if not DATA_DIR.exists():
+	DATA_DIR.mkdir(parents=True, exist_ok=True)
+	Path(DATA_DIR, "conversations.json").touch(exist_ok=True)
+	Path(DATA_DIR, "users.json").touch(exist_ok=True)
+	Path(DATA_DIR, "nfc_users.json").touch(exist_ok=True)
 FIREBASE_ACCOUNT_KEY_PATH = Path(PROJECT_ROOT, os.getenv("FIREBASE_ACCOUNT_KEY_PATH"))
 
 # Data file path
