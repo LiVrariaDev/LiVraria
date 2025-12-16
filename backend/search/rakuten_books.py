@@ -48,6 +48,8 @@ def rakuten_search_books(keywords: list[str], count: int = 4, genre_id: str = "0
         published_date = item.get("salesDate")  # YYYY-MM-DD形式
         isbn = item.get("isbn")
         genre = item.get("booksGenreId")
+        review = item.get("reviewAverage")  # レビュー平均
+        review_count = item.get("reviewCount")  # レビュー数
 
         book_info = {
             "title": title,
@@ -55,7 +57,9 @@ def rakuten_search_books(keywords: list[str], count: int = 4, genre_id: str = "0
             "publisher": publisher,
             "published_date": published_date,
             "isbn": isbn,
-            "genre": genre
+            "genre": genre,
+            "review": review,
+            "review_count": review_count,
         }
         book_list.append(book_info)
 

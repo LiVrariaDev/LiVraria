@@ -12,7 +12,7 @@ from .models import (
 	ChatStatus, UserStatus, User, Conversation, 
 	Message, Personal, BookData, RecommendationLogEntry, NfcUser
 )
-from .gemini import gemini_chat, gemini_summary
+from . import summary_function
 
 # ロガー設定
 logger = logging.getLogger("uvicorn.error")
@@ -444,8 +444,8 @@ class DataStore:
 						content = msg.content if hasattr(msg, 'content') else msg.get('content', '')
 						conversation_text += f"{role}: {content}\n\n"
 					
-					# gemini_summary を使って要約を生成（summary専用関数）
-					summary_text = gemini_summary(str(summary_path), conversation_text, ai_insight=user_insight)
+					# summary_function を使って要約を生成（summary専用関数）
+					summary_text = summary_function(str(summary_path), conversation_text, ai_insight=user_insight)
 					if summary_text:
 						conv.summary = summary_text
 						self.conversations[session_id] = conv
@@ -480,8 +480,8 @@ class DataStore:
 {conv.summary}
 ```
 """
-						# gemini_summary を使って新しい ai_insights を生成（ai_insightはNone）
-						user.ai_insights = gemini_summary(str(ai_insight_path), message, ai_insight=None)
+						# summary_function を使って新しい ai_insights を生成（ai_insightはNone）
+						user.ai_insights = summary_function(str(ai_insight_path), message, ai_insight=None)
 						logger.info(f"[SUCCESS] [BackgroundTask] ai_insights updated: {len(user.ai_insights)} characters")
 					else:
 						logger.warning(f"[WARNING] [BackgroundTask] ai_insight.md not found: {ai_insight_path}")
