@@ -139,3 +139,25 @@ pytest backend/test/
 - **pnpmの推奨**: フロントエンドは`pnpm`の使用を推奨します（`pnpm-lock.yaml`で依存関係を管理）
 
 詳しい技術仕様は `docs/technical_specs.md` を参照してください。
+
+## ライセンス
+
+このプロジェクトは**MIT License**の下で公開されています。詳細は[LICENSE](LICENSE)を参照してください。
+
+```
+MIT License
+Copyright (c) 2025 LiVrariaDev
+```
+
+### 改造版を作成する場合
+
+このソフトウェアを改造・再配布する場合は、[NOTICE](NOTICE)もご確認ください。
+改造版には元の著作権表示を保持し、LiVrariaをベースにしている旨を明記してください。
+
+### 使用ライブラリ
+
+このプロジェクトは以下のオープンソースライブラリを使用しています：
+- **Frontend**: Vue.js, Firebase, Vite, TailwindCSS
+- **Backend**: FastAPI, Firebase Admin SDK, Google Gemini AI, Pydantic, nfcpy
+
+各ライブラリのライセンスについては[NOTICE](NOTICE)を参照してください。
