@@ -1,0 +1,32 @@
+{
+  "name": "LiVraria",
+  "version": "1.0.0",
+  "description": "図書のAI推薦システム",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "install:front": "pnpm install -C frontend",
+    "start:front": "pnpm -C frontend run dev",
+    "install:back": "node scripts/setup-backend.js",
+    "start:back": "node scripts/run-backend.js",
+    "setup": "pnpm run install:front && pnpm run install:back",
+    "start": "concurrently \"pnpm run start:front\" \"pnpm run start:back\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LiVrariaDev/LiVraria.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/LiVrariaDev/LiVraria/issues"
+  },
+  "homepage": "https://github.com/LiVrariaDev/LiVraria#readme",
+  "packageManager": "pnpm@10.14.0",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

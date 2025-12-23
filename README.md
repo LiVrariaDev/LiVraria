@@ -1,6 +1,5 @@
 # LiVraria
-
-図書館向けAI推薦システムのPoC実装
+図書のAI推薦システム
 
 ## セットアップ手順
 
@@ -32,8 +31,8 @@ cd LiVraria
 #### 2. Backend セットアップ
 ```bash
 # Python仮想環境を作成
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 
 # 依存パッケージをインストール
 pip install -r backend/requirements.txt
@@ -94,7 +93,7 @@ scripts\start.bat
 #### Backend
 ```bash
 # 仮想環境を有効化
-source venv/bin/activate
+source .venv/bin/activate
 pip install -r backend/requirements.txt
 # requirementsから読み込めないライブラリ群
 pip install python-dotenv uvicorn fastapi google-genai firebase-admin
@@ -157,7 +156,7 @@ LiVraria/
 ### テスト実行
 ```bash
 # 仮想環境を有効化
-source venv/bin/activate
+source .venv/bin/activate
 
 # 特定のテストを実行
 python -m backend.test.test_firebase_integration
