@@ -10,29 +10,38 @@ PROJECT_ROOT = Path(DOTENV_ROOT).parent
 # .envの読み込み
 load_dotenv(dotenv_path=DOTENV_ROOT)
 
-# API KEY RATE
-GEMINI_API_KEY_RATE = int(os.getenv("GEMINI_API_KEY_RATE", "15"))
+# ============================================================================
+# Configuration Settings
+# ============================================================================
+# 必要に応じてここを直接編集してください
+
+# Directory paths
+PROMPTS_DIR_REL = "backend/api/prompts"  # プロンプトファイルのディレクトリ
+DATA_DIR_REL = "backend/api/data"        # データファイルのディレクトリ
+
+# Server settings
+BACKEND_HOST = "0.0.0.0"
+BACKEND_PORT = 8000
+
+# Session settings
+SESSION_TIMEOUT = 1800  # 30分（秒単位）
+
+# Database settings
+MONGODB_DB = "livraria_dev"
+
+# API settings
+GEMINI_API_KEY_RATE = 15  # Gemini APIキーのレート制限
+
+# ============================================================================
+# End of Configuration
+# ============================================================================
 
 # Directories
 if not Path(PROJECT_ROOT, ".env").exists():
 	raise FileNotFoundError(".env file not found")
 
-# 環境変数の存在チェック
-prompts_dir_env = os.getenv("PROMPTS_DIR")
-data_dir_env = os.getenv("DATA_DIR")
+# 環境変数の取得
 firebase_key_env = os.getenv("FIREBASE_ACCOUNT_KEY_PATH")
-	
-if not prompts_dir_env:
-	raise ValueError(
-		"Environment value 'PROMPTS_DIR' is not set\n"
-		"Hint: .env file not found or PROMPTS_DIR value is empty"
-	)
-
-if not data_dir_env:
-	raise ValueError(
-		"Environment value 'DATA_DIR' is not set\n"
-		"Hint: .env file not found or DATA_DIR value is empty"
-	)
 
 if not firebase_key_env:
 	raise ValueError(
@@ -53,8 +62,8 @@ if not os.getenv("FIREBASE_API_KEY"):
 		"Hint: .env file not found or FIREBASE_API_KEY value is empty"
 	)
 
-PROMPTS_DIR = Path(PROJECT_ROOT, prompts_dir_env)
-DATA_DIR = Path(PROJECT_ROOT, data_dir_env)
+PROMPTS_DIR = Path(PROJECT_ROOT, PROMPTS_DIR_REL)
+DATA_DIR = Path(PROJECT_ROOT, DATA_DIR_REL)
 
 if not DATA_DIR.exists():
 	DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -84,4 +93,11 @@ else:
 PROMPT_LIBRARIAN = Path(PROMPTS_DIR, os.getenv("PROMPT_LIBRARIAN", "librarian.md"))
 PROMPT_DEBUG = Path(PROMPTS_DIR, os.getenv("PROMPT_DEBUG", "debug.md"))
 
+# MongoDB configuration (環境変数で上書き可能)
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+MONGODB_DB = os.getenv("MONGODB_DB", MONGODB_DB)  # デフォルトは設定セクションの値を使用
 
+# TTL settings (optional)
+CONVERSATIONS_TTL_DAYS = int(os.getenv("CONVERSATIONS_TTL_DAYS")) if os.getenv("CONVERSATIONS_TTL_DAYS") else None
+RECOMMEND_LOG_TTL_DAYS = int(os.getenv("RECOMMEND_LOG_TTL_DAYS")) if os.getenv("RECOMMEND_LOG_TTL_DAYS") else None
+AI_INSIGHTS_TTL_DAYS = int(os.getenv("AI_INSIGHTS_TTL_DAYS")) if os.getenv("AI_INSIGHTS_TTL_DAYS") else None
