@@ -4,13 +4,32 @@
 
 ## セットアップ手順
 
-### 1. リポジトリのクローン
+### クイックスタート（推奨）
+
+**Linux/Mac:**
+```bash
+./scripts/setup.sh
+```
+
+**Windows:**
+```batch
+scripts\setup.bat
+```
+
+セットアップ完了後、`.env`ファイルを編集してAPIキーなどを設定してください。
+
+### 手動セットアップ
+
+<details>
+<summary>手動でセットアップする場合はこちらをクリック</summary>
+
+#### 1. リポジトリのクローン
 ```bash
 git clone <repository-url>
 cd LiVraria
 ```
 
-### 2. Backend セットアップ
+#### 2. Backend セットアップ
 ```bash
 # Python仮想環境を作成
 python3 -m venv venv
@@ -24,11 +43,13 @@ cp .env.template .env
 # .envを編集してAPIキーなどを記入
 ```
 
-### 3. Frontend セットアップ
+#### 3. Frontend セットアップ
 ```bash
 # pnpmを使用（推奨）
 pnpm install
 ```
+
+</details>
 
 ## 環境
 
@@ -53,7 +74,24 @@ pnpm install
 
 ## サーバー起動
 
-### Backend
+### クイックスタート（推奨）
+
+**Linux/Mac:**
+```bash
+./scripts/start.sh
+```
+
+**Windows:**
+```batch
+scripts\start.bat
+```
+
+### 手動起動
+
+<details>
+<summary>手動で起動する場合はこちらをクリック</summary>
+
+#### Backend
 ```bash
 # 仮想環境を有効化
 source venv/bin/activate
@@ -67,11 +105,13 @@ backend/run.pyを実行すると、backend libraryが読み込めないので失
 
 サーバーは `http://0.0.0.0:8000` で起動します（`.env`で変更可能）。
 
-### Frontend
+#### Frontend
 ```bash
 # 開発サーバー起動
 pnpm --filter frontend dev
 ```
+
+</details>
 
 ## プロジェクト構造
 
