@@ -8,11 +8,11 @@
   },
   "scripts": {
     "install:front": "pnpm install -C frontend",
-    "start:front": "pnpm -C frontend run dev",
+    "dev:front": "pnpm -C frontend run dev",
     "install:back": "node scripts/setup-backend.js",
-    "start:back": "node scripts/run-backend.js",
-    "setup": "pnpm run install:front && pnpm run install:back",
-    "start": "concurrently \"pnpm run start:front\" \"pnpm run start:back\""
+    "dev:back": "node scripts/run-backend.js",
+    "setup": "concurrently \"pnpm:install:front\" \"pnpm:install:back\" --names \"SETUP-F,SETUP-B\" --prefix-colors \"cyan,magenta\"",
+    "start": "concurrently \"pnpm:dev:front\" \"pnpm:dev:back\" --names \"FRONT,BACK\" --prefix-colors \"green,yellow\""
   },
   "repository": {
     "type": "git",

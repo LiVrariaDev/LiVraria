@@ -14,14 +14,55 @@ load_dotenv(dotenv_path=DOTENV_ROOT)
 GEMINI_API_KEY_RATE = int(os.getenv("GEMINI_API_KEY_RATE", "15"))
 
 # Directories
-PROMPTS_DIR = Path(PROJECT_ROOT, os.getenv("PROMPTS_DIR"))
-DATA_DIR = Path(PROJECT_ROOT, os.getenv("DATA_DIR"))
+if not Path(PROJECT_ROOT, ".env").exists():
+	raise FileNotFoundError(".env file not found")
+
+# 環境変数の存在チェック
+prompts_dir_env = os.getenv("PROMPTS_DIR")
+data_dir_env = os.getenv("DATA_DIR")
+firebase_key_env = os.getenv("FIREBASE_ACCOUNT_KEY_PATH")
+	
+if not prompts_dir_env:
+	raise ValueError(
+		"Environment value 'PROMPTS_DIR' is not set\n"
+		"Hint: .env file not found or PROMPTS_DIR value is empty"
+	)
+
+if not data_dir_env:
+	raise ValueError(
+		"Environment value 'DATA_DIR' is not set\n"
+		"Hint: .env file not found or DATA_DIR value is empty"
+	)
+
+if not firebase_key_env:
+	raise ValueError(
+		"Environment value 'FIREBASE_ACCOUNT_KEY_PATH' is not set\n"
+		"Hint: .env file not found or FIREBASE_ACCOUNT_KEY_PATH value is empty"
+	)
+
+# 最低限1だけ設定されているかチェック
+if not os.getenv("GEMINI_API_KEY1"):
+	raise ValueError(
+		"Environment value 'GEMINI_API_KEY1' is not set\n"
+		"Hint: .env file not found or GEMINI_API_KEY1 value is empty"
+	)
+
+if not os.getenv("FIREBASE_API_KEY"):
+	raise ValueError(
+		"Environment value 'FIREBASE_API_KEY' is not set\n"
+		"Hint: .env file not found or FIREBASE_API_KEY value is empty"
+	)
+
+PROMPTS_DIR = Path(PROJECT_ROOT, prompts_dir_env)
+DATA_DIR = Path(PROJECT_ROOT, data_dir_env)
+
 if not DATA_DIR.exists():
 	DATA_DIR.mkdir(parents=True, exist_ok=True)
 	Path(DATA_DIR, "conversations.json").touch(exist_ok=True)
 	Path(DATA_DIR, "users.json").touch(exist_ok=True)
 	Path(DATA_DIR, "nfc_users.json").touch(exist_ok=True)
-FIREBASE_ACCOUNT_KEY_PATH = Path(PROJECT_ROOT, os.getenv("FIREBASE_ACCOUNT_KEY_PATH"))
+
+FIREBASE_ACCOUNT_KEY_PATH = Path(PROJECT_ROOT, firebase_key_env)
 
 # Data file path
 CONVERSATIONS_FILE = Path(DATA_DIR, "conversations.json")

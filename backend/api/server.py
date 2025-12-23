@@ -7,7 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
 import uvicorn
-from pathlib import Path
 
 from .models import ChatRequest, ChatResponse, Personal, ChatStatus
 from .datastore import DataStore

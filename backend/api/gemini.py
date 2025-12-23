@@ -1,7 +1,6 @@
 # Standard Library
 import os
 import pprint
-from pathlib import Path
 import re
 import threading
 # Third Party

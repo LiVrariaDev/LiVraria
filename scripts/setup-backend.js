@@ -1,5 +1,6 @@
 const { spawnSync } = require("child_process");
 const path = require("path");
+const fs = require("fs");
 
 // Create virtual environment
 const isWin = process.platform === "win32";
@@ -33,4 +34,16 @@ if (child.error || child.status !== 0) {
     process.exit(1);
 }
 
-process.exit(child.status);
+try {
+    fs.copyFileSync(path.join(__dirname, "..", ".env.template"), path.join(__dirname, "..", ".env"));
+} catch (error) {
+    console.error("Failed to copy .env.template");
+    console.error(error);
+    process.exit(1);
+}
+
+console.log("-------------------------------")
+console.log("[WARNING] Please edit a .env file")
+console.log("-------------------------------")
+
+process.exit(0);
