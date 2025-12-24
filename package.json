@@ -26,6 +26,13 @@
   },
   "homepage": "https://github.com/LiVrariaDev/LiVraria#readme",
   "packageManager": "pnpm@10.14.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@firebase/util",
+      "esbuild",
+      "protobufjs"
+    ]
+  },
   "devDependencies": {
     "concurrently": "^9.2.1"
   }
