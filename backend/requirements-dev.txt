@@ -1,36 +1,36 @@
 # ============================================================================
-# 開発環境用の追加パッケージ
+# Development Environment Additional Packages
 # ============================================================================
-# 本番環境の依存関係を含める
+# Include production dependencies
 -r requirements.txt
 
 # ============================================================================
-# 開発ツール
+# Development Tools
 # ============================================================================
-# デバッグ・ログ表示
-rich==14.1.0  # 美しいターミナル出力
-rich-toolkit==0.15.1  # richの拡張ツール
+# Debug & Logging
+rich==14.1.0  # Beautiful terminal output
+rich-toolkit==0.15.1  # Rich extensions
 
-# CLIツール
-typer==0.19.2  # CLIアプリケーション作成
+# CLI Tools
+typer==0.19.2  # CLI application framework
 
-# FastAPI開発ツール
+# FastAPI Development Tools
 fastapi-cli==0.0.13  # FastAPI CLI
 
 # ============================================================================
-# テスト・品質管理
+# Testing & Quality Assurance
 # ============================================================================
-# pytest==8.0.0  # テストフレームワーク（必要に応じて追加）
-# pytest-asyncio==0.23.0  # 非同期テスト
-# httpx==0.28.1  # テストクライアント（既に依存関係に含まれる）
+# pytest==8.0.0  # Testing framework (add if needed)
+# pytest-asyncio==0.23.0  # Async testing
+# httpx==0.28.1  # Test client (already in dependencies)
 
 # ============================================================================
-# 監視・デバッグ
+# Monitoring & Debugging
 # ============================================================================
-# sentry-sdk==2.39.0  # エラートラッキング（本番で使う場合はrequirements.txtへ）
+# sentry-sdk==2.39.0  # Error tracking (move to requirements.txt for production)
 
 # ============================================================================
-# パフォーマンス最適化（オプション）
+# Performance Optimization (Optional)
 # ============================================================================
-# orjson==3.11.3  # 高速JSON（必要に応じて）
-# ujson==5.11.0  # 高速JSON（必要に応じて）
+# orjson==3.11.3  # Fast JSON (if needed)
+# ujson==5.11.0  # Fast JSON (if needed)

@@ -1,15 +1,15 @@
 # ============================================================================
-# コアフレームワーク
+# Core Framework
 # ============================================================================
 fastapi==0.118.0
-uvicorn[standard]==0.37.0  # ASGIサーバー（uvloop, httptools含む）
-pydantic==2.11.9  # データバリデーション
-pydantic-settings==2.11.0  # 環境変数管理用
+uvicorn[standard]==0.37.0  # ASGI server (includes uvloop, httptools)
+pydantic==2.11.9  # Data validation
+pydantic-settings==2.11.0  # Environment variable management
 
 # ============================================================================
-# 認証・Firebase
+# Authentication & Firebase
 # ============================================================================
-firebase_admin==7.1.0  # Firebase認証・Firestore
+firebase_admin==7.1.0  # Firebase Auth & Firestore
 
 # ============================================================================
 # AI/LLM
@@ -17,11 +17,11 @@ firebase_admin==7.1.0  # Firebase認証・Firestore
 google-genai==1.41.0  # Gemini API
 
 # ============================================================================
-# HTTP通信
+# HTTP Communication
 # ============================================================================
-requests==2.32.5  # 外部API通信（楽天、CiNii等）
+requests==2.32.5  # External API calls (Rakuten, CiNii, etc.)
 
 # ============================================================================
-# ユーティリティ
+# Utilities
 # ============================================================================
-python-dotenv==1.1.1  # 環境変数読み込み
+python-dotenv==1.1.1  # Environment variable loading
