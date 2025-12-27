@@ -147,16 +147,68 @@ const nfcLoading = ref(false);
 const startNfc = async () => {
   errorMessage.value = '';
   nfcLoading.value = true;
+  
   try {
-    const res = await api.startNfc(20);
-    if (res && res.status === 'ok') {
-      alert(`カード検出: ${res.idm}`);
-    } else {
-      alert('タイムアウトまたはカード未検出');
+    // 1. NFC読み取り開始
+    const startRes = await fetch('http://localhost:8000/start-nfc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ timeout: 20 })
+    });
+    
+    if (!startRes.ok) {
+      throw new Error('NFC読み取り開始に失敗しました');
     }
+    
+    // 2. ポーリングで読み取り状態を確認
+    const startTime = Date.now();
+    const timeout = 20000; // 20秒
+    
+    const checkNfc = async () => {
+      return new Promise((resolve, reject) => {
+        const interval = setInterval(async () => {
+          try {
+            const checkRes = await fetch('http://localhost:8000/check-nfc');
+            const data = await checkRes.json();
+            
+            if (data.status === 'success') {
+              clearInterval(interval);
+              resolve(data.idm);
+            } else if (data.status === 'timeout') {
+              clearInterval(interval);
+              reject(new Error('タイムアウト: カードが検出されませんでした'));
+            } else if (Date.now() - startTime > timeout) {
+              clearInterval(interval);
+              reject(new Error('タイムアウト'));
+            }
+          } catch (err) {
+            clearInterval(interval);
+            reject(err);
+          }
+        }, 1000); // 1秒ごとにポーリング
+      });
+    };
+    
+    const idm = await checkNfc();
+    console.log('NFC IDm取得:', idm);
+    
+    // 3. バックエンドでNFC認証
+    const authRes = await api.authenticateNfc(idm);
+    
+    if (!authRes || !authRes.custom_token) {
+      throw new Error('NFC認証に失敗しました。カードが登録されていない可能性があります。');
+    }
+    
+    // 4. Firebase Custom Tokenでログイン
+    const { signInWithCustomToken } = await import('firebase/auth');
+    await signInWithCustomToken(auth, authRes.custom_token);
+    
+    console.log('NFC認証成功');
+    // App.vueのリスナーが反応して画面遷移します
+    
   } catch (err) {
-    console.error('startNfc error', err);
-    errorMessage.value = err.message || String(err);
+    console.error('NFC認証エラー:', err);
+    errorMessage.value = err.message || 'NFC認証に失敗しました';
   } finally {
     nfcLoading.value = false;
   }
