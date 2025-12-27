@@ -176,3 +176,20 @@ export const api = {
         return response.json()
     }
 }
+
+// NFC読み取りトリガー（ボタン押下時に呼ぶ）
+api.startNfc = async function(timeout = 20) {
+    const response = await fetch(`${API_BASE_URL}/start-nfc`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timeout })
+    })
+
+    if (!response.ok) {
+        const text = await response.text()
+        throw new Error(`start-nfc failed: ${text}`)
+    }
+    return response.json()
+}
+
+export default api

@@ -105,6 +105,15 @@
           </button>
         </div>
       </form>
+  
+          <!-- カード認証ボタン -->
+          <div class="pt-4">
+            <button type="button" @click="startNfc" :disabled="nfcLoading"
+                    class="w-full px-4 py-3 text-lg font-bold text-white bg-green-600 rounded-lg hover:bg-green-700 transform hover:-translate-y-0.5 transition-all duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed">
+              <span v-if="nfcLoading">読み取り中...</span>
+              <span v-else>カードで認証</span>
+            </button>
+          </div>
     </div>
   </div>
 </template>
@@ -131,6 +140,27 @@ const profile = reactive({
   live_pref: '',
   live_city: ''
 });
+
+const nfcLoading = ref(false);
+
+// カードで認証ボタンの処理
+const startNfc = async () => {
+  errorMessage.value = '';
+  nfcLoading.value = true;
+  try {
+    const res = await api.startNfc(20);
+    if (res && res.status === 'ok') {
+      alert(`カード検出: ${res.idm}`);
+    } else {
+      alert('タイムアウトまたはカード未検出');
+    }
+  } catch (err) {
+    console.error('startNfc error', err);
+    errorMessage.value = err.message || String(err);
+  } finally {
+    nfcLoading.value = false;
+  }
+};
 
 // 都道府県リスト
 const prefectures = [
