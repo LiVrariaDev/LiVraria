@@ -36,31 +36,41 @@ def read_card_once(timeout=20):
     GET_IDM_APDU = [0xFF, 0xCA, 0x00, 0x00, 0x00]
     start_time = time.time()
     
+    print(f"[DEBUG] NFC読み取り開始（タイムアウト: {timeout}秒）")
+    
     while time.time() - start_time < timeout:
         try:
             reader_list = readers()
             if not reader_list:
+                print("[DEBUG] カードリーダーが見つかりません")
                 time.sleep(0.5)
                 continue
             
+            print(f"[DEBUG] カードリーダー検出: {reader_list[0]}")
             reader = reader_list[0]
             connection = reader.createConnection()
             connection.connect()
             
+            print("[DEBUG] APDUコマンド送信中...")
             response, sw1, sw2 = connection.transmit(GET_IDM_APDU)
+            
+            print(f"[DEBUG] レスポンス: sw1={hex(sw1)}, sw2={hex(sw2)}, response={response}")
             
             if sw1 == 0x90 and sw2 == 0x00:
                 idm_hex = toHexString(response).replace(" ", "")
+                print(f"[DEBUG] ✅ IDm取得成功: {idm_hex}")
                 connection.disconnect()
                 return {"status": "ok", "idm": idm_hex}
             
             connection.disconnect()
-        except Exception:
+        except Exception as e:
             # カードが置かれていない場合は例外が発生するため無視
+            print(f"[DEBUG] 例外発生: {type(e).__name__}: {e}")
             pass
         
         time.sleep(0.5)
     
+    print("[DEBUG] ❌ タイムアウト")
     return {"status": "timeout"}
 
 
