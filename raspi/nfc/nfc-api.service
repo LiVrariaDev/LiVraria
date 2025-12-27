@@ -6,16 +6,13 @@ Requires=pcscd.service
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/LiVraria/raspi/nfc
-ExecStart=/usr/bin/python3 /home/pi/LiVraria/raspi/nfc/nfc_api_server.py
+WorkingDirectory=/home/livraria/LiVraria/raspi/nfc
+ExecStart=/home/livraria/LiVraria/raspi/nfc/.venv/bin/python /home/livraria/LiVraria/raspi/nfc/nfc_api_server.py
 Restart=always
 RestartSec=10
 
-# ログ設定
 StandardOutput=journal
 StandardError=journal
-
-# 環境変数
 Environment="PYTHONUNBUFFERED=1"
 
 [Install]
