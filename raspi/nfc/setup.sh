@@ -63,7 +63,8 @@ else
 fi
 
 source .venv/bin/activate
-pip install --upgrade pip
+pip install --upgrade pip setuptools wheel
+pip install git+https://github.com/LudovicRousseau/pyscard.git@master
 pip install -r requirements.txt
 echo "依存関係のインストールが完了しました"
 
