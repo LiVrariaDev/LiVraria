@@ -1,0 +1,28 @@
+# ============================================================================
+# Raspberry Pi - NFC Functionality
+# ============================================================================
+# This file defines dependencies for using NFC card readers (RC-S300, etc.)
+# on Raspberry Pi.
+
+# ============================================================================
+# NFC Card Reader
+# ============================================================================
+pyscard==2.1.1  # smartcard module (PC/SC communication)
+nfcpy==1.0.4  # NFC communication library
+ndeflib==0.3.3  # NFC data format
+libusb1==3.3.1  # USB communication
+pyserial==3.5  # Serial communication
+pyDes==2.0.1  # DES encryption
+
+# ============================================================================
+# System Requirements (install via apt)
+# ============================================================================
+# Run the following commands on Raspberry Pi:
+#
+# sudo apt-get update
+# sudo apt-get install -y pcscd pcsc-tools libpcsclite-dev
+# sudo systemctl start pcscd
+# sudo systemctl enable pcscd
+#
+# Verify card reader:
+# pcsc_scan

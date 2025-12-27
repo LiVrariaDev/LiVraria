@@ -1,17 +1,39 @@
 {
   "name": "LiVraria",
   "version": "1.0.0",
-  "description": "",
+  "description": "図書のAI推薦システム",
   "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "install:front": "pnpm install -C frontend",
+    "dev:front": "pnpm -C frontend run dev",
+    "install:back": "node scripts/setup-backend.js",
+    "dev:back": "node scripts/run-backend.js",
+    "setup": "concurrently \"pnpm:install:front\" \"pnpm:install:back\" --names \"SETUP-F,SETUP-B\" --prefix-colors \"cyan,magenta\"",
+    "start": "concurrently \"pnpm:dev:front\" \"pnpm:dev:back\" --names \"FRONT,BACK\" --prefix-colors \"green,yellow\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LiVrariaDev/LiVraria.git"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "packageManager": "pnpm@10.8.1",
-  "dependencies": {
-    "express": "^5.1.0",
-    "firebase": "^12.4.0"
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/LiVrariaDev/LiVraria/issues"
+  },
+  "homepage": "https://github.com/LiVrariaDev/LiVraria#readme",
+  "packageManager": "pnpm@10.14.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@firebase/util",
+      "esbuild",
+      "protobufjs"
+    ]
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

@@ -1,20 +1,38 @@
 # LiVraria
-
-図書館向けAI推薦システムのPoC実装
+図書のAI推薦システム
 
 ## セットアップ手順
 
-### 1. リポジトリのクローン
+### クイックスタート（推奨）
+
+**Linux/Mac:**
+```bash
+./scripts/setup.sh
+```
+
+**Windows:**
+```batch
+scripts\setup.bat
+```
+
+セットアップ完了後、`.env`ファイルを編集してAPIキーなどを設定してください。
+
+### 手動セットアップ
+
+<details>
+<summary>手動でセットアップする場合はこちらをクリック</summary>
+
+#### 1. リポジトリのクローン
 ```bash
 git clone <repository-url>
 cd LiVraria
 ```
 
-### 2. Backend セットアップ
+#### 2. Backend セットアップ
 ```bash
 # Python仮想環境を作成
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 
 # 依存パッケージをインストール
 pip install -r backend/requirements.txt
@@ -24,11 +42,13 @@ cp .env.template .env
 # .envを編集してAPIキーなどを記入
 ```
 
-### 3. Frontend セットアップ
+#### 3. Frontend セットアップ
 ```bash
 # pnpmを使用（推奨）
 pnpm install
 ```
+
+</details>
 
 ## 環境
 
@@ -53,10 +73,27 @@ pnpm install
 
 ## サーバー起動
 
-### Backend
+### クイックスタート（推奨）
+
+**Linux/Mac:**
+```bash
+./scripts/start.sh
+```
+
+**Windows:**
+```batch
+scripts\start.bat
+```
+
+### 手動起動
+
+<details>
+<summary>手動で起動する場合はこちらをクリック</summary>
+
+#### Backend
 ```bash
 # 仮想環境を有効化
-source venv/bin/activate
+source .venv/bin/activate
 pip install -r backend/requirements.txt
 # requirementsから読み込めないライブラリ群
 pip install python-dotenv uvicorn fastapi google-genai firebase-admin
@@ -67,11 +104,13 @@ backend/run.pyを実行すると、backend libraryが読み込めないので失
 
 サーバーは `http://0.0.0.0:8000` で起動します（`.env`で変更可能）。
 
-### Frontend
+#### Frontend
 ```bash
 # 開発サーバー起動
 pnpm --filter frontend dev
 ```
+
+</details>
 
 ## プロジェクト構造
 
@@ -117,7 +156,7 @@ LiVraria/
 ### テスト実行
 ```bash
 # 仮想環境を有効化
-source venv/bin/activate
+source .venv/bin/activate
 
 # 特定のテストを実行
 python -m backend.test.test_firebase_integration
@@ -139,3 +178,25 @@ pytest backend/test/
 - **pnpmの推奨**: フロントエンドは`pnpm`の使用を推奨します（`pnpm-lock.yaml`で依存関係を管理）
 
 詳しい技術仕様は `docs/technical_specs.md` を参照してください。
+
+## ライセンス
+
+このプロジェクトは**MIT License**の下で公開されています。詳細は[LICENSE](LICENSE)を参照してください。
+
+```
+MIT License
+Copyright (c) 2025 LiVrariaDev
+```
+
+### 改造版を作成する場合
+
+このソフトウェアを改造・再配布する場合は、[NOTICE](NOTICE)もご確認ください。
+改造版には元の著作権表示を保持し、LiVrariaをベースにしている旨を明記してください。
+
+### 使用ライブラリ
+
+このプロジェクトは以下のオープンソースライブラリを使用しています：
+- **Frontend**: Vue.js, Firebase, Vite, TailwindCSS
+- **Backend**: FastAPI, Firebase Admin SDK, Google Gemini AI, Pydantic, nfcpy
+
+各ライブラリのライセンスについては[NOTICE](NOTICE)を参照してください。

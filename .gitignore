@@ -3,6 +3,7 @@
 !frontend/public/*.jpg
 *-firebase-adminsdk-*.json
 backend/api/data/
+.vscode/
 
 # Chat history
 chat-history_*.md

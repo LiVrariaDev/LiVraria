@@ -1,0 +1,40 @@
+# LiVraria
+
+Copyright (c) 2025 LiVrariaDev
+
+このソフトウェアを使用、改造、再配布する場合は、以下を遵守してください：
+
+1. **著作権表示の保持**: 元の著作権表示（LiVrariaDev）を保持すること
+2. **改造版の明記**: 改造版の場合、README等に「LiVrariaをベースにしている」旨を明記すること
+3. **推奨表現の禁止**: 元の開発者が改造版を推奨しているかのような表現を使用しないこと
+
+---
+
+## NOTICE
+
+When using, modifying, or redistributing this software, please:
+
+1. **Retain Copyright Notice**: Keep the original copyright notice (LiVrariaDev)
+2. **Attribution for Modified Versions**: For modified versions, clearly state in README or documentation that it is based on LiVraria
+3. **No Endorsement**: Do not imply that the original developers endorse your modified version
+
+---
+
+## 謝辞 / Acknowledgments
+
+このプロジェクトは以下のオープンソースライブラリを使用しています：
+
+### Frontend
+- Vue.js (MIT License)
+- Firebase (Apache License 2.0)
+- Vite (MIT License)
+- TailwindCSS (MIT License)
+
+### Backend
+- FastAPI (MIT License)
+- Firebase Admin SDK (Apache License 2.0)
+- Google Gemini AI (Apache License 2.0)
+- Pydantic (MIT License)
+- nfcpy (EUPL-1.1 / ISC License)
+
+各ライブラリの詳細なライセンスについては、それぞれのプロジェクトを参照してください。

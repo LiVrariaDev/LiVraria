@@ -2,6 +2,7 @@
   "name": "livraria",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
@@ -23,5 +24,12 @@
     "tailwindcss": "^4.1.17",
     "vite": "^7.0.6",
     "vite-plugin-vue-devtools": "^8.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@firebase/util",
+      "esbuild",
+      "protobufjs"
+    ]
   }
 }

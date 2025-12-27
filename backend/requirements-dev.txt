@@ -1,27 +1,36 @@
 # ============================================================================
-# Core Framework
+# Development Environment Additional Packages
 # ============================================================================
-fastapi==0.118.0
-uvicorn[standard]==0.37.0  # ASGI server (includes uvloop, httptools)
-pydantic==2.11.9  # Data validation
-pydantic-settings==2.11.0  # Environment variable management
+# Include production dependencies
+-r requirements.txt
 
 # ============================================================================
-# Authentication & Firebase
+# Development Tools
 # ============================================================================
-firebase_admin==7.1.0  # Firebase Auth & Firestore
+# Debug & Logging
+rich==14.1.0  # Beautiful terminal output
+rich-toolkit==0.15.1  # Rich extensions
+
+# CLI Tools
+typer==0.19.2  # CLI application framework
+
+# FastAPI Development Tools
+fastapi-cli==0.0.13  # FastAPI CLI
 
 # ============================================================================
-# AI/LLM
+# Testing & Quality Assurance
 # ============================================================================
-google-genai==1.41.0  # Gemini API
+# pytest==8.0.0  # Testing framework (add if needed)
+# pytest-asyncio==0.23.0  # Async testing
+# httpx==0.28.1  # Test client (already in dependencies)
 
 # ============================================================================
-# HTTP Communication
+# Monitoring & Debugging
 # ============================================================================
-requests==2.32.5  # External API calls (Rakuten, CiNii, etc.)
+# sentry-sdk==2.39.0  # Error tracking (move to requirements.txt for production)
 
 # ============================================================================
-# Utilities
+# Performance Optimization (Optional)
 # ============================================================================
-python-dotenv==1.1.1  # Environment variable loading
+# orjson==3.11.3  # Fast JSON (if needed)
+# ujson==5.11.0  # Fast JSON (if needed)
