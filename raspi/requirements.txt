@@ -15,6 +15,12 @@ pyserial==3.5  # Serial communication
 pyDes==2.0.1  # DES encryption
 
 # ============================================================================
+# Flask API Server
+# ============================================================================
+flask==3.0.0  # Web framework
+flask-cors==4.0.0  # CORS support
+
+# ============================================================================
 # System Requirements (install via apt)
 # ============================================================================
 # Run the following commands on Raspberry Pi:

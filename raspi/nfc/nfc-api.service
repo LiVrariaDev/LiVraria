@@ -1,0 +1,22 @@
+[Unit]
+Description=NFC API Server for LiVraria
+After=network.target pcscd.service
+Requires=pcscd.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/LiVraria/raspi/nfc
+ExecStart=/usr/bin/python3 /home/pi/LiVraria/raspi/nfc/nfc_api_server.py
+Restart=always
+RestartSec=10
+
+# ログ設定
+StandardOutput=journal
+StandardError=journal
+
+# 環境変数
+Environment="PYTHONUNBUFFERED=1"
+
+[Install]
+WantedBy=multi-user.target
