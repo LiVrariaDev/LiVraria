@@ -49,6 +49,8 @@ def read_card_once(timeout=20):
             print(f"[DEBUG] カードリーダー検出: {reader_list[0]}")
             reader = reader_list[0]
             connection = reader.createConnection()
+            
+            print("[DEBUG] 接続試行中...")
             connection.connect()
             
             print("[DEBUG] APDUコマンド送信中...")

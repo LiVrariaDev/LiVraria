@@ -5,9 +5,9 @@ Requires=pcscd.service
 
 [Service]
 Type=simple
-User=pi
+User=root
 WorkingDirectory=/home/livraria/LiVraria/raspi/nfc
-ExecStart=/home/livraria/LiVraria/raspi/nfc/.venv/bin/python /home/livraria/LiVraria/raspi/nfc/nfc_api_server.py
+ExecStart=/home/livraria/LiVraria/raspi/nfc/.venv/bin/python nfc_api_server.py
 Restart=always
 RestartSec=10
 
