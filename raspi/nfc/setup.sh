@@ -3,6 +3,17 @@
 # Stop on error
 set -e
 
+# sudoでの実行を防ぐ
+if [ "$EUID" -eq 0 ]; then
+    echo "エラー: このスクリプトをsudoで実行しないでください"
+    echo "スクリプト内で必要な箇所のみsudoを使用します"
+    echo ""
+    echo "正しい実行方法:"
+    echo "  ./setup.sh"
+    echo "  ./setup.sh --systemd"
+    exit 1
+fi
+
 echo "=== NFC API Server Setup ==="
 echo "このスクリプトはRaspberry Pi上でNFC APIサーバーをセットアップします"
 echo ""
@@ -41,7 +52,7 @@ eval "$(pyenv init -)"
 echo "=== Install Python3.11 ==="
 pyenv install 3.11.13 --skip-existing
 pyenv local 3.11.13
-echo "Python $(python --version) を使用します"
+echo "$(python --version) を使用します"
 
 echo "=== Virtual environment ==="
 if [ ! -d ".venv" ]; then
