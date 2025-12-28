@@ -4,7 +4,7 @@
 fastapi==0.118.0
 uvicorn[standard]==0.37.0  # ASGI server (includes uvloop, httptools)
 pydantic==2.11.9  # Data validation
-pydantic-settings==2.11.0  # Environment variable management
+pydantic-settings==2.12.0  # Environment variable management
 
 # ============================================================================
 # Authentication & Firebase
