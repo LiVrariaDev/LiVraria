@@ -1,0 +1,25 @@
+version: 2
+updates:
+  # ルートのnpm依存関係
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+  
+  # フロントエンドのnpm依存関係
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "daily"
+  
+  # バックエンドのPython依存関係
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "daily"
+  
+  # Raspberry Pi NFCのPython依存関係
+  - package-ecosystem: "pip"
+    directory: "/raspi/nfc"
+    schedule:
+      interval: "daily"
