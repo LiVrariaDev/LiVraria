@@ -57,5 +57,5 @@ def cinii_search_books(keywords: list[str], count: int = 4) -> list[dict]:
 
 if __name__ == "__main__":
 	keywords = ["人工知能", "機械学習"]
-	books = search_books(keywords)
+	books = cinii_search_books(keywords)
 	pprint.pprint(books)

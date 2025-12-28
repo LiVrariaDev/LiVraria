@@ -3,6 +3,7 @@ import os
 import requests
 import time
 import urllib.parse
+import pprint
 
 # Calil API endpoints
 CALIL_LIBRARY_ENDPOINT = "https://api.calil.jp/library"
@@ -62,14 +63,3 @@ if __name__ == "__main__":
 	# systemid = "tokyo"
 	# book_info = search_books(isbn, systemid)
 	# print("Book Info:", book_info)
-	while json_data.get('continue', False):
-		param = {
-			'appkey': os.getenv("CALIL_API_KEY"),
-			'session': json_data.get('session'),
-			'format': 'json',
-		}
-		time.sleep(2) # required more than 2 sec interval
-		response = requests.get(CALIL_BOOK_ENDPOINT, headers=headers, params=param)
-		json_data = response.json()
-	
-	return json_data
