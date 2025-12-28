@@ -4,22 +4,43 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+    groups:
+      npm-dependencies:
+        patterns:
+          - "*"
   
   # フロントエンドのnpm依存関係
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+    groups:
+      frontend-dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "vue*"
+      vue-ecosystem:
+        patterns:
+          - "vue*"
   
   # バックエンドのPython依存関係
   - package-ecosystem: "pip"
     directory: "/backend"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+    groups:
+      backend-dependencies:
+        patterns:
+          - "*"
   
   # Raspberry Pi NFCのPython依存関係
   - package-ecosystem: "pip"
     directory: "/raspi/nfc"
     schedule:
-      interval: "daily"
+      interval: "weekly"
+    groups:
+      raspi-dependencies:
+        patterns:
+          - "*"
