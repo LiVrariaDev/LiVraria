@@ -1,183 +1,293 @@
 # LiVraria
-図書のAI推薦システム
 
-## セットアップ手順
+図書のAI推薦システム - Firebase認証、NFC認証、AI会話機能を備えた次世代図書館システム
 
-### クイックスタート（推奨）
-
-**Linux/Mac:**
-```bash
-./scripts/setup.sh
-```
-
-**Windows:**
-```batch
-scripts\setup.bat
-```
-
-セットアップ完了後、`.env`ファイルを編集してAPIキーなどを設定してください。
-
-### 手動セットアップ
-
-<details>
-<summary>手動でセットアップする場合はこちらをクリック</summary>
-
-#### 1. リポジトリのクローン
-```bash
-git clone <repository-url>
-cd LiVraria
-```
-
-#### 2. Backend セットアップ
-```bash
-# Python仮想環境を作成
-python3 -m venv .venv
-source .venv/bin/activate
-
-# 依存パッケージをインストール
-pip install -r backend/requirements.txt
-
-# 環境変数ファイルを作成
-cp .env.template .env
-# .envを編集してAPIキーなどを記入
-```
-
-#### 3. Frontend セットアップ
-```bash
-# pnpmを使用（推奨）
-pnpm install
-```
-
-</details>
-
-## 環境
-
-### Backend
-- Python 3.11.4+
-- FastAPI
-- Google Gemini API
-- Firebase Admin SDK
-
-### Frontend
-- Node.js v22.14.0
-- pnpm 10.8.1（推奨）
-- Vite
-- **TailwindCSS v4** (`@tailwindcss/postcss`を使用)
+[![CI](https://github.com/LiVrariaDev/LiVraria/actions/workflows/ci.yaml/badge.svg)](https://github.com/LiVrariaDev/LiVraria/actions/workflows/ci.yaml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > [!IMPORTANT]
->  TailwindCSS v4を使用しています。`postcss.config.js`では  `'@tailwindcss/postcss': {}`を指定してください。  
-> v3の`tailwindcss: {}`は使用しないでください。
+> 本プロジェクトは開発段階であり、まだ完全ではありません。
+> また、このリポジトリのドキュメントはAIによって生成されたものです。
+> そのため、誤字脱字や不正確な情報が含まれている可能性があります。
 
-### その他
-- MongoDB (SQLは学習コストが高い！！！)
+## 主な機能
 
-## サーバー起動
+- **Firebase認証**: メール/パスワード認証
+- **NFC認証**: Raspberry Pi + NFCカードリーダーによる非接触ログイン
+- **AI会話**: Google Gemini APIによる書籍推薦・会話機能
+- **書籍検索**: CiNii、Calil APIとの連携
+- **モダンUI**: Vue 3 + TailwindCSS v4
 
-### クイックスタート（推奨）
+## クイックスタート
 
-**Linux/Mac:**
+### 前提条件
+
+- **Node.js** v22.14.0+
+- **Python** 3.11+
+- **pnpm** 10.14.0+
+- **Docker** (オプション)
+
+### セットアップ
+
 ```bash
-./scripts/start.sh
+# 1. ルートでpnpmをインストール（初回のみ）
+pnpm install
+
+# 2. フロントエンド・バックエンドの依存関係をインストール
+pnpm run setup
 ```
 
-**Windows:**
-```batch
-scripts\start.bat
-```
-
-### 手動起動
-
-<details>
-<summary>手動で起動する場合はこちらをクリック</summary>
-
-#### Backend
+**個別セットアップ:**
 ```bash
-# 仮想環境を有効化
-source .venv/bin/activate
-pip install -r backend/requirements.txt
-# requirementsから読み込めないライブラリ群
-pip install python-dotenv uvicorn fastapi google-genai firebase-admin
-# サーバー起動（推奨）
-python -m backend.run
+# フロントエンドのみ
+pnpm run install:front
+
+# バックエンドのみ
+pnpm run install:back
 ```
-backend/run.pyを実行すると、backend libraryが読み込めないので失敗する
 
-サーバーは `http://0.0.0.0:8000` で起動します（`.env`で変更可能）。
+セットアップ完了後、`.env`ファイルを編集してAPIキーを設定してください。
 
-#### Frontend
+### サーバー起動
+
 ```bash
-# 開発サーバー起動
-pnpm --filter frontend dev
+# フロントエンド・バックエンドを同時起動
+pnpm run start
 ```
 
-</details>
+**個別起動:**
+```bash
+# フロントエンドのみ
+pnpm run dev:front
+
+# バックエンドのみ
+pnpm run dev:back
+```
+
+- **Backend**: http://localhost:8000
+- **Frontend**: http://localhost:5173
+
+## Docker での起動
+
+```bash
+# ビルド
+docker compose build
+
+# 起動
+docker compose up -d
+
+# ログ確認
+docker compose logs -f
+
+# 停止
+docker compose down
+```
+
+- **Frontend**: http://localhost
+- **Backend**: http://localhost:8000
 
 ## プロジェクト構造
 
 ```
 LiVraria/
-├── backend/
-│   ├── __init__.py          # 環境変数とパス設定の一元管理
-│   ├── run.py               # サーバー起動エントリーポイント
+├── backend/                 # FastAPI バックエンド
+│   ├── __init__.py         # 環境変数・パス設定
+│   ├── run.py              # サーバー起動エントリーポイント
 │   ├── api/
-│   │   ├── server.py        # FastAPI サーバー
-│   │   ├── datastore.py     # データストア（JSON）
-│   │   ├── gemini.py        # Gemini API連携
-│   │   ├── models.py        # Pydanticモデル
-│   │   ├── prompts/         # AIプロンプトファイル
-│   │   └── data/            # JSONデータファイル
-│   ├── search/              # 検索機能（CiNii, Calilなど）
-│   └── test/                # テストファイル
-├── frontend/                # Viteフロントエンド
-├── .env                     # 環境変数（gitignore）
-├── .env.template            # 環境変数テンプレート
+│   │   ├── server.py       # FastAPI サーバー
+│   │   ├── datastore.py    # データストア（JSON/MongoDB）
+│   │   ├── llm.py          # LLM統合（Gemini/Ollama）
+│   │   ├── prompts/        # AIプロンプトファイル
+│   │   └── data/           # JSONデータファイル
+│   ├── search/             # 検索機能（CiNii, Calil）
+│   ├── Dockerfile          # バックエンド用Dockerfile
+│   └── requirements.txt    # Python依存関係
+├── frontend/               # Vue 3 + Vite フロントエンド
+│   ├── src/
+│   │   ├── components/     # Vueコンポーネント
+│   │   ├── services/       # API通信
+│   │   └── firebaseConfig.js
+│   ├── Dockerfile          # フロントエンド用Dockerfile
+│   └── package.json
+├── raspi/                  # Raspberry Pi 関連
+│   └── nfc/
+│       ├── nfc_api_server.py  # NFC APIサーバー
+│       ├── nfc-api.service    # systemdサービス
+│       ├── requirements.txt   # Python依存関係
+│       └── README.md          # セットアップガイド
+├── .github/
+│   ├── workflows/
+│   │   ├── ci.yaml         # CI（ビルドテスト）
+│   │   └── cd.yaml.disabled # CD（デプロイ）※準備中
+│   └── dependabot.yml      # 依存関係自動更新
+├── docker-compose.yml      # Docker Compose設定
+├── .env.template           # 環境変数テンプレート
 └── README.md
 ```
 
 ## 環境変数設定
 
-`.env.template`をコピーして`.env`を作成し、以下の値を設定してください：
+`.env.template`をコピーして`.env`を作成し、以下を設定：
 
 ### 必須項目
-- `GEMINI_API_KEY`: Google Gemini APIキー
-- `FIREBASE_ACCOUNT_KEY_PATH`: Firebase認証用JSONファイルのパス
-- `PROMPTS_DIR`: プロンプトファイルのディレクトリ
-- `DATA_DIR`: データファイルのディレクトリ
+
+```bash
+# Firebase
+FIREBASE_ACCOUNT_KEY_PATH=path/to/serviceAccountKey.json
+FIREBASE_API_KEY=your_firebase_api_key
+
+# Gemini API
+GEMINI_API_KEY1=your_gemini_api_key
+
+# Rakuten Books API
+RAKUTEN_APP_ID=your_rakuten_app_id
+```
 
 ### オプション項目
-- `BACKEND_HOST`: バックエンドホスト（デフォルト: `0.0.0.0`）
-- `BACKEND_PORT`: バックエンドポート（デフォルト: `8000`）
-- `PROMPT_DEFAULT`: デフォルトプロンプトファイル名
-- `PROMPT_LIBRARIAN`: 司書モードプロンプトファイル名
-- その他、詳細は`.env.template`を参照
+
+```bash
+# Backend設定
+BACKEND_HOST=0.0.0.0
+BACKEND_PORT=8000
+
+# LLMバックエンド（gemini または ollama）
+LLM_BACKEND=gemini
+
+# 本番環境CORS（カンマ区切り）
+PRODUCTION_ORIGINS=https://example.com,https://www.example.com
+
+# MongoDB（オプション）
+MONGODB_URI=mongodb://localhost:27017
+MONGODB_DB=livraria_dev
+```
+
+詳細は`.env.template`を参照してください。
 
 ## 開発ガイド
 
-### テスト実行
+### 推奨: pnpmコマンドを使用
+
 ```bash
-# 仮想環境を有効化
-source .venv/bin/activate
+# セットアップ
+pnpm install
+pnpm run setup
 
-# 特定のテストを実行
-python -m backend.test.test_firebase_integration
+# 開発サーバー起動
+pnpm run start  # フロントエンド・バックエンド同時起動
 
-# または pytest を使用
-pytest backend/test/
+# 個別起動
+pnpm run dev:front  # フロントエンドのみ
+pnpm run dev:back   # バックエンドのみ
 ```
 
-### コード構成の原則
-- すべてのパス設定は`backend/__init__.py`に集約
-- 環境変数は`.env`で管理（`.env.template`を参照）
-- サーバー起動は`python -m backend.run`を使用
-- テストは`python -m backend.test.<test_name>`で実行
+### 手動セットアップ（上級者向け）
 
-## 注意事項
+<details>
+<summary>手動でセットアップする場合</summary>
 
-- **`.env`はコミット禁止**: 機密情報を含むため、必ず`.gitignore`に含めてください
-- **仮想環境の使用**: 依存関係の競合を避けるため、必ず仮想環境を使用してください
-- **pnpmの推奨**: フロントエンドは`pnpm`の使用を推奨します（`pnpm-lock.yaml`で依存関係を管理）
+#### Backend
 
-詳しい技術仕様は `docs/technical_specs.md` を参照してください。
+```bash
+# 仮想環境作成・有効化
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# 依存関係インストール
+pip install -r backend/requirements.txt
+
+# サーバー起動
+python -m backend.run
+```
+
+#### Frontend
+
+```bash
+# 依存関係インストール
+cd frontend
+pnpm install
+
+# 開発サーバー起動
+pnpm run dev
+
+# ビルド
+pnpm run build
+```
+
+</details>
+
+### テスト
+
+```bash
+# Backend
+source .venv/bin/activate
+pytest backend/test/
+
+# Frontend（CIで自動実行）
+cd frontend
+pnpm run build
+```
+
+## NFC認証（Raspberry Pi）
+
+Raspberry Pi + NFCカードリーダーでNFC認証を有効化できます。
+
+### セットアップ
+
+```bash
+cd raspi/nfc
+# systemdオプション: systemdに登録して自動起動する
+./setup.sh --systemd
+```
+
+詳細は[raspi/nfc/README.md](raspi/nfc/README.md)を参照してください。
+
+## デプロイ
+
+### VPSへのデプロイ
+
+1. **GitHub Secretsを設定**
+   - `HOST`: VPSのIPアドレス
+   - `USERNAME`: SSHユーザー名
+   - `PRIVATE_KEY`: SSH秘密鍵
+
+2. **CDワークフローを有効化**
+   ```bash
+   mv .github/workflows/cd.yaml.disabled .github/workflows/cd.yaml
+   git add .github/workflows/cd.yaml
+   git commit -m "feat: enable CD"
+   git push
+   ```
+
+3. **mainブランチにpush**すると自動デプロイされます
+
+詳細は[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)を参照してください。
+
+## 技術スタック
+
+### Backend
+- **FastAPI** - 高速なPython Webフレームワーク
+- **Firebase Admin SDK** - 認証・データベース
+- **Google Gemini API** - AI会話機能
+- **MongoDB** - データベース（オプション）
+- **pyscard** - NFCカードリーダー連携
+
+### Frontend
+- **Vue 3** - プログレッシブJavaScriptフレームワーク
+- **Vite** - 高速ビルドツール
+- **TailwindCSS v4** - ユーティリティファーストCSS
+- **Firebase** - 認証・データベース
+
+### DevOps
+- **Docker** - コンテナ化
+- **GitHub Actions** - CI/CD
+- **Dependabot** - 依存関係自動更新
+
+## ドキュメント
+
+- [デプロイガイド](docs/DEPLOYMENT.md)
+- [RaspberryPi用セットアップガイド](raspi/README.md)
+- [NFC APIサーバー](raspi/nfc/README.md)
+- [技術仕様](docs/technical_specs.md)
 
 ## ライセンス
 
