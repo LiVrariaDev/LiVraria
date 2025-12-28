@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "firebase": "^12.7.0",
-    "vue": "^3.5.18"
+    "vue": "^3.5.26"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.17",
