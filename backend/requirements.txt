@@ -24,4 +24,4 @@ requests==2.32.5  # External API calls (Rakuten, CiNii, etc.)
 # ============================================================================
 # Utilities
 # ============================================================================
-python-dotenv==1.1.1  # Environment variable loading
+python-dotenv==1.2.1  # Environment variable loading
