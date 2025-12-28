@@ -15,7 +15,7 @@ rich-toolkit==0.15.1  # Rich extensions
 typer==0.19.2  # CLI application framework
 
 # FastAPI Development Tools
-fastapi-cli==0.0.13  # FastAPI CLI
+fastapi-cli==0.0.20  # FastAPI CLI
 
 # ============================================================================
 # Testing & Quality Assurance
