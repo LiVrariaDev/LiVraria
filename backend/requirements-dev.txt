@@ -9,7 +9,7 @@
 # ============================================================================
 # Debug & Logging
 rich==14.1.0  # Beautiful terminal output
-rich-toolkit==0.15.1  # Rich extensions
+rich-toolkit==0.17.1  # Rich extensions
 
 # CLI Tools
 typer==0.19.2  # CLI application framework
