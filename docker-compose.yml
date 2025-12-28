@@ -1,0 +1,28 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./.env:/app/.env:ro # .envファイルを読み取り専用でマウント
+    restart: always
+    networks:
+      - livraria-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - livraria-network
+
+networks:
+  livraria-network:
+    driver: bridge

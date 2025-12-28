@@ -1,9 +1,9 @@
 name: LiVraria CD
 
 on:
- push:
-   branches:
-     - main
+  push:
+    branches:
+      - main
 
 jobs:
   deploy:
@@ -11,17 +11,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy to Server via SSH
-        uses: appleboy/ssh-action@master
+      - name: Copy files to Server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.PRIVATE_KEY }}
+          source: "."
+          target: "/home/${{ secrets.USERNAME }}/LiVraria"
+          rm: true
+
+      - name: Deploy with Docker Compose
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.PRIVATE_KEY }}
           script: |
-            cd /var/www/LiVraria
-            git pull origin main
-            sudo systemctl restart livraria-backend
-            cd frontend
-            pnpm install
-            pnpm run build
-            sudo cp -r dist/* /var/www/LiVraria/frontend
+            cd /home/${{ secrets.USERNAME }}/LiVraria
+            docker compose down
+            docker compose up -d --build
+            docker image prune -f
