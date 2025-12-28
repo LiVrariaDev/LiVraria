@@ -32,17 +32,25 @@ async def startup_event():
 		logger.info("🤖 [LLM Backend] Using Gemini API")
 
 # CORS設定（フロントエンドからのアクセスを許可）
+# 開発環境のオリジン（デフォルト）
+allowed_origins = [
+	"http://localhost:5173",  # Vite開発サーバー
+	"http://localhost:3000",  # 他の開発サーバー
+	"http://127.0.0.1:5173",
+	"http://127.0.0.1:3000",
+]
+
+# 本番環境のオリジンを環境変数から追加
+production_origins = os.getenv("PRODUCTION_ORIGINS", "")
+if production_origins:
+	# カンマ区切りで複数のオリジンを指定可能
+	# 例: PRODUCTION_ORIGINS=https://example.com,https://www.example.com
+	allowed_origins.extend([origin.strip() for origin in production_origins.split(",") if origin.strip()])
+	logger.info(f"[CORS] Production origins added: {production_origins}")
+
 app.add_middleware(
 	CORSMiddleware,
-	allow_origins=[
-		"http://localhost:5173",  # Vite開発サーバー
-		"http://localhost:3000",  # 他の開発サーバー
-		"http://127.0.0.1:5173",
-		"http://127.0.0.1:3000",
-	],
-	# allow_origin_regex を使ってローカルのプライベートIP（例: 172.x.x.x）からの接続を許可
-	# 例: http://172.20.10.5:5173 のようなオリジンを許可します
-	allow_origin_regex=r"^https?://172\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$",
+	allow_origins=allowed_origins,
 	allow_credentials=True,
 	allow_methods=["*"],
 	allow_headers=["*"],
