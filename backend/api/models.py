@@ -24,11 +24,10 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
 	response: str
 	session_id: str
+	recommended_books: List[dict] = Field(default_factory=list, description="推薦された書籍リスト")
 
 # Data Models
-class Message(BaseModel):
-	role: str = Field(description="user or assistant")
-	content: str = Field(description="message content")
+# Message Class : 廃止, LangChainの方へ合わせる
 
 class NfcUser(BaseModel):
 	nfc_id: str = Field(alias="_id", description="NFC ID")

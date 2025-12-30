@@ -321,13 +321,25 @@ class Server:
 						ai_insight = ai_insights_text
 
 		# LLMバックエンドを使用してチャット
-		response_text, new_history = chat_function(prompt_file, request.message, history, ai_insight=ai_insight)
+		# llm_chatは (response_text, new_history, recommended_books) を返す
+		response_text, new_history, recommended_books = chat_function(
+			prompt_file, 
+			request.message, 
+			history, 
+			ai_insight=ai_insight
+		)
 
 		# メモリ上の履歴を更新（ディスク書き込みは close_session 時に行う）
 		self.data_store.update_history(session_id, new_history)
 		
 		logger.info(f"[DEBUG] chat_prompt returning session_id: {session_id}")
-		return ChatResponse(response=response_text, session_id=session_id)
+		logger.info(f"[DEBUG] recommended_books count: {len(recommended_books)}")
+		
+		return ChatResponse(
+			response=response_text, 
+			session_id=session_id,
+			recommended_books=recommended_books
+		)
 
 
 # DataStoreインスタンスを作成

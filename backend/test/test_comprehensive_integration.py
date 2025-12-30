@@ -346,7 +346,7 @@ def main():
 	# ========================================
 	print_section("11. セッションクローズ")
 	try:
-		response = requests.put(f"{BASE_URL}/sessions/{session_id}/close", params={"user_id": user_id}, headers=headers)
+		response = requests.post(f"{BASE_URL}/sessions/{session_id}/close", params={"user_id": user_id}, headers=headers)
 		response.raise_for_status()
 		print_result(True, "セッションクローズ成功")
 		
