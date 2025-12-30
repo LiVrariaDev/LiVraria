@@ -34,12 +34,14 @@ if (child.error || child.status !== 0) {
     process.exit(1);
 }
 
-try {
-    fs.copyFileSync(path.join(__dirname, "..", ".env.template"), path.join(__dirname, "..", ".env"));
-} catch (error) {
-    console.error("Failed to copy .env.template");
-    console.error(error);
-    process.exit(1);
+if (!fs.existsSync(path.join(__dirname, "..", ".env"))) {
+    try {
+        fs.copyFileSync(path.join(__dirname, "..", ".env.template"), path.join(__dirname, "..", ".env"));
+    } catch (error) {
+        console.error("Failed to copy .env.template");
+        console.error(error);
+        process.exit(1);
+    }
 }
 
 console.log("-------------------------------")
