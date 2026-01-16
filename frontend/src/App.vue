@@ -1,41 +1,52 @@
 <template>
-  <!-- 認証状態の読み込みが完了するまで「読み込み中...」を表示 -->
-  <div v-if="isAuthReady">
-    <!-- ユーザーがログインしているかどうかに基づいて表示を切り替える -->
-    <MainApp v-if="user" />
-    <Login v-else />
-  </div>
-  <div v-else class="flex items-center justify-center h-screen bg-gray-100">
+  <!-- 
+    URLに '?view=secondary' がついている時はセカンダリディスプレイを表示
+    それ以外は通常のログイン・メイン画面を表示
+  -->
+  <SecondaryDisplay v-if="isSecondaryView" />
+  
+  <div v-else>
+    <div v-if="isAuthReady">
+      <MainApp v-if="user" />
+      <Login v-else />
+    </div>
+    <div v-else class="flex items-center justify-center h-screen bg-gray-100">
       <p class="text-2xl font-semibold text-gray-700">読み込み中...</p>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from './firebaseConfig'; // 設定ファイルをインポート
+import { auth } from './firebaseConfig';
 
-// コンポーネントをインポート
+// コンポーネント
 import MainApp from './components/MainApp.vue';
 import Login from './components/Login.vue';
+import SecondaryDisplay from './components/SecondaryDisplay.vue';
 
 const user = ref(null);
-const isAuthReady = ref(false); // 認証状態の準備ができたか
-let unsubscribe = null; // 監視を停止するための変数
+const isAuthReady = ref(false);
+const isSecondaryView = ref(false);
+let unsubscribe = null;
 
-// コンポーネントがマウントされた時に実行
 onMounted(() => {
-  unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-    user.value = currentUser; // ユーザー情報を更新
-    isAuthReady.value = true; // 認証状態のチェックが完了したことを示す
-  });
+  // URLパラメータをチェック (?view=secondary があるか？)
+  const urlParams = new URLSearchParams(window.location.search);
+  isSecondaryView.value = urlParams.get('view') === 'secondary';
+
+  // セカンダリ画面でない場合のみ、認証監視を行う
+  if (!isSecondaryView.value) {
+    unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      user.value = currentUser;
+      isAuthReady.value = true;
+    });
+  }
 });
 
-// コンポーネントが破棄される時に実行
 onUnmounted(() => {
-  if (unsubscribe) {
-    unsubscribe();
-  }
+  if (unsubscribe) unsubscribe();
 });
 </script>
 

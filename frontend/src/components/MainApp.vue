@@ -1,8 +1,7 @@
 <template>
     <div class="w-screen h-screen font-sans text-gray-800 bg-gray-900">
 
-        <!-- ===== 診断用（画面には表示されませんが、裏で画像をチェックします） ===== -->
-        <!-- 画像の読み込みに成功したらコンソールに表示、失敗したらアラートを出します -->
+        <!-- ===== 診断用 ===== -->
         <img 
             src="/bg.jpg" 
             style="display: none;" 
@@ -12,16 +11,14 @@
 
         <!-- ===== ホームページ表示 ===== -->
         <div v-if="currentPage === 'home'" class="relative flex w-full h-full overflow-hidden">
-            <!-- 背景画像エリア -->
-            <!-- 直接 public フォルダのパスを指定します -->
+            <!-- 背景画像 -->
             <div class="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700"
-                 :style="{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('/bg.jpg')` }">
+                 :style="{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('/bg.jpg?v=2')` }">
             </div>
 
             <!-- 左側: アバターと会話エリア -->
             <div class="relative z-10 w-1/3 flex flex-col items-center justify-center p-8">
                 <div class="relative group">
-                    <!-- アバター本体 -->
                     <div class="avatar-container relative w-64 h-80 flex items-center justify-center transition-transform duration-500">
                         <div class="avatar-glow absolute inset-0 bg-gradient-to-tr from-blue-400 to-purple-400 rounded-[60%_40%_30%_70%/60%_30%_70%_40%] blur-xl opacity-30 animate-pulse-slow"></div>
                         <div class="avatar-shape w-full h-full bg-gradient-to-br from-white to-blue-50 border-4 border-blue-200 shadow-2xl flex items-center justify-center overflow-hidden relative animate-float">
@@ -68,7 +65,7 @@
                 </div>
             </div>
 
-            <!-- 下部: 入力とオプションエリア -->
+            <!-- 下部: 入力とオプション -->
             <div class="absolute bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-white/20 p-6 flex items-center shadow-lg z-20">
                 <div class="flex-grow mx-8 relative flex items-center">
                     <button @click="toggleSpeechRecognition" 
@@ -83,6 +80,11 @@
                            class="w-full bg-white/80 border border-slate-300 rounded-full py-4 px-6 pl-6 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all shadow-inner text-lg">
                 </div>
                 <div class="flex space-x-4 mr-8 items-center">
+                     <!-- 動画ウィンドウボタン -->
+                     <button @click="openSecondaryDisplay" class="flex items-center px-4 py-3 bg-teal-50 hover:bg-teal-100 text-teal-700 font-semibold rounded-full transition-colors duration-200 border border-teal-200 shadow-sm">
+                        <span class="mr-2">📺</span> 動画ウィンドウ
+                     </button>
+
                      <button @click="toggleSpeech" class="flex items-center px-4 py-3 mr-2 bg-white hover:bg-slate-100 text-slate-600 font-semibold rounded-full transition-colors duration-200 shadow-sm" :class="{'text-blue-500': isSpeechEnabled}">
                         <span v-if="isSpeechEnabled">🔊 ON</span>
                         <span v-else>🔇 OFF</span>
@@ -196,19 +198,13 @@ import { signOut, getIdToken } from "firebase/auth";
 import { auth } from '../firebaseConfig';
 import { api } from '../services/api'; 
 
-// 修正：画像のimportを削除し、エラーを回避します
-// import bgImage from '../assets/bg.jpg';
-
-// --- 診断用関数 ---
 const handleImageError = () => {
-    alert("【画像読み込みエラー】\n publicフォルダに 'bg.jpg' が見つかりません。\nファイル名が 'bg.jpg.jpg' になっていないか、\nフォルダが間違っていないか確認してください。");
+    alert("【画像読み込みエラー】\n publicフォルダに 'bg.jpg' が見つかりません。");
 };
 const handleImageLoad = () => {
     console.log("画像の読み込みに成功しました！");
 };
-// ----------------
 
-// --- 音声合成の実装（女性ボイス固定） ---
 const isSpeechEnabled = ref(true);
 const selectedVoice = ref(null);
 
@@ -250,7 +246,6 @@ const speakText = (text) => {
     utterance.volume = 1.0;
     window.speechSynthesis.speak(utterance);
 };
-// ---------------------
 
 const icons = {
     search: `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>`,
@@ -279,12 +274,30 @@ const suggestedBooks = ref(Array.from({ length: 6 }, (_, i) => ({ id: i + 1, tit
 const selectedBook = ref(null);
 const chatHistoryEl = ref(null);
 
+const channel = new BroadcastChannel('livraria_channel'); 
+
 const openSecondaryDisplay = () => {
+    // 修正：既存のウィンドウがあればフォーカス
     if (secondaryWindow.value && !secondaryWindow.value.closed) {
         secondaryWindow.value.focus();
         return;
     }
-    secondaryWindow.value = window.open('/secondary_display.html', 'LivrariaSecondaryDisplay', 'width=1280,height=720');
+    
+    // 修正：セカンダリディスプレイ（と想定される位置）にウィンドウを開く試み
+    // プライマリモニターの幅を取得し、その右側に配置するように 'left' を指定します
+    const leftPosition = window.screen.width; 
+    const width = window.screen.availWidth;
+    const height = window.screen.availHeight;
+
+    // ウィンドウオプションを設定
+    // resizable=yes でサイズ変更を許可、scrollbars=no でスクロールバーを消す
+    const features = `left=${leftPosition},top=0,width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no`;
+    
+    secondaryWindow.value = window.open('/?view=secondary', 'LivrariaSecondaryDisplay', features);
+};
+
+const sendMessageToSecondary = (text, state = 'speaking') => {
+    channel.postMessage({ type: 'chat', text, state });
 };
 
 const handleHomeButtonClick = (action) => {
@@ -293,35 +306,40 @@ const handleHomeButtonClick = (action) => {
         const msg = `「${action}」機能は準備中です。`;
         homeConversationText.value = msg;
         speakText(msg);
+        sendMessageToSecondary(msg);
     }
 };
 
 const sendHomeMessage = async () => {
     const user = auth.currentUser;
     if (!user) {
-        homeConversationText.value = 'エラー：ログインしてください。';
+        const msg = 'エラー：ログインしてください。';
+        homeConversationText.value = msg;
+        speakText(msg);
+        sendMessageToSecondary(msg);
         return;
     }
     const message = userInput.value;
     userInput.value = '';
-    
     isLoading.value = true;
 
     try {
         const token = await getIdToken(user);
-        
         const data = await api.sendMessage(currentSessionId.value, message, token, 'default');
         
         if (data.session_id) currentSessionId.value = data.session_id;
         
-        const aiResponse = data.response;
+        const aiResponse = data.reply;
         homeConversationText.value = aiResponse;
         speakText(aiResponse);
+        sendMessageToSecondary(aiResponse);
         
     } catch (error) {
         console.error(error);
-        homeConversationText.value = 'エラーが発生しました。';
-        speakText('エラーが発生しました。');
+        const msg = 'エラーが発生しました。';
+        homeConversationText.value = msg;
+        speakText(msg);
+        sendMessageToSecondary(msg);
     } finally {
         isLoading.value = false;
     }
@@ -342,14 +360,14 @@ const sendChatMessage = async () => {
 
     try {
         const token = await getIdToken(user);
-        
         const data = await api.sendMessage(currentSessionId.value, message, token, 'default');
         
         if (data.session_id) currentSessionId.value = data.session_id;
         
-        const aiResponse = data.response;
+        const aiResponse = data.reply;
         chatHistory.value.push({ sender: 'ai', text: aiResponse });
         speakText(aiResponse);
+        sendMessageToSecondary(aiResponse);
         
     } catch (error) {
         console.error(error);
@@ -367,10 +385,8 @@ const selectBook = (bookId) => {
 const askAboutBook = async () => {
     if (!selectedBook.value) return;
     const question = `「${selectedBook.value.title}」について教えてください。`;
-    
     chatHistory.value.push({ sender: 'user', text: question });
     scrollToBottom();
-    
     const user = auth.currentUser;
     if (!user) return;
     
@@ -378,14 +394,14 @@ const askAboutBook = async () => {
 
     try {
         const token = await getIdToken(user);
-        
         const data = await api.sendMessage(currentSessionId.value, question, token, 'default');
         
         if (data.session_id) currentSessionId.value = data.session_id;
         
-        const aiResponse = data.response;
+        const aiResponse = data.reply;
         chatHistory.value.push({ sender: 'ai', text: aiResponse });
         speakText(aiResponse);
+        sendMessageToSecondary(aiResponse);
 
     } catch (error) {
         console.error(error);
@@ -401,23 +417,8 @@ const scrollToBottom = async () => {
     if(chatHistoryEl.value) chatHistoryEl.value.scrollTop = chatHistoryEl.value.scrollHeight;
 };
 
-const logout = async () => {
-    // アクティブセッションがあればクローズ
-    if (currentSessionId.value) {
-        try {
-            const user = auth.currentUser;
-            if (user) {
-                const token = await getIdToken(user);
-                await api.closeSession(currentSessionId.value, token);
-                console.log('セッションをクローズしました');
-            }
-        } catch (error) {
-            console.error('セッションクローズ失敗:', error);
-        }
-    }
-    
-    // Firebase ログアウト
-    signOut(auth).catch(error => console.error('Logout failed', error));
+const logout = () => {
+  signOut(auth).catch(error => console.error('Logout failed', error));
 };
 
 const fetchUserGreeting = async () => {
@@ -426,10 +427,9 @@ const fetchUserGreeting = async () => {
     
     try {
         const token = await getIdToken(user);
-        
         const userData = await api.getUser(user.uid, token);
-        
         const greeting = `ようこそ、${userData.name || user.email}さん！<br>今日はどんな本をお探しですか？`;
+        
         homeConversationText.value = greeting;
         isLoading.value = false;
         
@@ -437,6 +437,7 @@ const fetchUserGreeting = async () => {
         const speakGreeting = () => {
             if (selectedVoice.value || attempts > 10) {
                 speakText(greeting);
+                sendMessageToSecondary(greeting);
             } else {
                 attempts++;
                 setTimeout(speakGreeting, 100);
@@ -454,48 +455,20 @@ const fetchUserGreeting = async () => {
 // --- 音声認識の実装 ---
 const isRecording = ref(false);
 let recognition = null;
-
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SpeechRecognition();
-    recognition.lang = 'ja-JP'; 
-    recognition.interimResults = false; 
-    recognition.continuous = false; 
-
+    recognition.lang = 'ja-JP'; recognition.interimResults = false; recognition.continuous = false; 
     recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
-        console.log('音声認識結果:', transcript);
-        if (userInput.value) {
-            userInput.value += ' ' + transcript;
-        } else {
-            userInput.value = transcript;
-        }
+        if (userInput.value) userInput.value += ' ' + transcript; else userInput.value = transcript;
     };
-
-    recognition.onend = () => {
-        isRecording.value = false;
-    };
-
-    recognition.onerror = (event) => {
-        console.error('音声認識エラー:', event.error);
-        isRecording.value = false;
-        alert('音声認識でエラーが発生しました: ' + event.error);
-    };
-} else {
-    console.warn('このブラウザはWeb Speech APIをサポートしていません。');
+    recognition.onend = () => { isRecording.value = false; };
+    recognition.onerror = (event) => { console.error('音声認識エラー:', event.error); isRecording.value = false; alert('音声認識でエラーが発生しました: ' + event.error); };
 }
-
 const toggleSpeechRecognition = () => {
-    if (!recognition) {
-        alert('お使いのブラウザは音声認識に対応していません。Google Chromeなどをご利用ください。');
-        return;
-    }
-    if (isRecording.value) {
-        recognition.stop();
-    } else {
-        recognition.start();
-        isRecording.value = true;
-    }
+    if (!recognition) return alert('音声認識未対応です');
+    if (isRecording.value) { recognition.stop(); } else { recognition.start(); isRecording.value = true; }
 };
 
 onMounted(() => {
@@ -506,35 +479,19 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-    if (recognition && isRecording.value) {
-        recognition.stop();
-    }
+    channel.close();
+    if (recognition && isRecording.value) recognition.stop();
     window.speechSynthesis.cancel();
 });
 </script>
 
 <style>
 /* アニメーション定義 */
-.avatar-shape {
-    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
-}
-
-@keyframes float {
-    0%, 100% { transform: translateY(0px); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
-    50% { transform: translateY(-15px); border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
-}
-.animate-float {
-    animation: float 6s ease-in-out infinite;
-}
-
-@keyframes pulse-slow {
-    0%, 100% { transform: scale(1); opacity: 0.3; }
-    50% { transform: scale(1.1); opacity: 0.5; }
-}
-.animate-pulse-slow {
-    animation: pulse-slow 4s ease-in-out infinite;
-}
-
+.avatar-shape { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+@keyframes float { 0%, 100% { transform: translateY(0px); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; } 50% { transform: translateY(-15px); border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; } }
+.animate-float { animation: float 6s ease-in-out infinite; }
+@keyframes pulse-slow { 0%, 100% { transform: scale(1); opacity: 0.3; } 50% { transform: scale(1.1); opacity: 0.5; } }
+.animate-pulse-slow { animation: pulse-slow 4s ease-in-out infinite; }
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }

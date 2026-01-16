@@ -38,6 +38,7 @@ allowed_origins = [
 	"http://localhost:3000",  # 他の開発サーバー
 	"http://127.0.0.1:5173",
 	"http://127.0.0.1:3000",
+	"*",  # Allow all origins for network access
 ]
 
 # 本番環境のオリジンを環境変数から追加
