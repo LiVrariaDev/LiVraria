@@ -72,6 +72,7 @@ export const api = {
      * @param {string} message - メッセージ内容
      * @param {string} idToken - Firebase ID Token
      * @param {string} mode - チャットモード
+     * @returns {Promise<{response: string, session_id: string, recommended_books: Array}>}
      */
     async sendMessage(sessionId, message, idToken, mode = 'default') {
         // 新規セッションの場合はsession_id="new"を使用
@@ -88,7 +89,22 @@ export const api = {
         })
 
         if (!response.ok) throw new Error('Failed to send message')
-        return response.json()
+        const data = await response.json()
+
+        // レスポンス形式:
+        // {
+        //   response: "AIの応答テキスト",
+        //   session_id: "セッションID",
+        //   recommended_books: [
+        //     {
+        //       title: "書籍タイトル",
+        //       author: "著者",
+        //       isbn: "ISBN",
+        //       recommendation_reason: "推薦理由"
+        //     }
+        //   ]
+        // }
+        return data
     },
 
     /*

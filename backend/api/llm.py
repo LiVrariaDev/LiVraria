@@ -1,113 +1,207 @@
 # Standard Library
 import os
-import json
-import re
-import pprint
-from typing import Optional, List, Dict, Any, Tuple
+import threading
+from typing import Optional, List, Dict, Any, TypedDict, Annotated, Sequence
+import logging
 
-# Third Party
-import requests
+# LangChain
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
+from langchain_core.tools import tool
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_ollama import ChatOllama
+from langgraph.graph import StateGraph, END
+from langgraph.graph.message import add_messages
+from langgraph.prebuilt import ToolNode
 
-# user-defined
-from backend import PROMPTS_DIR
+# User-defined
+from backend import PROMPTS_DIR, GEMINI_API_KEY_RATE
 from backend.search.rakuten_books import rakuten_search_books
 
-# Ollama APIのエンドポイント（デフォルト）
-OLLAMA_API_URL = os.getenv("OLLAMA_API_URL", "http://localhost:11434/api/chat")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
+# Logger
+logger = logging.getLogger("uvicorn.error")
 
 
-def remove_markdown_formatting(text: str) -> str:
+# State Definition
+
+class AgentState(TypedDict):
+	"""エージェントの状態"""
+	messages: Annotated[Sequence[BaseMessage], add_messages]
+	search_results: Dict[int, dict]  # 検索結果（番号 → 書籍データ）
+	recommended_books: List[dict]  # 推薦された書籍
+
+
+# グローバルステート（ツール間で共有）
+_global_state = {
+	"search_results": {},
+	"recommended_books": []
+}
+
+
+# API Key Management (from gemini.py)
+
+_chat_lock = threading.Lock()
+API_KEY_NUMBER = 1
+API_KEY_USES = 0
+
+def get_gemini_api_key():
 	"""
-	Markdown記号を除去してプレーンテキストに変換
+	Gemini APIキーを取得（ローテーション機能付き）
+	
+	GEMINI_API_KEY_RATE回使用したら次のキーに切り替える
+	"""
+	global API_KEY_USES, API_KEY_NUMBER
+	with _chat_lock:
+		API_KEY_USES += 1
+		if API_KEY_USES > GEMINI_API_KEY_RATE:
+			API_KEY_NUMBER += 1
+			API_KEY_USES = 0
+		logger.info(f"Using Gemini API Key number: GEMINI_API_KEY{API_KEY_NUMBER}")
+		API_KEY = os.getenv(f"GEMINI_API_KEY{API_KEY_NUMBER}", "none")
+		if API_KEY == "none":
+			logger.error(f"GEMINI_API_KEY{API_KEY_NUMBER} not found")
+			# フォールバック: GEMINI_API_KEY1を試す
+			API_KEY = os.getenv("GEMINI_API_KEY1")
+			if not API_KEY:
+				raise ValueError("No Gemini API key found")
+		return API_KEY
+
+
+# LLM Initialization
+
+def get_llm(backend: str = None, temperature: float = 0.3, max_tokens: int = 512, system_prompt: Optional[str] = None):
+	"""
+	LLMインスタンスを取得
 	
 	Args:
-		text: Markdown形式のテキスト
+		backend: LLMバックエンド（'gemini' または 'ollama'）
+		temperature: 温度パラメータ
+		max_tokens: 最大トークン数
+		system_prompt: システムプロンプト（オプション）
 		
 	Returns:
-		プレーンテキスト
+		LangChain LLMインスタンス
 	"""
-	if not text:
-		return text
+	if backend is None:
+		backend = os.getenv("LLM_BACKEND", "gemini")
 	
-	# コードブロックを除去（```で囲まれた部分）
-	text = re.sub(r'```[a-z]*\n.*?\n```', '', text, flags=re.DOTALL)
-	
-	# インラインコードを除去（`で囲まれた部分）
-	text = re.sub(r'`([^`]+)`', r'\1', text)
-	
-	# 太字を除去（**または__で囲まれた部分）
-	text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
-	text = re.sub(r'__([^_]+)__', r'\1', text)
-	
-	# イタリックを除去（*または_で囲まれた部分）
-	text = re.sub(r'\*([^*]+)\*', r'\1', text)
-	text = re.sub(r'_([^_]+)_', r'\1', text)
-	
-	# 見出し記号を除去（#で始まる行）
-	text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
-	
-	# リンクを除去（[テキスト](URL)形式）
-	text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
-	
-	# リストマーカーを除去（-、*、+で始まる行）
-	text = re.sub(r'^[\-\*\+]\s+', '', text, flags=re.MULTILINE)
-	
-	# 番号付きリストマーカーを除去（1.で始まる行）
-	text = re.sub(r'^\d+\.\s+', '', text, flags=re.MULTILINE)
-	
-	# 引用記号を除去（>で始まる行）
-	text = re.sub(r'^>\s+', '', text, flags=re.MULTILINE)
-	
-	# 水平線を除去（---または***）
-	text = re.sub(r'^[\-\*]{3,}$', '', text, flags=re.MULTILINE)
-	
-	# 余分な空行を削除
-	text = re.sub(r'\n{3,}', '\n\n', text)
-	
-	return text.strip()
+	if backend == "gemini":
+		# Geminiの場合、system_instructionとして渡す
+		kwargs = {
+			"model": "gemini-2.5-flash",
+			"temperature": temperature,
+			"max_tokens": max_tokens,
+			"google_api_key": get_gemini_api_key()
+		}
+		if system_prompt:
+			# LangChainのChatGoogleGenerativeAIはsystem_instructionをサポート
+			# ただし、メッセージとして渡す必要がある場合もあるため、
+			# ここでは含めずに、メッセージリストに追加する方式を採用
+			pass
+		return ChatGoogleGenerativeAI(**kwargs)
+	else:  # ollama
+		return ChatOllama(
+			model=os.getenv("OLLAMA_MODEL", "llama3.2"),
+			base_url=os.getenv("OLLAMA_API_URL", "http://localhost:11434"),
+			temperature=temperature,
+			num_predict=max_tokens
+		)
 
-def search_books(keywords: list[list[str]], count: int = 4) -> list[dict]:
+
+# Tools Definition
+
+@tool
+def search_books(keywords: list[str], count: int = 10) -> str:
 	"""
 	楽天Books APIを使って書籍を検索
 	
+	検索結果は番号付きリストで返されます。
+	推薦する本を選ぶ際は、この番号を使用してください。
+	
 	Args:
-		keywords: 検索キーワードのリスト（各内部リストはAND検索）
-		count: 取得する書籍数
+		keywords: 検索キーワードのリスト（例: ["SF", "初心者", "おすすめ"]）
+		count: 取得する書籍数（デフォルト: 10）
 		
 	Returns:
-		検索結果の辞書
+		番号付き書籍リスト
 	"""
-	integrated_results = {
-		"search_result": []
-	}
-	seen_ids = set()
-	for i, item in enumerate(keywords):
-		books = rakuten_search_books(item, count)
-		current_context_result = {
-			"context_query": ", ".join(item),
-			"books": []
-		}
+	try:
+		logger.info(f"[DEBUG] search_books called with keywords: {keywords}, type: {type(keywords)}")
+		
+		# キーワードのバリデーション
+		if not keywords or not isinstance(keywords, list):
+			logger.error(f"[ERROR] Invalid keywords: {keywords}")
+			return "検索キーワードが指定されていません。"
+		
+		# rakuten_search_booksは list[dict] を返す
+		books = rakuten_search_books(keywords, count)
+		
+		if not books:
+			logger.error("No books found for keywords: %s", keywords)
+			return "申し訳ございません。該当する書籍が見つかりませんでした。"
+		
+		# グローバルステートに保存（番号 → 書籍データ）
+		_global_state["search_results"] = {i+1: book for i, book in enumerate(books)}
+		
+		# LLMには番号付きリストとして返す
+		book_list = []
+		for i, book in enumerate(books, 1):
+			title = book.get("title", "不明")
+			# authorsはリスト形式なので、最初の著者を取得
+			authors = book.get("authors", [])
+			author = authors[0] if authors else "不明"
+			book_list.append(f"{i}. 『{title}』 - {author}")
+		
+		logger.info(f"[DEBUG] Found {len(books)} books")
+		return f"検索結果（{len(books)}冊）:\n" + "\n".join(book_list)
+		
+	except Exception as e:
+		logger.error(f"[ERROR] search_books error: {e}", exc_info=True)
+		return f"検索中にエラーが発生しました: {str(e)}"
 
-		for j, book in enumerate(books):
-			book_id = book.get("isbn")
-			if book_id not in seen_ids:
-				seen_ids.add(book_id)
-				index = {
-					"index": i*100 + j
-				}
-				book.update(index)
-				current_context_result["books"].append(book)
 
-		if current_context_result["books"]:
-			integrated_results["search_result"].append(current_context_result)
+@tool
+def recommend_books(selections: list[dict]) -> str:
+	"""
+	検索結果から推薦する本を選択
+	
+	Args:
+		selections: 推薦する本のリスト
+			各要素は {"number": 番号, "reason": "推薦理由"} の形式
+			例: [{"number": 1, "reason": "初心者向けで分かりやすい"}, {"number": 3, "reason": "実践的な内容"}]
+		
+	Returns:
+		推薦完了メッセージ
+	"""
+	try:
+		recommended = []
+		search_results = _global_state.get("search_results", {})
+		
+		for selection in selections:
+			num = selection.get("number")
+			reason = selection.get("reason", "")
+			
+			if num in search_results:
+				book = search_results[num].copy()
+				book["recommendation_reason"] = reason
+				recommended.append(book)
+		
+		_global_state["recommended_books"] = recommended
+		
+		if recommended:
+			return f"{len(recommended)}冊の本を推薦しました。推薦理由と共にユーザーに提示してください。"
+		else:
+			return "推薦する本が選択されませんでした。"
+			
+	except Exception as e:
+		return f"推薦処理中にエラーが発生しました: {str(e)}"
 
-	return integrated_results
 
+# Prompt Management
 
 def load_prompt_text(filepath: str) -> str:
 	"""プロンプトファイルを読み込む"""
-	with open(filepath, "r", encoding="utf-8") as f:
+	with open(filepath, 'r', encoding='utf-8') as f:
 		return f.read()
 
 
@@ -122,108 +216,111 @@ def create_system_prompt(base_prompt: str, ai_insight: Optional[str] = None) -> 
 	Returns:
 		完成したシステムプロンプト
 	"""
-	prompt = base_prompt
-	
-	# Function calling用の指示を追加
-	prompt += """
+	# 書籍推薦の指示を追加
+	recommendation_instruction = """
 
----
-## 書籍検索機能の使用方法
+## 書籍推薦の手順
 
-書籍検索が必要な場合、他のテキストは一切含めず、以下のJSON形式のみを出力すること。
-複数の検索クエリを送信する場合は、各クエリを配列の要素として含めること。
+1. ユーザーの要望を理解し、適切なキーワードで `search_books` を実行
+2. 検索結果から、ユーザーに最適な本を3冊程度選択
+3. `recommend_books` ツールを使って、選んだ本の番号と推薦理由を送信
+4. 推薦理由をユーザーに分かりやすく説明
 
-```json
-{
-  "tool_call": "search_books",
-  "keywords": [["キーワード1", "キーワード2"], ["キーワード3"]],
-  "count": 4
-}
-```
-
-例：
-- Pythonと機械学習に関する本を検索: `{"tool_call": "search_books", "keywords": [["Python", "機械学習"]], "count": 4}`
-- ミステリーと感動する本を別々に検索: `{"tool_call": "search_books", "keywords": [["ミステリー", "傑作"], ["感動", "泣ける"]], "count": 4}`
-
-検索結果を受け取った後は、通常の会話形式でユーザーに推薦を提示すること。
+**重要**: 書籍情報（タイトル、著者など）は検索結果の番号で参照してください。
+書籍の詳細情報を自分で作成したり、変更したりしないでください。
 """
 	
-	# ai_insightがある場合は追加
-	if ai_insight:
-		prompt += "\n\n---\nユーザー情報 (ai_insights):\n"
-		prompt += ai_insight
+	full_prompt = base_prompt + recommendation_instruction
 	
-	return prompt
+	if ai_insight and ai_insight.strip():
+		full_prompt += f"""
+
+## ユーザー情報
+以下は、これまでの会話から学習したユーザーの傾向です。
+
+{ai_insight}
+"""
+	
+	return full_prompt
 
 
-def detect_tool_call(response_text: str) -> Optional[Dict[str, Any]]:
-	"""
-	レスポンスからJSON形式のtool callを検出
-	
-	Args:
-		response_text: LLMのレスポンステキスト
+def messages_to_langchain(history: List[Dict[str, str]]) -> List[BaseMessage]:
+	"""辞書形式のメッセージ履歴をLangChainのメッセージに変換"""
+	langchain_messages = []
+	for msg in history:
+		role = msg.get("role", "user")
+		content = msg.get("content", "")
 		
-	Returns:
-		tool callの辞書、検出されない場合はNone
-	"""
-	# JSONブロックを探す（```json ... ``` または直接JSONオブジェクト）
-	json_pattern = r'```json\s*(\{.*?\})\s*```|(\{[^{}]*"tool_call"[^{}]*\})'
-	matches = re.findall(json_pattern, response_text, re.DOTALL)
+		if role == "user":
+			langchain_messages.append(HumanMessage(content=content))
+		elif role in ["assistant", "model"]:
+			langchain_messages.append(AIMessage(content=content))
 	
-	if not matches:
-		return None
-	
-	# マッチした最初のJSONを取得
-	json_str = matches[0][0] or matches[0][1]
-	
-	try:
-		tool_call = json.loads(json_str)
-		if "tool_call" in tool_call:
-			return tool_call
-	except json.JSONDecodeError as e:
-		print(f"JSON parse error: {e}")
-		return None
-	
-	return None
+	return langchain_messages
 
 
-def call_ollama_api(
-	model: str,
-	messages: List[Dict[str, str]],
-	temperature: float = 0.7,
-	max_tokens: int = 512
-) -> str:
-	"""
-	Ollama APIを呼び出す
+def langchain_to_messages(langchain_messages: List[BaseMessage]) -> List[Dict[str, str]]:
+	"""LangChainのメッセージを辞書形式に変換"""
+	messages = []
+	for msg in langchain_messages:
+		if isinstance(msg, HumanMessage):
+			messages.append({"role": "user", "content": msg.content})
+		elif isinstance(msg, AIMessage):
+			messages.append({"role": "assistant", "content": msg.content})
 	
-	Args:
-		model: 使用するモデル名
-		messages: メッセージ履歴
-		temperature: 温度パラメータ
-		max_tokens: 最大トークン数
-		
-	Returns:
-		LLMのレスポンステキスト
-	"""
-	payload = {
-		"model": model,
-		"messages": messages,
-		"stream": False,
-		"options": {
-			"temperature": temperature,
-			"num_predict": max_tokens
+	return messages
+
+
+# LangGraph Workflow
+
+def create_agent_workflow(llm, tools):
+	"""エージェントワークフローを作成"""
+	
+	# ツールをLLMにバインド
+	llm_with_tools = llm.bind_tools(tools)
+	
+	def agent_node(state: AgentState):
+		"""エージェントノード: LLMで応答を生成"""
+		messages = state["messages"]
+		logger.info(f"[DEBUG] agent_node: Received {len(messages)} messages")
+		if not messages:
+			logger.error("[ERROR] agent_node: Empty messages list!")
+			raise ValueError("Messages list is empty in agent_node")
+		response = llm_with_tools.invoke(messages)
+		return {"messages": [response]}
+	
+	def should_continue(state: AgentState):
+		"""次のノードを決定"""
+		last_message = state["messages"][-1]
+		if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+			return "tools"
+		return "end"
+	
+	# グラフ構築
+	workflow = StateGraph(AgentState)
+	
+	# ノード追加
+	workflow.add_node("agent", agent_node)
+	workflow.add_node("tools", ToolNode(tools))
+	
+	# エントリーポイント設定
+	workflow.set_entry_point("agent")
+	
+	# エッジ追加
+	workflow.add_conditional_edges(
+		"agent",
+		should_continue,
+		{
+			"tools": "tools",
+			"end": END
 		}
-	}
+	)
+	workflow.add_edge("tools", "agent")
 	
-	try:
-		response = requests.post(OLLAMA_API_URL, json=payload, timeout=60)
-		response.raise_for_status()
-		result = response.json()
-		return result["message"]["content"]
-	except requests.exceptions.RequestException as e:
-		print(f"Error calling Ollama API: {e}")
-		raise
+	return workflow.compile()
 
+
+# Chat Functions
 
 def llm_chat(
 	prompt_file: str,
@@ -231,126 +328,115 @@ def llm_chat(
 	history: Optional[List[Dict[str, str]]] = None,
 	ai_insight: Optional[str] = None,
 	model: Optional[str] = None,
-	temperature: float = 0.3,  # 0.7から0.3に下げて指示に従いやすく
+	temperature: float = 0.3,
 	max_tokens: int = 512
-) -> Tuple[str, List[Dict[str, str]]]:
+) -> tuple[str, List[Dict[str, str]], List[dict]]:
 	"""
-	ローカルLLMとチャット（function calling対応）
+	LangGraphを使ったチャット対話
 	
 	Args:
 		prompt_file: プロンプトファイルのパス
 		message: ユーザーメッセージ
 		history: 会話履歴
 		ai_insight: ユーザー情報
-		model: 使用するモデル名（Noneの場合は環境変数から取得）
+		model: 使用するLLMバックエンド
 		temperature: 温度パラメータ
 		max_tokens: 最大トークン数
 		
 	Returns:
-		(レスポンステキスト, 新しい会話履歴)
+		(応答テキスト, 更新された履歴, 推薦された書籍リスト)
 	"""
-	# プロンプト読込
+	# グローバルステートをクリア
+	_global_state["search_results"] = {}
+	_global_state["recommended_books"] = []
+	
+	# プロンプト読み込み
 	base_prompt = load_prompt_text(prompt_file)
 	system_prompt = create_system_prompt(base_prompt, ai_insight)
 	
-	# モデル名の決定
-	if model is None:
-		model = OLLAMA_MODEL
+	# LLM初期化
+	llm = get_llm(backend=model, temperature=temperature, max_tokens=max_tokens)
 	
-	# 履歴の初期化
+	# ツール定義
+	tools = [search_books, recommend_books]
+	
+	# ワークフロー作成
+	app = create_agent_workflow(llm, tools)
+	
+	# メッセージ履歴を準備
 	if history is None:
 		history = []
 	
-	# 履歴がMessageオブジェクトのリストの場合は辞書形式に変換
-	converted_history = []
-	for item in history:
-		if hasattr(item, 'role') and hasattr(item, 'content'):
-			# Messageオブジェクトの場合
-			role = item.role
-			# "model"を"assistant"に変換
-			if role == "model":
-				role = "assistant"
-			converted_history.append({
-				"role": role,
-				"content": item.content
-			})
-		elif isinstance(item, dict):
-			# すでに辞書形式の場合
-			role = item.get("role", "user")
-			# "model"を"assistant"に変換
-			if role == "model":
-				role = "assistant"
-			converted_history.append({
-				"role": role,
-				"content": item.get("content", "")
-			})
-		else:
-			# その他の場合はスキップ
-			print(f"Warning: Skipping unknown history item type: {type(item)}")
-			continue
+	langchain_history = messages_to_langchain(history)
+	logger.info(f"[DEBUG] History length: {len(history)}, LangChain history length: {len(langchain_history)}")
 	
-	# デバッグ: 変換後の履歴を確認
-	if history and not converted_history:
-		print(f"Warning: History conversion failed. Original history length: {len(history)}")
-		print(f"First item type: {type(history[0]) if history else 'N/A'}")
+	# メッセージリストを構築
+	# Gemini APIではSystemMessageを使わず、最初のメッセージに含める
+	if not langchain_history:
+		# 履歴がない場合: システムプロンプトを最初のメッセージに含める
+		first_message = f"{system_prompt}\n\n---\n\nユーザー: {message}"
+		messages = [HumanMessage(content=first_message)]
+		logger.info(f"[DEBUG] No history, created first message with system prompt")
+	else:
+		# 履歴がある場合: システムプロンプトは最初の会話で既に送信済みなので、通常のメッセージのみ
+		messages = langchain_history + [HumanMessage(content=message)]
+		logger.info(f"[DEBUG] With history, messages count: {len(messages)}")
 	
-	# メッセージリストの構築
-	messages = [{"role": "system", "content": system_prompt}]
-	messages.extend(converted_history)
-	messages.append({"role": "user", "content": message})
+	logger.info(f"[DEBUG] Final messages for LangGraph: {len(messages)} messages")
 	
-	# LLM呼び出し
-	response_text = call_ollama_api(model, messages, temperature, max_tokens)
-	
-	# Tool callの検出
-	tool_call = detect_tool_call(response_text)
-	
-	if tool_call and tool_call.get("tool_call") == "search_books":
-		print("Tool call detected:")
-		pprint.pprint(tool_call)
+	# ワークフロー実行
+	try:
+		result = app.invoke({
+			"messages": messages,
+			"search_results": {},
+			"recommended_books": []
+		})
 		
-		# 書籍検索を実行
-		try:
-			keywords = tool_call.get("keywords", [])
-			count = tool_call.get("count", 4)
-			search_result = search_books(keywords, count)
-			print(f"Search result:\n{pprint.pformat(search_result)}\n")
-			
-			# 検索結果をLLMに渡して最終レスポンスを生成
-			result_message = f"検索結果:\n{json.dumps(search_result, ensure_ascii=False, indent=2)}"
-			messages.append({"role": "assistant", "content": response_text})
-			messages.append({"role": "user", "content": result_message})
-			
-			final_response = call_ollama_api(model, messages, temperature, max_tokens)
-			
-			# Markdown記号を除去
-			final_response_clean = remove_markdown_formatting(final_response)
-			
-			# 履歴を更新
-			new_history = history + [
-				{"role": "user", "content": message},
-				{"role": "assistant", "content": response_text},
-				{"role": "user", "content": result_message},
-				{"role": "assistant", "content": final_response_clean}
-			]
-			
-			return final_response_clean, new_history
-			
-		except Exception as e:
-			error_msg = f"書籍検索中にエラーが発生しました: {e}"
-			print(error_msg)
-			return error_msg, history
-	
-	# 通常のレスポンス
-	# Markdown記号を除去
-	response_text_clean = remove_markdown_formatting(response_text)
-	
-	new_history = history + [
-		{"role": "user", "content": message},
-		{"role": "assistant", "content": response_text_clean}
-	]
-	
-	return response_text_clean, new_history
+		# 最後のAIメッセージを取得
+		ai_messages = [msg for msg in result["messages"] if isinstance(msg, AIMessage)]
+		if ai_messages:
+			last_message = ai_messages[-1]
+			# contentが文字列でない場合の処理
+			if isinstance(last_message.content, str):
+				response_text = last_message.content
+			elif isinstance(last_message.content, list):
+				# contentがリストの場合、テキスト部分を抽出
+				text_parts = []
+				for part in last_message.content:
+					if isinstance(part, dict) and 'text' in part:
+						text_parts.append(part['text'])
+					elif isinstance(part, str):
+						text_parts.append(part)
+				response_text = ''.join(text_parts) if text_parts else str(last_message.content)
+			else:
+				response_text = str(last_message.content)
+		else:
+			response_text = "申し訳ございません。応答を生成できませんでした。"
+			logger.error("No AI message found in result: %s", result)
+		
+		# 履歴を更新
+		updated_history = history + [
+			{"role": "user", "content": message},
+			{"role": "assistant", "content": response_text}
+		]
+		
+		# 推薦された書籍を取得
+		recommended_books = _global_state.get("recommended_books", [])
+		
+		return response_text, updated_history, recommended_books
+		
+	except Exception as e:
+		import traceback
+		traceback.print_exc()
+		
+		error_message = "申し訳ございません。応答を生成できませんでした。"
+		logger.error(f"Error in llm_chat: {e}")
+		updated_history = history + [
+			{"role": "user", "content": message},
+			{"role": "assistant", "content": error_message}
+		]
+		# errorログは別で保存する → クライアント側に返すと脆弱
+		return error_message, updated_history, []
 
 
 def llm_summary(
@@ -358,49 +444,46 @@ def llm_summary(
 	message: str,
 	ai_insight: Optional[str] = None,
 	model: Optional[str] = None,
-	temperature: float = 0.3,  # 0.5から0.3に下げて一貫性を向上
+	temperature: float = 0.3,
 	max_tokens: int = 512
 ) -> str:
 	"""
-	ローカルLLMで要約生成（履歴なし）
+	LangChainを使った要約生成（履歴なし）
 	
 	Args:
 		prompt_file: プロンプトファイルのパス
 		message: ユーザーメッセージ
 		ai_insight: ユーザー情報
-		model: 使用するモデル名
+		model: 使用するLLMバックエンド
 		temperature: 温度パラメータ
 		max_tokens: 最大トークン数
 		
 	Returns:
 		要約テキスト
 	"""
-	# プロンプト読込
+	# プロンプト読み込み
 	base_prompt = load_prompt_text(prompt_file)
+	system_prompt = create_system_prompt(base_prompt, ai_insight)
 	
-	# ai_insightがある場合は追加
-	if ai_insight:
-		base_prompt += "\n\n---\nユーザー情報 (ai_insights):\n"
-		base_prompt += ai_insight
+	# LLM初期化
+	llm = get_llm(backend=model, temperature=temperature, max_tokens=max_tokens)
 	
-	# モデル名の決定
-	if model is None:
-		model = OLLAMA_MODEL
-	
-	# メッセージリストの構築
+	# メッセージ作成
 	messages = [
-		{"role": "system", "content": base_prompt},
-		{"role": "user", "content": message}
+		SystemMessage(content=system_prompt),
+		HumanMessage(content=message)
 	]
 	
-	# LLM呼び出し
-	response_text = call_ollama_api(model, messages, temperature, max_tokens)
-	
-	# Markdown記号を除去
-	response_text_clean = remove_markdown_formatting(response_text)
-	
-	return response_text_clean
+	# LLM実行
+	try:
+		response = llm.invoke(messages)
+		return response.content
+	except Exception as e:
+		print(f"Error in llm_summary: {e}")
+		return f"エラーが発生しました: {str(e)}"
 
+
+# Main (for testing)
 
 if __name__ == "__main__":
 	# テスト用
@@ -409,8 +492,8 @@ if __name__ == "__main__":
 	# プロンプトファイルのパスを設定（適宜変更）
 	from backend import PROMPT_LIBRARIAN
 	
-	print("Testing LLM chat...")
-	response, history = llm_chat(
+	print("Testing LangGraph LLM chat...")
+	response, history, recommended_books = llm_chat(
 		prompt_file=str(PROMPT_LIBRARIAN),
 		message=test_message,
 		history=[]
@@ -418,3 +501,9 @@ if __name__ == "__main__":
 	
 	print(f"\nResponse:\n{response}")
 	print(f"\nHistory length: {len(history)}")
+	print(f"\nRecommended books: {len(recommended_books)}")
+	
+	if recommended_books:
+		print("\n推薦された書籍:")
+		for book in recommended_books:
+			print(f"  - {book.get('title')} ({book.get('recommendation_reason')})")

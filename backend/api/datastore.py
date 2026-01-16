@@ -11,7 +11,8 @@ from .models import (
 	ChatStatus, UserStatus, User, Conversation, 
 	Message, Personal, BookData, RecommendationLogEntry, NfcUser
 )
-from .gemini import gemini_chat, gemini_summary
+# LangChainベースのLLM関数を使用
+from . import summary_function
 
 # ロガー設定
 logger = logging.getLogger("uvicorn.error")
@@ -70,9 +71,7 @@ class DataStore:
 		for session_id, conv in self.conversations.items():
 			if conv.status == ChatStatus.pause:
 				# messagesをin-memoryセッションに復元
-				# Gemini APIが理解できる形式に変換する必要がある
-				# ここでは単純にmessagesをそのまま復元
-				self.sessions[session_id] = conv.messages
+				self.sessions[session_id] = [m.model_dump() for m in conv.messages]
 				restored_count += 1
 		
 		if restored_count > 0:
@@ -258,7 +257,8 @@ class DataStore:
 			return self.sessions.get(session_id, [])
 		# 過去のセッション（永続化済み）をチェック
 		elif session_id in self.conversations:
-			return self.conversations.get(session_id, {}).messages
+			messages = self.conversations.get(session_id).messages
+			return [m.model_dump() for m in messages]
 		else:
 			return []
 
@@ -443,8 +443,8 @@ class DataStore:
 						content = msg.content if hasattr(msg, 'content') else msg.get('content', '')
 						conversation_text += f"{role}: {content}\n\n"
 					
-					# gemini_summary を使って要約を生成（summary専用関数）
-					summary_text = gemini_summary(str(summary_path), conversation_text, ai_insight=user_insight)
+					# summary_function を使って要約を生成（LangChainベース）
+					summary_text = summary_function(str(summary_path), conversation_text, ai_insight=user_insight)
 					if summary_text:
 						conv.summary = summary_text
 						self.conversations[session_id] = conv
@@ -479,8 +479,8 @@ class DataStore:
 {conv.summary}
 ```
 """
-						# gemini_summary を使って新しい ai_insights を生成（ai_insightはNone）
-						user.ai_insights = gemini_summary(str(ai_insight_path), message, ai_insight=None)
+						# summary_function を使って新しい ai_insights を生成（LangChainベース）
+						user.ai_insights = summary_function(str(ai_insight_path), message, ai_insight=None)
 						logger.info(f"[SUCCESS] [BackgroundTask] ai_insights updated: {len(user.ai_insights)} characters")
 					else:
 						logger.warning(f"[WARNING] [BackgroundTask] ai_insight.md not found: {ai_insight_path}")
@@ -538,6 +538,5 @@ class DataStore:
 				conv.status = ChatStatus.active
 				conv.last_accessed = datetime.now()
 				# messagesをin-memoryセッションに復元
-				if session_id not in self.sessions:
-					self.sessions[session_id] = conv.messages
+				self.sessions[session_id] = [m.model_dump() for m in conv.messages]
 				logger.info(f"[INFO] Session resumed: {session_id}")
