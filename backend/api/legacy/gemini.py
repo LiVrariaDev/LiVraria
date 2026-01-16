@@ -2,7 +2,7 @@
 import os
 import pprint
 import re
-import threading
+
 # Third Party
 from google import genai
 from google.genai import types
@@ -10,42 +10,25 @@ import logging
 # module logger (use uvicorn.error for consistency with server logging)
 logger = logging.getLogger("uvicorn.error")
 # user-defined
-from backend import PROMPTS_DIR, PROMPT_DEBUG, GEMINI_API_KEY_RATE
+from backend import PROMPTS_DIR, PROMPT_DEBUG
 from backend.search.rakuten_books import rakuten_search_books
 # 実行する際は、ProjectRootで`python -m backend.api.gemini`
 
-_chat_lock = threading.Lock()
-API_KEY_NUMBER = 1
-API_KEY_USES = 0
+# Modified to use single key
 def api_key_chat():
-	global API_KEY_USES, API_KEY_NUMBER
-	with _chat_lock:
-		API_KEY_USES += 1
-		if API_KEY_USES > GEMINI_API_KEY_RATE:
-			API_KEY_NUMBER += 1
-			API_KEY_USES = 0
-		logger.info(f"Using Gemini API Key number: GEMINI_API_KEY{API_KEY_NUMBER}")
-		API_KEY = os.getenv(f"GEMINI_API_KEY{API_KEY_NUMBER}", "none")
-		if API_KEY == "none":
-			logger.error("API Key not found")
-			exit()
-		return API_KEY
+	API_KEY = os.getenv("GEMINI_API_KEY")
+	if not API_KEY:
+		logger.error("API Key not found")
+		exit()
+	return API_KEY
 
-_summary_lock = threading.Lock()
-API_KEY_SUMMARY_NUMBER = 1
-API_KEY_SUMMARY_USES = 0
+# Modified to use single key
 def api_key_summary():
-	global API_KEY_SUMMARY_USES, API_KEY_SUMMARY_NUMBER
-	with _summary_lock:
-		API_KEY_SUMMARY_USES += 1
-		if API_KEY_SUMMARY_USES > GEMINI_API_KEY_RATE:
-			API_KEY_SUMMARY_NUMBER += 1
-			API_KEY_SUMMARY_USES = 0
-		API_KEY = os.getenv(f"GEMINI_API_KEY{API_KEY_SUMMARY_NUMBER}", "none")
-		if API_KEY == "none":
-			logger.error("API Key not found")
-			exit()
-		return API_KEY
+	API_KEY = os.getenv("GEMINI_API_KEY")
+	if not API_KEY:
+		logger.error("API Key not found")
+		exit()
+	return API_KEY
 
 def search_books(keywords: list[list[str]], count: int = 4) -> list[dict]:
 	integrated_results = {

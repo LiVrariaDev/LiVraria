@@ -29,8 +29,6 @@ SESSION_TIMEOUT = 1800  # 30分（秒単位）
 # Database settings
 MONGODB_DB = "livraria_dev"
 
-# API settings
-GEMINI_API_KEY_RATE = 15  # Gemini APIキーのレート制限
 
 # ============================================================================
 # End of Configuration
@@ -49,11 +47,11 @@ if not firebase_key_env:
 		"Hint: .env file not found or FIREBASE_ACCOUNT_KEY_PATH value is empty"
 	)
 
-# 最低限1だけ設定されているかチェック
-if not os.getenv("GEMINI_API_KEY1"):
+# GEMINI_API_KEYが設定されているかチェック
+if not os.getenv("GEMINI_API_KEY"):
 	raise ValueError(
-		"Environment value 'GEMINI_API_KEY1' is not set\n"
-		"Hint: .env file not found or GEMINI_API_KEY1 value is empty"
+		"Environment value 'GEMINI_API_KEY' is not set\n"
+		"Hint: .env file not found or GEMINI_API_KEY value is empty"
 	)
 
 if not os.getenv("FIREBASE_API_KEY"):

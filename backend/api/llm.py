@@ -1,6 +1,6 @@
 # Standard Library
 import os
-import threading
+
 from typing import Optional, List, Dict, Any, TypedDict, Annotated, Sequence
 import logging
 
@@ -15,7 +15,7 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
 # User-defined
-from backend import PROMPTS_DIR, GEMINI_API_KEY_RATE
+from backend import PROMPTS_DIR
 from backend.search.rakuten_books import rakuten_search_books
 
 # Logger
@@ -36,36 +36,6 @@ _global_state = {
 	"search_results": {},
 	"recommended_books": []
 }
-
-
-# API Key Management (from gemini.py)
-
-_chat_lock = threading.Lock()
-API_KEY_NUMBER = 1
-API_KEY_USES = 0
-
-def get_gemini_api_key():
-	"""
-	Gemini APIキーを取得（ローテーション機能付き）
-	
-	GEMINI_API_KEY_RATE回使用したら次のキーに切り替える
-	"""
-	global API_KEY_USES, API_KEY_NUMBER
-	with _chat_lock:
-		API_KEY_USES += 1
-		if API_KEY_USES > GEMINI_API_KEY_RATE:
-			API_KEY_NUMBER += 1
-			API_KEY_USES = 0
-		logger.info(f"Using Gemini API Key number: GEMINI_API_KEY{API_KEY_NUMBER}")
-		API_KEY = os.getenv(f"GEMINI_API_KEY{API_KEY_NUMBER}", "none")
-		if API_KEY == "none":
-			logger.error(f"GEMINI_API_KEY{API_KEY_NUMBER} not found")
-			# フォールバック: GEMINI_API_KEY1を試す
-			API_KEY = os.getenv("GEMINI_API_KEY1")
-			if not API_KEY:
-				raise ValueError("No Gemini API key found")
-		return API_KEY
-
 
 # LLM Initialization
 
@@ -91,7 +61,7 @@ def get_llm(backend: str = None, temperature: float = 0.3, max_tokens: int = 512
 			"model": "gemini-2.5-flash",
 			"temperature": temperature,
 			"max_tokens": max_tokens,
-			"google_api_key": get_gemini_api_key()
+			"google_api_key": os.getenv("GEMINI_API_KEY")
 		}
 		if system_prompt:
 			# LangChainのChatGoogleGenerativeAIはsystem_instructionをサポート
