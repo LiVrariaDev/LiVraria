@@ -10,6 +10,11 @@
             @load="handleImageLoad"
         />
 
+        <!-- ===== NFC会員情報編集ページ ===== -->
+        <div v-if="currentPage === 'nfc_member_edit'" class="w-full h-full">
+            <NfcMemberEdit :onBack="() => currentPage = 'home'" />
+        </div>
+
         <!-- ===== ホームページ表示 ===== -->
         <div v-if="currentPage === 'home'" class="relative flex w-full h-full overflow-hidden">
             <!-- 背景画像エリア -->
@@ -195,8 +200,7 @@ import { ref, onMounted, nextTick, onUnmounted } from 'vue';
 import { signOut, getIdToken } from "firebase/auth";
 import { auth } from '../firebaseConfig';
 import { api } from '../services/api'; 
-
-// 修正：画像のimportを削除し、エラーを回避します
+import NfcMemberEdit from './NfcMemberEdit.vue';
 // import bgImage from '../assets/bg.jpg';
 
 // --- 診断用関数 ---
@@ -268,7 +272,7 @@ const currentSessionId = ref(null);
 const mainButtons = ref([ 
     { id: 1, text: '書籍検索', action: 'search', icon: 'search' }, 
     { id: 2, text: '会話集中モード', action: 'focus_chat', icon: 'chat' }, 
-    { id: 3, text: 'ライブラリーサーフィン', action: 'library_surfing', icon: 'grid' }, 
+    { id: 3, text: 'NFC会員情報編集', action: 'nfc_member_edit', icon: 'grid' }, 
     { id: 4, text: 'グッドスナイパー', action: 'good_sniper', icon: 'star' }
 ]);
 const utilityButtons = ref([ { id: 6, text: 'オプション', action: 'options' } ]); 
@@ -289,6 +293,7 @@ const openSecondaryDisplay = () => {
 
 const handleHomeButtonClick = (action) => {
     if (action === 'focus_chat') currentPage.value = 'chat_mode';
+    else if (action === 'nfc_member_edit') currentPage.value = 'nfc_member_edit';
     else {
         const msg = `「${action}」機能は準備中です。`;
         homeConversationText.value = msg;

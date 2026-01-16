@@ -190,6 +190,38 @@ export const api = {
 
         if (!response.ok) throw new Error('Failed to unregister NFC')
         return response.json()
+    },
+
+    /*
+     * NFC会員情報取得
+     */
+    async getNfcMemberInfo(nfcId, idToken) {
+        const response = await fetch(`${API_BASE_URL}/nfc/${nfcId}/info`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${idToken}`
+            }
+        })
+
+        if (!response.ok) throw new Error('Failed to get NFC member info')
+        return response.json()
+    },
+
+    /*
+     * NFC会員情報更新
+     */
+    async updateNfcMemberInfo(nfcId, updates, idToken) {
+        const response = await fetch(`${API_BASE_URL}/nfc/${nfcId}/info`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify(updates)
+        })
+
+        if (!response.ok) throw new Error('Failed to update NFC member info')
+        return response.json()
     }
 }
 

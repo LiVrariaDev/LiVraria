@@ -196,6 +196,72 @@ class Server:
 			self.data_store.unregister_nfc(nfc_id)
 			return {"detail": "NFC unregistered successfully"}
 		
+		@self.app.get("/nfc/{nfc_id}/info")
+		async def get_nfc_member_info(nfc_id: str, user_id: str = Depends(get_current_user_id)):
+			"""
+			NFC IDから会員情報を取得する（認証必須）。
+			NFCタグが登録されたユーザー情報を返す。
+			"""
+			registered_user_id = self.data_store.get_user_by_nfc(nfc_id)
+			if registered_user_id is None:
+				raise HTTPException(status_code=404, detail="NFC ID not registered")
+			
+			# 自分のNFCタグ情報のみ取得可能（または管理者権限があれば取得可能）
+			if registered_user_id != user_id:
+				raise HTTPException(status_code=403, detail="Unauthorized")
+			
+			user = self.data_store.get_user(registered_user_id)
+			if user is None:
+				raise HTTPException(status_code=404, detail="User not found")
+			
+			return {
+				"user_id": user.user_id,
+				"nfc_id": nfc_id,
+				"personal": user.personal.dict(),
+				"status": user.status,
+				"lastlogin": user.lastlogin
+			}
+		
+		@self.app.put("/nfc/{nfc_id}/info")
+		async def update_nfc_member_info(nfc_id: str, updates: dict, user_id: str = Depends(get_current_user_id)):
+			"""
+			NFC IDに紐付いた会員情報を更新する（認証必須）。
+			更新可能な項目: name, gender, age, live_pref, live_city
+			"""
+			registered_user_id = self.data_store.get_user_by_nfc(nfc_id)
+			if registered_user_id is None:
+				raise HTTPException(status_code=404, detail="NFC ID not registered")
+			
+			# 自分のNFCタグ情報のみ更新可能
+			if registered_user_id != user_id:
+				raise HTTPException(status_code=403, detail="Unauthorized")
+			
+			try:
+				# personal情報の更新
+				allowed_fields = {"name", "gender", "age", "live_pref", "live_city"}
+				personal_updates = {k: v for k, v in updates.items() if k in allowed_fields}
+				
+				if personal_updates:
+					user = self.data_store.get_user(registered_user_id)
+					if user is None:
+						raise HTTPException(status_code=404, detail="User not found")
+					
+					# Personal情報を更新
+					for field, value in personal_updates.items():
+						setattr(user.personal, field, value)
+					
+					# ディスクに保存
+					self.data_store.save_user(user)
+				
+				return {
+					"detail": "Member info updated successfully",
+					"nfc_id": nfc_id,
+					"updated_fields": list(personal_updates.keys())
+				}
+			except Exception as e:
+				logger.error(f"[ERROR] Failed to update member info: {e}")
+				raise HTTPException(status_code=400, detail=str(e))
+		
 		@self.app.on_event("shutdown")
 		async def shutdown_event():
 			"""サーバー終了時に全アクティブセッションを一時停止して保存"""
