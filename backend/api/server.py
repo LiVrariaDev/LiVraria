@@ -12,8 +12,8 @@ from .models import ChatRequest, ChatResponse, Personal, ChatStatus
 from .datastore import DataStore
 from . import chat_function, LLM_BACKEND
 
-# calil
-from backend.search.calil import search_libraries, search_books
+# 検索機能
+from backend.api.routers import search
 
 # firebase import
 import firebase_admin
@@ -33,6 +33,9 @@ async def startup_event():
 		logger.info(f"🤖 [LLM Backend] Using Ollama (model: {os.getenv('OLLAMA_MODEL', 'llama3.2')})")
 	else:
 		logger.info("🤖 [LLM Backend] Using Gemini API")
+
+# 検索機能
+app.include_router(search.router)
 
 # CORS設定（フロントエンドからのアクセスを許可）
 # 開発環境のオリジン（デフォルト）
@@ -199,37 +202,6 @@ class Server:
 			
 			self.data_store.unregister_nfc(nfc_id)
 			return {"detail": "NFC unregistered successfully"}
-		
-		# 1. 図書館を探す窓口
-		# 例: /search/libraries?pref=静岡県
-		@self.app.get("/search/libraries")
-		def get_libraries(pref: str, limit: int = 5):
-			"""
-			指定した都道府県の図書館を検索する。
-			"""
-			try:
-				# backend/search/calil.py の search_libraries 関数を実行
-				return search_libraries(pref, limit)
-			except Exception as e:
-				logger.error(f"[ERROR] Library search failed: {e}")
-				raise HTTPException(status_code=500, detail=str(e))
-
-		# 2. 本の貸出状況を確認する窓口
-		# 例: /search/books/availability?isbn=9784...&systemid=Tokyo_Minato
-		@self.app.get("/search/books/availability")
-		def check_book_availability(isbn: str, systemid: str):
-			"""
-			指定したISBNの蔵書状況を、指定した図書館システムIDで確認する。
-			ポーリング処理を含むため、応答に数秒かかる場合がある。
-			"""
-			try:
-				# backend/search/calil.py の search_books 関数を実行
-				return search_books(isbn, systemid)
-			except Exception as e:
-				logger.error(f"[ERROR] Book availability check failed: {e}")
-				raise HTTPException(status_code=500, detail=str(e))
-		# ==========================================
-
 
 		@self.app.on_event("shutdown")
 		async def shutdown_event():
