@@ -22,7 +22,7 @@ echo "Starting Livraria..."
 
 # 1. メイン画面 (操作用) を起動
 # --window-position=0,0 : 左上のディスプレイに表示
-chromium-browser \
+chromium \
   --new-window "$TARGET_URL" \
   --window-position=0,0 \
   --start-fullscreen \
@@ -30,6 +30,7 @@ chromium-browser \
   --no-first-run \
   --noerrdialogs \
   --disable-infobars \
+  --ozone-platform=x11 \
   --user-data-dir="/tmp/chrome_main_profile" &
 
 echo "Main display launched."
@@ -39,7 +40,7 @@ sleep 3
 
 # 2. セカンダリ画面 (アバター用) を起動
 # --window-position=$PRIMARY_WIDTH,0 : 右隣のディスプレイに表示
-chromium-browser \
+chromium \
   --new-window "$TARGET_URL/?view=secondary" \
   --window-position=$PRIMARY_WIDTH,0 \
   --start-fullscreen \
@@ -47,8 +48,12 @@ chromium-browser \
   --no-first-run \
   --noerrdialogs \
   --disable-infobars \
+  --ozone-platform=x11 \
   --user-data-dir="/tmp/chrome_secondary_profile" &
 
 echo "Secondary display launched."
 
 echo "Livraria system is running."
+
+echo "Press Enter to exit..."
+read
