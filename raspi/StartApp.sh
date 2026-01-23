@@ -39,9 +39,7 @@ chromium \
 echo "Main display launched."
 
 # 少し待機して、ブラウザの競合を防ぐ
-sleep 3
-wmctrl -r "LiVraria Main" -e 0,0,0,-1,-1
-wmctrl -r "LiVraria Main" -b add,fullscreen
+sleep 1
 
 # 2. セカンダリ画面 (アバター用) を起動
 # --window-position=$PRIMARY_WIDTH,0 : 右隣のディスプレイに表示
@@ -56,8 +54,21 @@ chromium \
 
 echo "Secondary display launched."
 
-sleep 3
-wmctrl -r "Secondary Display" -e 0,$PRIMARY_WIDTH,0,-1,-1
-wmctrl -r "Secondary Display" -b add,fullscreen
+sleep 5
+
+MAIN_ID=$(wmctrl -lx | grep "Chromium" | grep 'Main' | awk '{print $1}')
+SEC_ID=$(wmctrl -lx | grep "Chromium" | grep 'Secondary' | awk '{print $1}')
+
+if [ -z "$MAIN_ID" ] || [ -z "$SEC_ID" ]; then
+    echo "Error: Could not find window IDs."
+else
+    # メインを左へ移動してフルスクリーン
+    wmctrl -i -r "$MAIN_ID" -e 0,0,0,-1,-1
+    wmctrl -i -r "$MAIN_ID" -b add,fullscreen
+
+    # セカンダリを右へ移動してフルスクリーン
+    wmctrl -i -r "$SEC_ID" -e 0,$PRIMARY_WIDTH,0,-1,-1
+    wmctrl -i -r "$SEC_ID" -b add,fullscreen
+fi
 
 echo "Livraria system is running."
