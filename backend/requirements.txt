@@ -1,19 +1,13 @@
-# ============================================================================
 # Core Framework
-# ============================================================================
 fastapi==0.128.0
 uvicorn[standard]==0.40.0  # ASGI server (includes uvloop, httptools)
 pydantic==2.12.5  # Data validation
 pydantic-settings==2.12.0  # Environment variable management
 
-# ============================================================================
 # Authentication & Firebase
-# ============================================================================
 firebase_admin==7.1.0  # Firebase Auth & Firestore
 
-# ============================================================================
 # AI/LLM
-# ============================================================================
 google-genai==1.56.0  # Gemini API
 
 # LangChain
@@ -22,12 +16,9 @@ langgraph==1.0.5  # LangGraph for stateful workflows
 langchain-google-genai==4.1.2  # LangChain Gemini integration
 langchain-ollama==1.0.1  # LangChain Ollama integration
 
-# ============================================================================
 # HTTP Communication
-# ============================================================================
 requests==2.32.5  # External API calls (Rakuten, CiNii, etc.)
 
-# ============================================================================
 # Utilities
-# ============================================================================
 python-dotenv==1.2.1  # Environment variable loading
+pymongo[srv]==4.16.0  # MongoDB Atlas
