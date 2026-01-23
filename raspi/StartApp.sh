@@ -28,10 +28,8 @@ echo "Starting Livraria..."
 # 1. メイン画面 (操作用) を起動
 # --window-position=0,0 : 左上のディスプレイに表示
 chromium \
-  --new-window "$SERVER_URL" \
+  --app="$SERVER_URL" \
   --window-position=0,0 \
-  --start-fullscreen \
-  --kiosk \
   --no-first-run \
   --noerrdialogs \
   --disable-infobars \
@@ -43,14 +41,13 @@ echo "Main display launched."
 # 少し待機して、ブラウザの競合を防ぐ
 sleep 3
 wmctrl -r "LiVraria Main" -e 0,0,0,-1,-1
+wmctrl -r "LiVraria Main" -b add,fullscreen
 
 # 2. セカンダリ画面 (アバター用) を起動
-# --window-position=$$PRIMARY_WIDTH,0 : 右隣のディスプレイに表示
+# --window-position=$PRIMARY_WIDTH,0 : 右隣のディスプレイに表示
 chromium \
-  --new-window "$SERVER_URL/?view=secondary" \
+  --app="$SERVER_URL/?view=secondary" \
   --window-position=$PRIMARY_WIDTH,0 \
-  --start-fullscreen \
-  --kiosk \
   --no-first-run \
   --noerrdialogs \
   --disable-infobars \
@@ -61,5 +58,6 @@ echo "Secondary display launched."
 
 sleep 3
 wmctrl -r "Secondary Display" -e 0,$PRIMARY_WIDTH,0,-1,-1
+wmctrl -r "Secondary Display" -b add,fullscreen
 
 echo "Livraria system is running."
