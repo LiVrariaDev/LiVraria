@@ -1,20 +1,21 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
 from backend import PROMPTS_DIR
-from backend.search.calil import search_libraries, search_books
-from backend.search.rakuten_books import search_books as search_books_rakuten
+from backend.search.calil import search_libraries, search_books as search_books_calil
+from backend.search.rakuten_books import rakuten_search_books as search_books_rakuten
 # 循環参照を防ぐため、auth.pyやserver.pyからはインポートせず、ここでFirebase認証を行う
 from firebase_admin import auth
 
 # backend.api パッケージから chat_function をインポート
-from backend.api.llm import chat_function 
+from backend.api.llm import llm_chat as chat_function
 
 logger = logging.getLogger("uvicorn.error")
 
 # ルーターの作成
+# prefixを空にして、個別のエンドポイントでパスを完全に制御できるようにします
 router = APIRouter(
-    prefix="/search",
+    prefix="",
     tags=["search"]
 )
 
@@ -34,40 +35,17 @@ def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(oaut
         decoded_token = auth.verify_id_token(id_token)
         return decoded_token["uid"]
     except Exception as e:
-        logger.error(f"[ERROR] Firebase authentication failed in search router: {e}")
+        logger.error(f"[ERROR] Firebase authentication failed: {e}")
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
 
-# 1. 図書館を探す窓口
-# URL: /search/libraries
-@router.get("/libraries")
-def get_libraries(pref: str, limit: int = 5):
-    """
-    指定した都道府県の図書館を検索する。
-    """
-    try:
-        return search_libraries(pref, limit)
-    except Exception as e:
-        logger.error(f"[ERROR] Library search failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# 2. 本の貸出状況を確認する窓口
-# URL: /search/books/availability
-@router.get("/books/availability")
-def check_book_availability(isbn: str, systemid: str):
-    """
-    指定したISBNの蔵書状況を、指定した図書館システムIDで確認する。
-    """
-    try:
-        return search_books(isbn, systemid)
-    except Exception as e:
-        logger.error(f"[ERROR] Book availability check failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# 3. 本をキーワードで検索する窓口（楽天ブックス + AI）
-# URL: /search/books
-@router.get("/books")
-async def search_books_endpoint(q: str, semantic: bool = False, user_id: str = Depends(get_current_user_id)):
+# 書籍検索エンドポイント (/books/search)
+@router.get("/books/search")
+async def search_books_endpoint(
+    q: str, 
+    semantic: bool = False, 
+    user_id: str = Depends(get_current_user_id)
+):
     """
     キーワードで本を検索する。
     semantic=True の場合、AIを使って曖昧な入力からキーワードを抽出する。
@@ -102,7 +80,31 @@ async def search_books_endpoint(q: str, semantic: bool = False, user_id: str = D
 
     # 楽天ブックスで検索を実行
     try:
-        return search_books_rakuten(search_query)
+        # 全角スペースを半角に変換して分割
+        keywords = search_query.replace("　", " ").split()
+        if not keywords:
+            return []
+            
+        books = search_books_rakuten(keywords)
+        return books
     except Exception as e:
-        logger.error(f"[ERROR] Book search failed: {e}")
+        logger.error(f"[ERROR] Rakuten book search failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# 図書館検索エンドポイント (/search/libraries)
+# 既存の機能があればこちらに残しておきます
+@router.get("/search/libraries")
+async def search_libraries_endpoint(
+    pref: str, 
+    limit: int = 5,
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    図書館を検索する
+    """
+    try:
+        return search_libraries(pref, limit)
+    except Exception as e:
+        logger.error(f"[ERROR] Library search failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))

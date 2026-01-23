@@ -34,9 +34,6 @@ async def startup_event():
 	else:
 		logger.info("🤖 [LLM Backend] Using Gemini API")
 
-# 検索機能
-app.include_router(search.router)
-
 # CORS設定（フロントエンドからのアクセスを許可）
 # 開発環境のオリジン（デフォルト）
 allowed_origins = [
@@ -281,6 +278,11 @@ class Server:
 				raise HTTPException(status_code=404, detail="Session not found")
 			
 			return {"detail": "Session closed successfully", "session_id": session_id}
+		
+		self.app.include_router(
+            search.router, 
+            dependencies=[Depends(get_current_user_id)]
+        )
 
 
 	async def chat_prompt(self, request: ChatRequest, prompt_file: str, user_id: str) -> ChatResponse:

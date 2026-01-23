@@ -31,25 +31,23 @@ onMounted(async () => {
 
     const user = auth.currentUser;
     if (user) {
-        // 既存の getUser(userId, idToken) に合わせてトークンを取得して渡す
-        const token = await user.getIdToken();
+        const token = await user.getIdToken(); // ここでトークンは取れてる
         const userData = await api.getUser(user.uid, token);
         
-        // ※ ユーザーデータのどこに都道府県が入っているか確認してね
-        // ここでは user.personal.prefecture だと仮定しているよ
+        // 都道府県を取得（データ構造に合わせて調整してね）
         const pref = userData.personal?.address || userData.personal?.prefecture || '東京都'; 
-        
         console.log(`User prefecture: ${pref}`);
 
         // 2. その地域の図書館を検索してリストアップしておく
-        // limit=10 くらいで主要な図書館を取得
-        const libs = await api.searchLibraries(pref, 10);
+        // ★修正: 第3引数に token を渡す！
+        const libs = await api.searchLibraries(pref, 10, token);
+        
         myLibraries.value = libs;
         console.log("Libraries loaded:", myLibraries.value);
     }
   } catch (e) {
+    // ★ここが抜けていました！
     console.error("Setup failed:", e);
-    // エラーが出ても本の検索だけはできるようにエラーは表示しないでおく
   }
 });
 
@@ -64,15 +62,30 @@ const searchBooks = async () => {
   selectedBook.value = null;
 
   try {
+    // ★追加: 現在のユーザーを取得してトークンを発行する
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+        throw new Error("ログインが必要です");
+    }
+    const token = await user.getIdToken();
+
     // APIを呼び出して本を検索
-    // semanticSearch.value が true (デフォルト) なので常にAI検索が走る
-    const result = await api.searchBooks(query.value, semanticSearch.value);
+    const result = await api.searchBooks(query.value, token, semanticSearch.value);
     
-    // 楽天ブックスのレスポンス形式に合わせて調整
-    // (Items配列の中にItemオブジェクトが入っている構造を想定)
-    if (result.Items) {
+    // ★ここを追加：コンソールで中身を見てみる（F12のConsoleタブで確認してね）
+    console.log("検索結果の生データ:", result);
+
+    // ★修正：データの構造に合わせて取り出し方を変える
+    if (Array.isArray(result)) {
+        // パターンA: Python側ですでにリストに整形されている場合（こっちの可能性が高い）
+        books.value = result;
+    } else if (result.Items) {
+        // パターンB: 楽天APIの生の構造の場合
         books.value = result.Items.map(item => item.Item);
     } else {
+        // パターンC: それ以外（エラーなど）
+        console.warn("予期しないデータ形式です", result);
         books.value = [];
     }
 

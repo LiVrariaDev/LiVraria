@@ -199,15 +199,19 @@ export const api = {
     /*
      * 図書館検索
      */
-    async searchLibraries(pref, limit = 5) {
+    async searchLibraries(pref, limit = 5, idToken) {
         const params = new URLSearchParams({ pref, limit });
         const response = await fetch(`${API_BASE_URL}/search/libraries?${params}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
+            method: 'GET',
+            headers: { 
+                'Content-Type': 'application/json',
+                // ★追加: 認証トークンをヘッダーにセット
+                'Authorization': `Bearer ${idToken}`
+            }
         });
         
         if (!response.ok) {
-        throw new Error('Library search failed');
+            throw new Error('Library search failed');
         }
         return response.json();
     },
@@ -232,19 +236,29 @@ export const api = {
      * 本検索
      */
     // semantic=true にするとAIがキーワードを考えてくれる
-    async searchBooks(query, semantic = false) {
-        const params = new URLSearchParams({ q: query, semantic });
-        
-        // このAPIは user_id を必要とするので認証トークンをつける
-        const headers = await getAuthHeaders();
-        
-        const response = await fetch(`${API_BASE_URL}/search/books?${params}`, {
-        method: 'GET',
-        headers
+    /*
+     * 本検索
+     */
+    // semantic=true にするとAIがキーワードを考えてくれる
+    // 修正: 第2引数に idToken を追加しました
+    async searchBooks(query, idToken, semantic = false) {
+        // URLパラメータを生成（semanticもここに含める）
+        const params = new URLSearchParams({ 
+            q: query, 
+            semantic: semantic.toString() 
         });
+        
+        // 修正: params.toString() を使ってURLを組み立てるように変更
+        const response = await fetch(`${API_BASE_URL}/books/search?${params.toString()}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}` // これで正しくトークンが使われます
+            }
+        })
 
         if (!response.ok) {
-        throw new Error('Book search failed');
+            throw new Error('Book search failed');
         }
         return response.json();
     }
