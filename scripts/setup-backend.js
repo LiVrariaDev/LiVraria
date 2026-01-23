@@ -23,7 +23,8 @@ const binPath = isWin ? "Scripts" : "bin";
 const pip = isWin ? "pip.exe" : "pip";
 const pipPath = path.join(backendPath, ".venv", binPath, pip);
 
-child = spawnSync(pipPath, ["install", "-r", "requirements-dev.txt"], {
+// Use python -m pip to avoid shebang issues in the pip executable
+child = spawnSync(path.join(backendPath, ".venv", binPath, python), ["-m", "pip", "install", "-r", "requirements-dev.txt"], {
     cwd: backendPath,
     stdio: "inherit",
     shell: true,
