@@ -4,6 +4,10 @@
 # Livraria 起動スクリプト (Dual Display Kiosk)
 # ==========================================
 
+# ファイル実体へ移動
+SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+cd "$SCRIPT_DIR"
+
 # log file (1回ごと上書き)
 LOG_FILE="$(dirname "$0")/livraria_start.log"
 exec > >(tee "$LOG_FILE") 2>&1
