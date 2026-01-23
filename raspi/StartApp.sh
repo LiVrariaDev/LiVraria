@@ -37,6 +37,7 @@ echo "Main display launched."
 
 # 少し待機して、ブラウザの競合を防ぐ
 sleep 3
+wmctrl -r "LiVraria Main" -e 0,0,0,-1,-1
 
 # 2. セカンダリ画面 (アバター用) を起動
 # --window-position=$PRIMARY_WIDTH,0 : 右隣のディスプレイに表示
@@ -52,6 +53,9 @@ chromium \
   --user-data-dir="/tmp/chrome_secondary_profile" &
 
 echo "Secondary display launched."
+
+sleep 3
+wmctrl -r "Secondary Display" -e 0,$PRIMARY_WIDTH,0,-1,-1
 
 echo "Livraria system is running."
 

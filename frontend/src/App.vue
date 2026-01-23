@@ -36,6 +36,13 @@ onMounted(() => {
   const urlParams = new URLSearchParams(window.location.search);
   isSecondaryView.value = urlParams.get('view') === 'secondary';
 
+  // タブ名（タイトル）を設定
+  if (isSecondaryView.value) {
+    document.title = "Secondary Display";
+  } else {
+    document.title = "LiVraria Main";
+  }
+
   // セカンダリ画面でない場合のみ、認証監視を行う
   if (!isSecondaryView.value) {
     unsubscribe = onAuthStateChanged(auth, (currentUser) => {
