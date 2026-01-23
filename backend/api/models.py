@@ -66,7 +66,7 @@ class Conversation(BaseModel):
 	session_id: str = Field(alias="_id", description="Session ID")
 	user_id: str = Field(description="User ID")
 	status: ChatStatus = Field(default=ChatStatus.active, description="Chat status")
-	messages: List[Message] = Field(default_factory=list, description="Chat messages")
+	messages: List[dict] = Field(default_factory=list, description="Chat messages")
 	summary: Optional[str] = Field(None, description="AI-generated summary at session end")
 	last_accessed: datetime = Field(default_factory=datetime.now, description="Last accessed time")
 

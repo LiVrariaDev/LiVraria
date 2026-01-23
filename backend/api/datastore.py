@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Any
 
 from .models import (
 	ChatStatus, UserStatus, User, Conversation, 
-	Message, Personal, BookData, RecommendationLogEntry, NfcUser
+	Personal, BookData, RecommendationLogEntry, NfcUser
 )
 # LangChainベースのLLM関数を使用
 from . import summary_function
@@ -71,7 +71,7 @@ class DataStore:
 		for session_id, conv in self.conversations.items():
 			if conv.status == ChatStatus.pause:
 				# messagesをin-memoryセッションに復元
-				self.sessions[session_id] = [m.model_dump() for m in conv.messages]
+				self.sessions[session_id] = [m for m in conv.messages]
 				restored_count += 1
 		
 		if restored_count > 0:
@@ -258,7 +258,7 @@ class DataStore:
 		# 過去のセッション（永続化済み）をチェック
 		elif session_id in self.conversations:
 			messages = self.conversations.get(session_id).messages
-			return [m.model_dump() for m in messages]
+			return messages
 		else:
 			return []
 
@@ -287,41 +287,8 @@ class DataStore:
 			raise KeyError("Session not found")
 
 		history = self.sessions.get(session_id, [])
-		messages: List[Message] = []
-		# history の形式は可変なので耐性を持って変換する
-		for part in history:
-			try:
-				# Gemini APIのレスポンスオブジェクトの場合
-				if hasattr(part, 'role') and hasattr(part, 'parts'):
-					# roleを抽出（userまたはmodel）
-					role = getattr(part, 'role', 'model')
-					# partsからテキストを抽出
-					content = ""
-					parts = getattr(part, 'parts', [])
-					if parts and len(parts) > 0:
-						content = getattr(parts[0], 'text', str(part))
-					else:
-						content = str(part)
-					messages.append(Message(role=role, content=content))
-				# 辞書形式の場合
-				elif isinstance(part, dict) and "role" in part and "content" in part:
-					role = part["role"]
-					# assistantをmodelに変換
-					if role == "assistant":
-						role = "model"
-					messages.append(Message(role=role, content=part["content"]))
-				# Messageオブジェクトの場合
-				elif hasattr(part, "role") and hasattr(part, "content"):
-					role = getattr(part, "role")
-					# assistantをmodelに変換
-					if role == "assistant":
-						role = "model"
-					messages.append(Message(role=role, content=getattr(part, "content")))
-				else:
-					# fallback: シリアライズして model として格納
-					messages.append(Message(role="model", content=str(part)))
-			except Exception:
-				messages.append(Message(role="model", content=str(part)))
+		# 既に List[dict] なのでそのまま使用
+		messages = history
 
 		conv = self.conversations.get(session_id)
 		if not conv:
@@ -358,41 +325,8 @@ class DataStore:
 			return
 		
 		history = self.sessions.get(session_id, [])
-		messages: List[Message] = []
-		# history の形式は可変なので耐性を持って変換する
-		for part in history:
-			try:
-				# Gemini APIのレスポンスオブジェクトの場合
-				if hasattr(part, 'role') and hasattr(part, 'parts'):
-					# roleを抽出（userまたはmodel）
-					role = getattr(part, 'role', 'model')
-					# partsからテキストを抽出
-					content = ""
-					parts = getattr(part, 'parts', [])
-					if parts and len(parts) > 0:
-						content = getattr(parts[0], 'text', str(part))
-					else:
-						content = str(part)
-					messages.append(Message(role=role, content=content))
-				# 辞書形式の場合
-				elif isinstance(part, dict) and "role" in part and "content" in part:
-					role = part["role"]
-					# assistantをmodelに変換
-					if role == "assistant":
-						role = "model"
-					messages.append(Message(role=role, content=part["content"]))
-				# Messageオブジェクトの場合
-				elif hasattr(part, "role") and hasattr(part, "content"):
-					role = getattr(part, "role")
-					# assistantをmodelに変換
-					if role == "assistant":
-						role = "model"
-					messages.append(Message(role=role, content=getattr(part, "content")))
-				else:
-					# fallback: シリアライズして model として格納
-					messages.append(Message(role="model", content=str(part)))
-			except Exception:
-				messages.append(Message(role="model", content=str(part)))
+		# 既に List[dict] なのでそのまま使用
+		messages = history
 
 		conv = self.conversations.get(session_id)
 		if not conv:
@@ -538,5 +472,5 @@ class DataStore:
 				conv.status = ChatStatus.active
 				conv.last_accessed = datetime.now()
 				# messagesをin-memoryセッションに復元
-				self.sessions[session_id] = [m.model_dump() for m in conv.messages]
+				self.sessions[session_id] = [m for m in conv.messages]
 				logger.info(f"[INFO] Session resumed: {session_id}")

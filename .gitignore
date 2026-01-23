@@ -1,7 +1,7 @@
 # Other
 *.jpg
 !frontend/public/*.jpg
-*-firebase-adminsdk-*.json
+*firebase-adminsdk*.json
 backend/api/data/
 .vscode/
 
