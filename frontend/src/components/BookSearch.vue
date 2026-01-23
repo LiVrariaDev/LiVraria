@@ -5,7 +5,7 @@ import api from '../services/api';
 
 // 状態管理用の変数
 const query = ref('');
-const semanticSearch = ref(true); // AI検索をデフォルトでONに変更
+const semanticSearch = ref(false); // AI検索をデフォルトでONに変更
 const books = ref([]);
 const loading = ref(false);
 const error = ref(null);
@@ -20,33 +20,49 @@ const selectedBook = ref(null); // 現在在庫を確認している本
 onMounted(async () => {
   try {
     const auth = getAuth();
-    // ログイン待ち
     await new Promise(resolve => {
         const unsubscribe = auth.onAuthStateChanged(user => {
             if (user) resolve(user);
-            else resolve(null); // 未ログイン
+            else resolve(null);
             unsubscribe();
         });
     });
 
     const user = auth.currentUser;
     if (user) {
-        const token = await user.getIdToken(); // ここでトークンは取れてる
+        const token = await user.getIdToken();
         const userData = await api.getUser(user.uid, token);
+        const pref = userData.personal?.live_pref || userData.personal?.address || userData.personal?.prefecture || '東京都'; 
         
-        // 都道府県を取得（データ構造に合わせて調整してね）
-        const pref = userData.personal?.address || userData.personal?.prefecture || '東京都'; 
         console.log(`User prefecture: ${pref}`);
 
-        // 2. その地域の図書館を検索してリストアップしておく
-        // ★修正: 第3引数に token を渡す！
-        const libs = await api.searchLibraries(pref, 10, token);
+        // ★作戦変更: 専門図書館が多すぎるので、一気に100件とってくる
+        const libs = await api.searchLibraries(pref, 2000, token);
         
-        myLibraries.value = libs;
-        console.log("Libraries loaded:", myLibraries.value);
+        if (Array.isArray(libs)) {
+            // 1. systemid で重複を排除する
+            const uniqueLibsMap = new Map();
+            libs.forEach(lib => {
+                if (!uniqueLibsMap.has(lib.systemid)) {
+                    uniqueLibsMap.set(lib.systemid, lib);
+                }
+            });
+            const uniqueLibs = Array.from(uniqueLibsMap.values());
+
+            // 2. ★ここを修正: 専門図書館(Special_)と大学図書館(Univ_)を「完全に除外」する
+            // ソートではなく filter で消してしまいます
+            const publicLibs = uniqueLibs.filter(lib => 
+                !lib.systemid.startsWith('Special_') && 
+                !lib.systemid.startsWith('Univ_')
+            );
+
+            // 3. 公立図書館だけになったリストから上位10件を使う
+            myLibraries.value = publicLibs.slice(0, 10);
+            
+            console.log("Filtered Libraries (Public Only):", myLibraries.value);
+        }
     }
   } catch (e) {
-    // ★ここが抜けていました！
     console.error("Setup failed:", e);
   }
 });
@@ -103,8 +119,35 @@ const searchBooks = async () => {
 
 // 特定の本の図書館在庫を確認する関数
 const checkAvailability = async (book) => {
+  // ★追加: もし図書館リストがまだ空なら、ここで再取得を試みる（保険）
   if (myLibraries.value.length === 0) {
-    alert("地域の図書館情報が取得できていません。");
+      console.log("図書館リストが空のため、再取得を試みます...");
+      try {
+          const auth = getAuth();
+          const user = auth.currentUser;
+          if (user) {
+              const token = await user.getIdToken();
+              const userData = await api.getUser(user.uid, token);
+              // 都道府県の場所が合っているか確認（address か prefecture か live_pref か）
+              const pref = userData.personal?.live_pref || userData.personal?.address || userData.personal?.prefecture || '東京都';
+              
+              console.log(`Retry fetching libraries for: ${pref}`);
+              
+              // 範囲を広げて検索
+              const allLibs = await api.searchLibraries(pref, 50, token);
+              
+              // 公立図書館だけに絞る
+              const publicLibs = allLibs.filter(lib => !lib.systemid.startsWith('Special_'));
+              myLibraries.value = publicLibs.slice(0, 10);
+          }
+      } catch (e) {
+          console.error("再取得に失敗:", e);
+      }
+  }
+
+  // それでもダメならアラートを出す
+  if (myLibraries.value.length === 0) {
+    alert("地域の図書館情報が取得できませんでした。\nユーザー設定の「居住地」が正しく登録されているか確認してください。");
     return;
   }
 
@@ -113,11 +156,15 @@ const checkAvailability = async (book) => {
   availability.value = null;
 
   try {
-    // 地域の図書館IDをカンマ区切りで結合 (例: "Tokyo_Minato,Tokyo_Shibuya")
+    const auth = getAuth();
+    const user = auth.currentUser;
+    // ...以下、既存のコードのまま（トークン取得など）...
+    if (!user) throw new Error("ログインが必要です");
+    const token = await user.getIdToken();
+
     const systemIds = myLibraries.value.map(lib => lib.systemid).join(',');
     
-    // APIを呼び出して在庫確認
-    const result = await api.checkBookAvailability(book.isbn, systemIds);
+    const result = await api.checkBookAvailability(book.isbn, systemIds, token);
     
     // カーリルのレスポンスを解析
     // result[isbn][systemid] = {status: 'OK', libkey: { ... }} のような構造

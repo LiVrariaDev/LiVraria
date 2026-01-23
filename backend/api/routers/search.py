@@ -1,35 +1,34 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
 from backend import PROMPTS_DIR
-from backend.search.calil import search_libraries, search_books as search_books_calil
-from backend.search.rakuten_books import rakuten_search_books as search_books_rakuten
-# 循環参照を防ぐため、auth.pyやserver.pyからはインポートせず、ここでFirebase認証を行う
-from firebase_admin import auth
+import requests
 
-# backend.api パッケージから chat_function をインポート
+# ----------------------------------------------------------------
+# ★必要な関数をインポート
+# ----------------------------------------------------------------
+# calil.py から: 図書館検索 と 在庫確認(ポーリング機能付き)
+from backend.search.calil import search_libraries, search_books as check_stock_calil
+
+# rakuten_books.py から: ランダム検索(豪華版) を使う
+from backend.search.rakuten_books import rakuten_search_books_random as search_books_random
+
+# Firebase認証 & AIチャット
+from firebase_admin import auth
 from backend.api.llm import llm_chat as chat_function
 
 logger = logging.getLogger("uvicorn.error")
 
-# ルーターの作成
-# prefixを空にして、個別のエンドポイントでパスを完全に制御できるようにします
 router = APIRouter(
     prefix="",
     tags=["search"]
 )
 
-# キーワード抽出用プロンプトのパス
 PROMPT_KEYWORD_SEARCH = PROMPTS_DIR / "keyword_search.md"
-
-# 認証ロジック (Server.pyとの循環参照を避けるためここに定義)
 oauth2_scheme = HTTPBearer()
 
 def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)) -> str:
-    """
-    HTTP Headerに含まれたTokenをFirebase Authで認証し
-    認証に成功した場合はUser IDを返す (Server.pyと同じロジック)
-    """
+    """Firebase Authによる認証"""
     try:
         id_token = credentials.credentials
         decoded_token = auth.verify_id_token(id_token)
@@ -39,7 +38,9 @@ def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(oaut
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
 
-# 書籍検索エンドポイント (/books/search)
+# ----------------------------------------------------------------
+# 1. 書籍検索エンドポイント (豪華版・ランダム表示)
+# ----------------------------------------------------------------
 @router.get("/books/search")
 async def search_books_endpoint(
     q: str, 
@@ -48,63 +49,81 @@ async def search_books_endpoint(
 ):
     """
     キーワードで本を検索する。
-    semantic=True の場合、AIを使って曖昧な入力からキーワードを抽出する。
+    「豪華版（人気順・30件・ランダム）」を使用する。
     """
     search_query = q
     
-    # AIによるキーワード抽出
+    # AIによるキーワード抽出 (semantic=Trueの場合)
     if semantic:
         try:
-            if not PROMPT_KEYWORD_SEARCH.exists():
-                logger.warning(f"[WARNING] Keyword search prompt not found: {PROMPT_KEYWORD_SEARCH}")
-            else:
+            if PROMPT_KEYWORD_SEARCH.exists():
                 extracted_keyword, _, _ = chat_function(
-                    str(PROMPT_KEYWORD_SEARCH),
-                    q,
-                    [], 
-                    ai_insight=""
+                    str(PROMPT_KEYWORD_SEARCH), q, [], ai_insight=""
                 )
-                # AIが変な空白を入れることがあるので除去
                 extracted_keyword = extracted_keyword.strip()
                 if extracted_keyword:
                     search_query = extracted_keyword
-                    logger.info(f"[Semantic Search] Original: '{q}' -> Extracted: '{search_query}'")
-                else:
-                    logger.warning(f"[Semantic Search] Extracted keyword was empty. Using original: '{q}'")
+                    logger.info(f"[Semantic Search] '{q}' -> '{search_query}'")
         except Exception as e:
             logger.error(f"[ERROR] AI keyword extraction failed: {e}")
-            # 失敗した場合は元のクエリで検索続行
-            pass
 
-    logger.info(f"[Book Search] Query: '{search_query}' (Original: '{q}', Semantic: {semantic})")
+    logger.info(f"[Book Search] Query: '{search_query}'")
 
-    # 楽天ブックスで検索を実行
     try:
-        # 全角スペースを半角に変換して分割
+        # 全角スペース対応
         keywords = search_query.replace("　", " ").split()
         if not keywords:
             return []
             
-        books = search_books_rakuten(keywords)
+        # ★ここで「豪華版（ランダム）」関数を呼び出す
+        books = search_books_random(keywords)
         return books
+        
     except Exception as e:
         logger.error(f"[ERROR] Rakuten book search failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# 図書館検索エンドポイント (/search/libraries)
-# 既存の機能があればこちらに残しておきます
+# ----------------------------------------------------------------
+# 2. 図書館検索エンドポイント
+# ----------------------------------------------------------------
 @router.get("/search/libraries")
 async def search_libraries_endpoint(
-    pref: str, 
+    pref: str,  # ★フロントから送られてくる住所をそのまま使う（余計な加工なし！）
     limit: int = 5,
     user_id: str = Depends(get_current_user_id)
 ):
     """
-    図書館を検索する
+    指定された都道府県(pref)の図書館を探す。
+    ユーザーの住所判定はフロントエンド側で行われているため、ここでは受け取ったprefをそのまま使う。
     """
     try:
         return search_libraries(pref, limit)
     except Exception as e:
         logger.error(f"[ERROR] Library search failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ----------------------------------------------------------------
+# 3. 在庫確認エンドポイント (同期関数・calil使用)
+# ----------------------------------------------------------------
+@router.get("/search/books/availability")
+def check_availability_endpoint(
+    isbn: str, 
+    systemid: str,
+    user_id: str = Depends(get_current_user_id)
+):
+    """
+    指定された図書館(systemid)での蔵書状況を確認する。
+    calil.py のポーリング機能(time.sleep)を利用するため、async def ではなく def で定義する。
+    """
+    logger.info(f"[Availability Check] ISBN: {isbn}, Systems: {systemid}")
+    
+    try:
+        # ★calil.py の関数を使って、検索完了まで待機してから結果を返す
+        data = check_stock_calil(isbn, systemid)
+        return data
+        
+    except Exception as e:
+        logger.error(f"[ERROR] Calil availability check failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))

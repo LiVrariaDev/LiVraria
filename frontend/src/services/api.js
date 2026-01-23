@@ -219,15 +219,19 @@ export const api = {
     /*
      * 貸出状況確認
      */
-    async checkBookAvailability(isbn, systemid) {
+    async checkBookAvailability(isbn, systemid, idToken) {
         const params = new URLSearchParams({ isbn, systemid });
         const response = await fetch(`${API_BASE_URL}/search/books/availability?${params}`, {
             method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+                'Content-Type': 'application/json',
+                // ★追加: 認証ヘッダー
+                'Authorization': `Bearer ${idToken}`
+            }
         });
 
         if (!response.ok) {
-        throw new Error('Book availability check failed');
+            throw new Error('Book availability check failed');
         }
         return response.json();
     },
