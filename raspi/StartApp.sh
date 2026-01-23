@@ -4,17 +4,20 @@
 # Livraria 起動スクリプト (Dual Display Kiosk)
 # ==========================================
 
+# log file (1回ごと上書き, シンボリックリンク元で)
+LOG_FILE="$(dirname "$0")/livraria_start.log"
+exec > >(tee "$LOG_FILE") 2>&1
+
 # ファイル実体へ移動
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 cd "$SCRIPT_DIR"
 
-# log file (1回ごと上書き)
-LOG_FILE="$(dirname "$0")/livraria_start.log"
-exec > >(tee "$LOG_FILE") 2>&1
-
 # .envファイルを読み込む
 if [ -f .env ]; then
     source .env
+else
+    echo "Error: .env file not found."
+    exit 1
 fi
 
 echo "Starting Livraria..."
