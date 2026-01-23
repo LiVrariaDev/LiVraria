@@ -187,23 +187,18 @@ const newCardId = ref('');
 const errorMessage = ref('');
 const successMessage = ref('');
 
-const readNfcCard = async (onSuccess) => {
+import { readNfcCard } from '../services/nfc';
+
+const startNfcReading = async () => {
+  successMessage.value = '';
   isReadingNfc.value = true;
   errorMessage.value = '';
-  
+
   try {
-    // 読み取り開始リクエスト
-    const response = await fetch('http://localhost:8080/start-nfc', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ timeout: 30 })
+    await readNfcCard(async (idm) => {
+      isReadingNfc.value = false;
+      await registerCard(idm);
     });
-
-    if (!response.ok) throw new Error('NFC読み取りの開始に失敗しました');
-    
-    // ポーリング開始
-    await pollNfcStatus(onSuccess);
-
   } catch (error) {
     console.error('NFC読み取りエラー:', error);
     errorMessage.value = `NFC読み取りエラー: ${error.message}`;
@@ -211,65 +206,23 @@ const readNfcCard = async (onSuccess) => {
   }
 };
 
-const pollNfcStatus = (onSuccess) => {
-  return new Promise((resolve, reject) => {
-    const pollInterval = 500; // 0.5秒ごとに確認
-    const maxRetries = 60; // 最大30秒 (0.5 * 60)
-    let retries = 0;
-
-    const checkStatus = async () => {
-      try {
-        // キャンセルまたはコンポーネントが破棄された場合は終了
-        if (!isReadingNfc.value) {
-          resolve();
-          return;
-        }
-
-        const response = await fetch('http://localhost:8080/check-nfc');
-        if (!response.ok) {
-           console.warn("NFC status check failed, retrying...");
-        } else {
-          const data = await response.json();
-          
-          if (data.status === 'success' && data.idm) {
-            isReadingNfc.value = false;
-            onSuccess(data.idm);
-            resolve();
-            return;
-          } else if (data.status === 'timeout') {
-            throw new Error('NFC読み取りがタイムアウトしました');
-          }
-        }
-
-        retries++;
-        if (retries >= maxRetries) {
-          throw new Error('応答がありません（タイムアウト）');
-        }
-
-        setTimeout(checkStatus, pollInterval);
-
-      } catch (error) {
-        reject(error);
-      }
-    };
-
-    setTimeout(checkStatus, pollInterval);
-  });
-};
-
-const startNfcReading = async () => {
-  successMessage.value = '';
-  await readNfcCard(async (idm) => {
-    await registerCard(idm);
-  });
-};
-
 const startNfcReadingForChange = async () => {
-  await readNfcCard(async (idm) => {
-    newCardId.value = idm;
-    // 読み取ったら即座に変更処理を実行
-    await confirmCardChange();
-  });
+  isReadingNfc.value = true;
+  newCardId.value = '';
+  errorMessage.value = '';
+
+  try {
+    await readNfcCard(async (idm) => {
+      isReadingNfc.value = false;
+      newCardId.value = idm;
+      // 読み取ったら即座に変更処理を実行
+      await confirmCardChange();
+    });
+  } catch (error) {
+     console.error('NFC読み取りエラー:', error);
+    errorMessage.value = `NFC読み取りエラー: ${error.message}`;
+    isReadingNfc.value = false;
+  }
 };
 
 const registerCardManual = async () => {
