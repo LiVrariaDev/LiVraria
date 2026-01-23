@@ -1,7 +1,7 @@
 <template>
     <div class="w-screen h-screen font-sans text-gray-800 bg-gray-900">
 
-        <!-- ===== 診断用 ===== -->
+        <!-- ===== 診断用（画面には表示されませんが、裏で画像をチェックします） ===== -->
         <img 
             src="/bg.jpg" 
             style="display: none;" 
@@ -11,7 +11,7 @@
 
         <!-- ===== ホームページ表示 ===== -->
         <div v-if="currentPage === 'home'" class="relative flex w-full h-full overflow-hidden">
-            <!-- 背景画像 -->
+            <!-- 背景画像エリア -->
             <div class="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700"
                  :style="{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('/bg.jpg?v=2')` }">
             </div>
@@ -19,6 +19,7 @@
             <!-- 左側: アバターと会話エリア -->
             <div class="relative z-10 w-1/3 flex flex-col items-center justify-center p-8">
                 <div class="relative group">
+                    <!-- アバター本体 -->
                     <div class="avatar-container relative w-64 h-80 flex items-center justify-center transition-transform duration-500">
                         <div class="avatar-glow absolute inset-0 bg-gradient-to-tr from-blue-400 to-purple-400 rounded-[60%_40%_30%_70%/60%_30%_70%_40%] blur-xl opacity-30 animate-pulse-slow"></div>
                         <div class="avatar-shape w-full h-full bg-gradient-to-br from-white to-blue-50 border-4 border-blue-200 shadow-2xl flex items-center justify-center overflow-hidden relative animate-float">
@@ -65,7 +66,7 @@
                 </div>
             </div>
 
-            <!-- 下部: 入力とオプション -->
+            <!-- 下部: 入力とオプションエリア -->
             <div class="absolute bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-white/20 p-6 flex items-center shadow-lg z-20">
                 <div class="flex-grow mx-8 relative flex items-center">
                     <button @click="toggleSpeechRecognition" 
@@ -198,13 +199,16 @@ import { signOut, getIdToken } from "firebase/auth";
 import { auth } from '../firebaseConfig';
 import { api } from '../services/api'; 
 
+// --- 診断用関数 ---
 const handleImageError = () => {
     alert("【画像読み込みエラー】\n publicフォルダに 'bg.jpg' が見つかりません。");
 };
 const handleImageLoad = () => {
     console.log("画像の読み込みに成功しました！");
 };
+// ----------------
 
+// --- 音声合成の実装（女性ボイス固定） ---
 const isSpeechEnabled = ref(true);
 const selectedVoice = ref(null);
 
@@ -235,9 +239,16 @@ const toggleSpeech = () => {
 const speakText = (text) => {
     if (!isSpeechEnabled.value) return;
     if (!window.speechSynthesis) return;
+    // 修正：テキストが空の場合は何もしない（undefinedエラー回避）
+    if (!text) return;
+
     if (!selectedVoice.value) loadVoices();
 
-    const plainText = text.replace(/<[^>]+>/g, '');
+    // 修正：文字列であることを確認してからreplaceする
+    const plainText = typeof text === 'string' ? text.replace(/<[^>]+>/g, '') : '';
+    
+    if (!plainText) return; // 空なら終了
+
     const utterance = new SpeechSynthesisUtterance(plainText);
     if (selectedVoice.value) utterance.voice = selectedVoice.value;
     utterance.lang = 'ja-JP';
@@ -246,6 +257,7 @@ const speakText = (text) => {
     utterance.volume = 1.0;
     window.speechSynthesis.speak(utterance);
 };
+// ---------------------
 
 const icons = {
     search: `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>`,
@@ -274,25 +286,17 @@ const suggestedBooks = ref(Array.from({ length: 6 }, (_, i) => ({ id: i + 1, tit
 const selectedBook = ref(null);
 const chatHistoryEl = ref(null);
 
-const channel = new BroadcastChannel('livraria_channel'); 
+const channel = new BroadcastChannel('livraria_channel'); // チャンネル作成
 
 const openSecondaryDisplay = () => {
-    // 修正：既存のウィンドウがあればフォーカス
     if (secondaryWindow.value && !secondaryWindow.value.closed) {
         secondaryWindow.value.focus();
         return;
     }
-    
-    // 修正：セカンダリディスプレイ（と想定される位置）にウィンドウを開く試み
-    // プライマリモニターの幅を取得し、その右側に配置するように 'left' を指定します
     const leftPosition = window.screen.width; 
     const width = window.screen.availWidth;
     const height = window.screen.availHeight;
-
-    // ウィンドウオプションを設定
-    // resizable=yes でサイズ変更を許可、scrollbars=no でスクロールバーを消す
     const features = `left=${leftPosition},top=0,width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no`;
-    
     secondaryWindow.value = window.open('/?view=secondary', 'LivrariaSecondaryDisplay', features);
 };
 
@@ -329,7 +333,9 @@ const sendHomeMessage = async () => {
         
         if (data.session_id) currentSessionId.value = data.session_id;
         
-        const aiResponse = data.reply;
+        // 修正：APIレスポンスのキー名の不一致に対応
+        const aiResponse = data.response || data.reply || data.message || '';
+        
         homeConversationText.value = aiResponse;
         speakText(aiResponse);
         sendMessageToSecondary(aiResponse);
@@ -347,7 +353,6 @@ const sendHomeMessage = async () => {
 
 const sendChatMessage = async () => {
     if (!userInput.value.trim()) return;
-    
     const user = auth.currentUser;
     if (!user) return;
 
@@ -364,7 +369,9 @@ const sendChatMessage = async () => {
         
         if (data.session_id) currentSessionId.value = data.session_id;
         
-        const aiResponse = data.reply;
+        // 修正：APIレスポンスのキー名の不一致に対応
+        const aiResponse = data.response || data.reply || data.message || '';
+        
         chatHistory.value.push({ sender: 'ai', text: aiResponse });
         speakText(aiResponse);
         sendMessageToSecondary(aiResponse);
@@ -398,7 +405,9 @@ const askAboutBook = async () => {
         
         if (data.session_id) currentSessionId.value = data.session_id;
         
-        const aiResponse = data.reply;
+        // 修正：APIレスポンスのキー名の不一致に対応
+        const aiResponse = data.response || data.reply || data.message || '';
+        
         chatHistory.value.push({ sender: 'ai', text: aiResponse });
         speakText(aiResponse);
         sendMessageToSecondary(aiResponse);
@@ -428,7 +437,10 @@ const fetchUserGreeting = async () => {
     try {
         const token = await getIdToken(user);
         const userData = await api.getUser(user.uid, token);
-        const greeting = `ようこそ、${userData.name || user.email}さん！<br>今日はどんな本をお探しですか？`;
+        
+        // バックエンドがデータを返さなかった場合のフォールバック
+        const userName = userData.name || user.email || 'ゲスト';
+        const greeting = `ようこそ、${userName}さん！<br>今日はどんな本をお探しですか？`;
         
         homeConversationText.value = greeting;
         isLoading.value = false;
@@ -472,7 +484,8 @@ const toggleSpeechRecognition = () => {
 };
 
 onMounted(() => {
-    openSecondaryDisplay();
+    // OSコマンドで開く場合は自動オープンしない
+    // openSecondaryDisplay(); 
     fetchUserGreeting();
     loadVoices();
     setTimeout(loadVoices, 500);
