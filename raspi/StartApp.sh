@@ -4,6 +4,10 @@
 # Livraria 起動スクリプト (Dual Display Kiosk)
 # ==========================================
 
+# log file (1回ごと上書き)
+LOG_FILE="$(dirname "$0")/livraria_start.log"
+exec > >(tee "$LOG_FILE") 2>&1
+
 # .envファイルを読み込む
 if [ -f .env ]; then
     source .env
@@ -52,6 +56,3 @@ sleep 3
 wmctrl -r "Secondary Display" -e 0,$PRIMARY_WIDTH,0,-1,-1
 
 echo "Livraria system is running."
-
-echo "Press Enter to exit..."
-read
