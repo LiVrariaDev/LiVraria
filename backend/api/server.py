@@ -8,7 +8,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
 import uvicorn
 
-from .models import ChatRequest, ChatResponse, Personal, ChatStatus
+from .models import ChatRequest, ChatResponse, Personal, ChatStatus, NfcIdRequest
 from .datastore import DataStore
 from . import chat_function, LLM_BACKEND
 
@@ -145,11 +145,12 @@ class Server:
 
 		# NFC Authentication Endpoints
 		@self.app.post("/nfc/auth")
-		async def nfc_auth(nfc_id: str):
+		async def nfc_auth(request: NfcIdRequest):
 			"""
 			NFC IDで認証し、Firebase Custom Tokenを返す。
 			認証不要（NFCタグの物理的所持が前提）。
 			"""
+			nfc_id = request.nfc_id
 			user_id = self.data_store.get_user_by_nfc(nfc_id)
 			if user_id is None:
 				raise HTTPException(status_code=404, detail="NFC ID not registered")
@@ -170,11 +171,12 @@ class Server:
 				raise HTTPException(status_code=500, detail="Token creation failed")
 		
 		@self.app.post("/nfc/register")
-		async def nfc_register(nfc_id: str, user_id: str = Depends(get_current_user_id)):
+		async def nfc_register(request: NfcIdRequest, user_id: str = Depends(get_current_user_id)):
 			"""
 			NFC IDをユーザーに紐付ける（FirebaseToken認証必須）。
 			"""
 			try:
+				nfc_id = request.nfc_id
 				nfc_user = self.data_store.register_nfc(nfc_id, user_id)
 				return {
 					"detail": "NFC registered successfully",
@@ -184,12 +186,13 @@ class Server:
 			except KeyError as e:
 				raise HTTPException(status_code=404, detail=str(e))
 		
-		@self.app.delete("/nfc/unregister")
-		async def nfc_unregister(nfc_id: str, user_id: str = Depends(get_current_user_id)):
+		@self.app.post("/nfc/unregister")
+		async def nfc_unregister(request: NfcIdRequest, user_id: str = Depends(get_current_user_id)):
 			"""
 			NFC IDの登録を解除する（FirebaseToken認証必須）。
 			"""
 			# 認証チェック: このNFC IDが本当にこのユーザーのものか確認
+			nfc_id = request.nfc_id
 			registered_user_id = self.data_store.get_user_by_nfc(nfc_id)
 			if registered_user_id != user_id:
 				raise HTTPException(status_code=404, detail="NFC ID not found")
@@ -197,71 +200,21 @@ class Server:
 			self.data_store.unregister_nfc(nfc_id)
 			return {"detail": "NFC unregistered successfully"}
 		
-		@self.app.get("/nfc/{nfc_id}/info")
-		async def get_nfc_member_info(nfc_id: str, user_id: str = Depends(get_current_user_id)):
+		@self.app.get("/users/{user_id}/nfc")
+		async def get_user_nfc(user_id: str, current_user_id: str = Depends(get_current_user_id)):
 			"""
-			NFC IDから会員情報を取得する（認証必須）。
-			NFCタグが登録されたユーザー情報を返す。
+			ユーザーのNFC IDを取得する（認証必須）。
 			"""
-			registered_user_id = self.data_store.get_user_by_nfc(nfc_id)
-			if registered_user_id is None:
-				raise HTTPException(status_code=404, detail="NFC ID not registered")
-			
-			# 自分のNFCタグ情報のみ取得可能（または管理者権限があれば取得可能）
-			if registered_user_id != user_id:
-				raise HTTPException(status_code=403, detail="Unauthorized")
-			
-			user = self.data_store.get_user(registered_user_id)
-			if user is None:
-				raise HTTPException(status_code=404, detail="User not found")
-			
-			return {
-				"user_id": user.user_id,
-				"nfc_id": nfc_id,
-				"personal": user.personal.dict(),
-				"status": user.status,
-				"lastlogin": user.lastlogin
-			}
+			# 自分自身の情報のみ取得可能
+			if user_id != current_user_id:
+				raise HTTPException(status_code=403, detail="Forbidden")
+				
+			nfc_id = self.data_store.get_nfc_by_user_id(user_id)
+			if nfc_id is None:
+				return {"nfc_id": None}
+				
+			return {"nfc_id": nfc_id}
 		
-		@self.app.put("/nfc/{nfc_id}/info")
-		async def update_nfc_member_info(nfc_id: str, updates: dict, user_id: str = Depends(get_current_user_id)):
-			"""
-			NFC IDに紐付いた会員情報を更新する（認証必須）。
-			更新可能な項目: name, gender, age, live_pref, live_city
-			"""
-			registered_user_id = self.data_store.get_user_by_nfc(nfc_id)
-			if registered_user_id is None:
-				raise HTTPException(status_code=404, detail="NFC ID not registered")
-			
-			# 自分のNFCタグ情報のみ更新可能
-			if registered_user_id != user_id:
-				raise HTTPException(status_code=403, detail="Unauthorized")
-			
-			try:
-				# personal情報の更新
-				allowed_fields = {"name", "gender", "age", "live_pref", "live_city"}
-				personal_updates = {k: v for k, v in updates.items() if k in allowed_fields}
-				
-				if personal_updates:
-					user = self.data_store.get_user(registered_user_id)
-					if user is None:
-						raise HTTPException(status_code=404, detail="User not found")
-					
-					# Personal情報を更新
-					for field, value in personal_updates.items():
-						setattr(user.personal, field, value)
-					
-					# ディスクに保存
-					self.data_store.save_user(user)
-				
-				return {
-					"detail": "Member info updated successfully",
-					"nfc_id": nfc_id,
-					"updated_fields": list(personal_updates.keys())
-				}
-			except Exception as e:
-				logger.error(f"[ERROR] Failed to update member info: {e}")
-				raise HTTPException(status_code=400, detail=str(e))
 		
 		@self.app.on_event("shutdown")
 		async def shutdown_event():

@@ -5,20 +5,20 @@
       <!-- 新規登録モード -->
       <div class="bg-white rounded-2xl shadow-md p-8 border-2 border-purple-100">
         <h2 class="text-2xl font-bold text-slate-700 mb-6">
-          <span class="text-3xl mr-2">💳</span>NFCカードを登録する
+          NFCカードを登録する
         </h2>
 
         <div class="space-y-6">
           <!-- 方法1: NFC読み取り -->
-          <div class="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-6">
-            <h3 class="text-lg font-bold text-purple-700 mb-4">📱 NFCカードをリーダーにかざす</h3>
+          <div class="bg-purple-50 border-2 border-purple-200 rounded-xl p-6">
+            <h3 class="text-lg font-bold text-purple-700 mb-4">NFCカードをリーダーにかざす</h3>
             <button
               @click="startNfcReading"
               :disabled="isReadingNfc"
-              class="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-4 rounded-lg hover:from-purple-600 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-400 transition-all transform active:scale-95"
+              class="w-full bg-purple-600 text-white font-bold py-4 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 transition-colors"
             >
-              <span v-if="!isReadingNfc" class="text-xl">🔍 NFC読み取り開始</span>
-              <span v-else class="text-xl animate-pulse">⏳ 読み取り中...</span>
+              <span v-if="!isReadingNfc" class="text-xl">NFC読み取り開始</span>
+              <span v-else class="text-xl animate-pulse">読み取り中...</span>
             </button>
             <p class="text-sm text-purple-600 mt-3 text-center">タイムアウト: 30秒</p>
           </div>
@@ -32,7 +32,7 @@
 
           <!-- 方法2: 手動入力 -->
           <div class="bg-slate-50 border-2 border-slate-200 rounded-xl p-6">
-            <h3 class="text-lg font-bold text-slate-700 mb-4">✏️ NFCカードIDを手動で入力</h3>
+            <h3 class="text-lg font-bold text-slate-700 mb-4">NFCカードIDを手動で入力</h3>
             <input
               type="text"
               v-model="manualCardId"
@@ -50,7 +50,7 @@
 
           <!-- エラーメッセージ -->
           <div v-if="errorMessage" class="bg-red-50 border-l-4 border-red-500 p-4 rounded">
-            <p class="text-red-700 font-semibold">❌ エラー</p>
+            <p class="text-red-700 font-semibold">エラー</p>
             <p class="text-red-600 text-sm">{{ errorMessage }}</p>
           </div>
         </div>
@@ -62,12 +62,11 @@
       <!-- 現在のカード情報 -->
       <div class="bg-white rounded-2xl shadow-md p-8 border-2 border-purple-100">
         <h2 class="text-2xl font-bold text-slate-700 mb-6">
-          <span class="text-3xl mr-2">✅</span>登録済みのカード
+          登録済みのカード
         </h2>
 
-        <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 mb-6">
+        <div class="bg-purple-50 rounded-xl p-6 mb-6">
           <div class="flex items-center space-x-4">
-            <div class="text-5xl">🎫</div>
             <div>
               <p class="text-sm text-slate-600">カードID</p>
               <p class="text-2xl font-bold text-slate-800 font-mono">{{ registeredCard }}</p>
@@ -78,7 +77,7 @@
 
         <!-- 成功メッセージ -->
         <div v-if="successMessage" class="bg-green-50 border-l-4 border-green-500 p-4 rounded mb-6">
-          <p class="text-green-700 font-semibold">✅ 成功</p>
+          <p class="text-green-700 font-semibold">成功</p>
           <p class="text-green-600 text-sm">{{ successMessage }}</p>
         </div>
 
@@ -86,15 +85,15 @@
         <div class="flex space-x-4">
           <button
             @click="changeCard"
-            class="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-colors"
+            class="flex-1 bg-purple-600 text-white font-bold py-3 rounded-lg hover:bg-purple-700 transition-colors"
           >
-            <span class="mr-2">🔄</span>カードを変更する
+            カードを変更する
           </button>
           <button
             @click="unregisterCard"
             class="flex-1 bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 rounded-lg border border-red-200 transition-colors"
           >
-            <span class="mr-2">❌</span>登録を解除
+            登録を解除
           </button>
         </div>
       </div>
@@ -102,20 +101,20 @@
       <!-- 新規カード登録フォーム（変更時）-->
       <div v-if="isChangingCard" class="bg-white rounded-2xl shadow-md p-8 border-2 border-orange-100">
         <h2 class="text-2xl font-bold text-slate-700 mb-6">
-          <span class="text-3xl mr-2">🔄</span>カードを変更する
+          カードを変更する
         </h2>
 
         <div class="space-y-6">
           <!-- 方法1: NFC読み取り -->
-          <div class="bg-gradient-to-br from-orange-50 to-yellow-50 border-2 border-orange-200 rounded-xl p-6">
-            <h3 class="text-lg font-bold text-orange-700 mb-4">📱 新しいNFCカードをリーダーにかざす</h3>
+          <div class="bg-orange-50 border-2 border-orange-200 rounded-xl p-6">
+            <h3 class="text-lg font-bold text-orange-700 mb-4">新しいNFCカードをリーダーにかざす</h3>
             <button
               @click="startNfcReadingForChange"
               :disabled="isReadingNfc"
-              class="w-full bg-gradient-to-r from-orange-500 to-yellow-500 text-white font-bold py-4 rounded-lg hover:from-orange-600 hover:to-yellow-600 disabled:from-gray-400 disabled:to-gray-400 transition-all transform active:scale-95"
+              class="w-full bg-orange-600 text-white font-bold py-4 rounded-lg hover:bg-orange-700 disabled:bg-gray-400 transition-colors"
             >
-              <span v-if="!isReadingNfc" class="text-xl">🔍 NFC読み取り開始</span>
-              <span v-else class="text-xl animate-pulse">⏳ 読み取り中...</span>
+              <span v-if="!isReadingNfc" class="text-xl">NFC読み取り開始</span>
+              <span v-else class="text-xl animate-pulse">読み取り中...</span>
             </button>
           </div>
 
@@ -194,7 +193,7 @@ const readNfcCard = async (onSuccess) => {
   
   try {
     // 読み取り開始リクエスト
-    const response = await fetch('http://localhost:8000/start-nfc', {
+    const response = await fetch('http://localhost:8080/start-nfc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ timeout: 30 })
@@ -226,7 +225,7 @@ const pollNfcStatus = (onSuccess) => {
           return;
         }
 
-        const response = await fetch('http://localhost:8000/check-nfc');
+        const response = await fetch('http://localhost:8080/check-nfc');
         if (!response.ok) {
            console.warn("NFC status check failed, retrying...");
         } else {
@@ -266,8 +265,10 @@ const startNfcReading = async () => {
 };
 
 const startNfcReadingForChange = async () => {
-  await readNfcCard((idm) => {
+  await readNfcCard(async (idm) => {
     newCardId.value = idm;
+    // 読み取ったら即座に変更処理を実行
+    await confirmCardChange();
   });
 };
 
@@ -379,23 +380,38 @@ const unregisterCard = async () => {
   }
 };
 
-onMounted(async () => {
-  // ユーザーのNFC登録状況を確認
-  try {
-    const user = auth.currentUser;
-    if (!user) return;
+import { onAuthStateChanged } from 'firebase/auth';
 
-    const token = await getIdToken(user);
-    const userInfo = await api.getUser(user.uid, token);
+onMounted(() => {
+  console.log('CardRegistration mounted');
+  
+  // 認証状態の変更を監視（初期ロード時も発火する）
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      console.log('User logged in:', user.uid);
+      try {
+        const token = await getIdToken(user);
+        console.log('Fetching NFC info...');
+        const result = await api.getUserNfc(user.uid, token);
+        console.log('getUserNfc result:', result);
+        
+        if (result && result.nfc_id) {
+            registeredCard.value = result.nfc_id;
+            registrationDate.value = '登録済み';
+            console.log('Set registeredCard:', registeredCard.value);
+        }
+      } catch (error) {
+        console.error('ユーザー情報取得エラー:', error);
+      }
+    } else {
+      console.log('User not logged in');
+    }
+  });
 
-    // ユーザーが既にカード登録しているか確認
-    // （バックエンドで管理されているNFC IDを取得する必要があります）
-    // ここでは、NFC登録状態は別途取得する必要があります
-    // 簡略化のため、初期状態は「未登録」とします
-  } catch (error) {
-    console.error('ユーザー情報取得エラー:', error);
-  }
+  // コンポーネント破棄時に監視を解除（VueのonUnmounted等があればそこで呼ぶべきだが、setup script内ならこれでも動作はするが、
+  // 正しくは onUnmounted(() => unsubscribe()) です）
 });
+
 </script>
 
 <style scoped>

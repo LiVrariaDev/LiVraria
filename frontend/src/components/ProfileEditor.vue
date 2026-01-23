@@ -74,12 +74,20 @@
           <label class="block text-sm font-bold text-slate-700 mb-2">
             <span class="text-slate-400">*</span> 都道府県
           </label>
-          <input
-            type="text"
-            v-model="formData.live_pref"
-            placeholder="例: 東京都"
-            class="w-full bg-slate-50 border border-slate-300 rounded-lg py-3 px-4 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
-          />
+          <div class="relative">
+            <select
+              v-model="formData.live_pref"
+              class="w-full bg-slate-50 border border-slate-300 rounded-lg py-3 px-4 appearance-none focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
+            >
+              <option value="" disabled>選択してください</option>
+              <option v-for="pref in PREFECTURES" :key="pref" :value="pref">
+                {{ pref }}
+              </option>
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
+              <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+            </div>
+          </div>
         </div>
 
         <!-- 市区町村 -->
@@ -119,9 +127,10 @@
           <button
             type="submit"
             :disabled="isSaving"
-            class="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-3 rounded-lg hover:from-purple-600 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-400 transition-all transform active:scale-95"
+            class="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg hover:from-purple-600 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-400 transition-all transform active:scale-95 flex items-center justify-center space-x-2"
           >
-            <span v-if="!isSaving">💾 変更を保存</span>
+            <span v-if="!isSaving" class="text-xl">💾</span>
+            <span v-if="!isSaving">変更を保存</span>
             <span v-else>⏳ 保存中...</span>
           </button>
         </div>
@@ -142,6 +151,16 @@ import { ref, reactive, onMounted } from 'vue';
 import { getIdToken } from 'firebase/auth';
 import { auth } from '../firebaseConfig';
 import { api } from '../services/api';
+
+const PREFECTURES = [
+  "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
+  "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県",
+  "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県",
+  "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県",
+  "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県",
+  "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県",
+  "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"
+];
 
 const props = defineProps({
   onBack: {
@@ -191,7 +210,8 @@ const fetchUserProfile = async () => {
       formData.gender = userInfo.personal.gender || '男性';
       formData.age = userInfo.personal.age || 0;
       formData.live_pref = userInfo.personal.live_pref || '';
-      formData.live_city = userInfo.personal.live_city || '';
+      // unknownの場合は空文字にする
+      formData.live_city = (userInfo.personal.live_city === 'unknown' || !userInfo.personal.live_city) ? '' : userInfo.personal.live_city;
 
       // オリジナル値も保存
       originalData.name = formData.name;

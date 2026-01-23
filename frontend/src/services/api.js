@@ -1,5 +1,5 @@
 // 修正：プロキシ設定(vite.config.js)を利用するため、空文字にします
-const API_BASE_URL = '' 
+const API_BASE_URL = ''
 
 export const api = {
     // ========================================
@@ -160,35 +160,17 @@ export const api = {
         return response.json()
     },
 
-    /*
-     * NFC会員情報取得
-     */
-    async getNfcMemberInfo(nfcId, idToken) {
-        const response = await fetch(`${API_BASE_URL}/nfc/${nfcId}/info`, {
+    async getUserNfc(userId, idToken) {
+        const response = await fetch(`${API_BASE_URL}/users/${userId}/nfc`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${idToken}`
             }
         })
 
-        if (!response.ok) throw new Error('Failed to get NFC member info')
+        if (!response.ok) throw new Error('Failed to get user NFC')
         return response.json()
     },
 
-    /*
-     * NFC会員情報更新
-     */
-    async updateNfcMemberInfo(nfcId, updates, idToken) {
-        const response = await fetch(`${API_BASE_URL}/nfc/${nfcId}/info`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${idToken}`
-            },
-            body: JSON.stringify(updates)
-        })
 
-        if (!response.ok) throw new Error('Failed to update NFC member info')
-        return response.json()
-    }
 }
