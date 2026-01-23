@@ -14,12 +14,12 @@ firebase_admin==7.1.0  # Firebase Auth & Firestore
 # ============================================================================
 # AI/LLM
 # ============================================================================
-google-genai==1.56.0  # Gemini API
+google-genai==1.59.0  # Gemini API
 
 # LangChain
-langchain-core==1.2.5  # LangChain core components
-langgraph==1.0.5  # LangGraph for stateful workflows
-langchain-google-genai==4.1.2  # LangChain Gemini integration
+langchain-core==1.2.7  # LangChain core components
+langgraph==1.0.6  # LangGraph for stateful workflows
+langchain-google-genai==4.2.0  # LangChain Gemini integration
 langchain-ollama==1.0.1  # LangChain Ollama integration
 
 # ============================================================================
