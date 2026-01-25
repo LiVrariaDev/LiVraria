@@ -1,5 +1,5 @@
 // 修正：プロキシ設定(vite.config.js)を利用するため、空文字にします
-const API_BASE_URL = '' 
+const API_BASE_URL = ''
 
 export const api = {
     // ========================================
@@ -158,5 +158,19 @@ export const api = {
 
         if (!response.ok) throw new Error('Failed to unregister NFC')
         return response.json()
-    }
+    },
+
+    async getUserNfc(userId, idToken) {
+        const response = await fetch(`${API_BASE_URL}/users/${userId}/nfc`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${idToken}`
+            }
+        })
+
+        if (!response.ok) throw new Error('Failed to get user NFC')
+        return response.json()
+    },
+
+
 }
