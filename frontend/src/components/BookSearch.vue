@@ -1,25 +1,62 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue'; // computed を追加
 import { getAuth } from 'firebase/auth';
 import api from '../services/api';
 
-// 状態管理用の変数
+// 既存の変数...
 const query = ref('');
-const semanticSearch = ref(false); // AI検索をデフォルトでONに変更
+const semanticSearch = ref(false);
 const books = ref([]);
 const loading = ref(false);
 const error = ref(null);
 
 // 図書館関連の変数
-const myLibraries = ref([]); // 住んでいる地域の図書館リスト
-const availability = ref(null); // 選択した本の貸出状況
-const checkingStock = ref(false); // 在庫確認中かどうか
-const selectedBook = ref(null); // 現在在庫を確認している本
+const myLibraries = ref([]); // 【検索対象】に選ばれた図書館リスト
+const allLibraries = ref([]); // 【県内の全】公立図書館リスト（ここから選ぶ）
 
-// ユーザーの居住地（都道府県）を取得して、近所の図書館リストを準備する
+const availability = ref(null);
+const checkingStock = ref(false);
+const selectedBook = ref(null);
+
+// ★追加：図書館設定モーダル用の変数
+const showLibModal = ref(false); // 設定画面の開閉
+const libFilter = ref(''); // 図書館検索用のキーワード
+
+// ★追加：設定画面で表示する図書館リスト（検索＋ソート）
+const filteredAllLibraries = computed(() => {
+    let libs = allLibraries.value;
+    
+    // 1. キーワードで絞り込み
+    if (libFilter.value) {
+        const k = libFilter.value.toLowerCase();
+        libs = libs.filter(lib => lib.formal.toLowerCase().includes(k));
+    }
+    
+    // 2. 名前順（五十音順っぽい感じ）にソート
+    // 日本語のソートは localeCompare を使うとそこそこ綺麗に並ぶよ
+    return libs.slice().sort((a, b) => a.formal.localeCompare(b.formal, 'ja'));
+});
+
+// ★追加：図書館の選択・解除を切り替える関数
+const toggleLibrary = (lib) => {
+    const index = myLibraries.value.findIndex(l => l.systemid === lib.systemid);
+    if (index >= 0) {
+        myLibraries.value.splice(index, 1); // 登録解除
+    } else {
+        myLibraries.value.push(lib); // 登録
+    }
+};
+
+// ★追加：その図書館が選択済みかどうか判定する関数
+const isSelected = (lib) => {
+    return myLibraries.value.some(l => l.systemid === lib.systemid);
+};
+
+// ユーザーの居住地を取得してリストを準備
 onMounted(async () => {
   try {
     const auth = getAuth();
+    // ... (認証待ちのロジックはそのまま) ...
     await new Promise(resolve => {
         const unsubscribe = auth.onAuthStateChanged(user => {
             if (user) resolve(user);
@@ -36,11 +73,11 @@ onMounted(async () => {
         
         console.log(`User prefecture: ${pref}`);
 
-        // ★作戦変更: 専門図書館が多すぎるので、一気に100件とってくる
+        // 一気に2000件とってくる
         const libs = await api.searchLibraries(pref, 2000, token);
         
         if (Array.isArray(libs)) {
-            // 1. systemid で重複を排除する
+            // 重複排除などはそのまま
             const uniqueLibsMap = new Map();
             libs.forEach(lib => {
                 if (!uniqueLibsMap.has(lib.systemid)) {
@@ -49,17 +86,21 @@ onMounted(async () => {
             });
             const uniqueLibs = Array.from(uniqueLibsMap.values());
 
-            // 2. ★ここを修正: 専門図書館(Special_)と大学図書館(Univ_)を「完全に除外」する
-            // ソートではなく filter で消してしまいます
+            // 公立図書館だけに絞る
             const publicLibs = uniqueLibs.filter(lib => 
                 !lib.systemid.startsWith('Special_') && 
                 !lib.systemid.startsWith('Univ_')
             );
 
-            // 3. 公立図書館だけになったリストから上位10件を使う
-            myLibraries.value = publicLibs.slice(0, 10);
+            // ★変更点：
+            // ここでいきなり slice(0, 10) せず、まずは全リストに保存する
+            allLibraries.value = publicLibs;
+
+            // 初期値として、とりあえず上位5件だけを「検索対象」に入れておく（空だと困るから）
+            // ユーザーがあとで変更できる
+            myLibraries.value = publicLibs.slice(0, 5);
             
-            console.log("Filtered Libraries (Public Only):", myLibraries.value);
+            console.log("All Public Libraries:", allLibraries.value);
         }
     }
   } catch (e) {
@@ -167,40 +208,44 @@ const checkAvailability = async (book) => {
     const result = await api.checkBookAvailability(book.isbn, systemIds, token);
     
     // カーリルのレスポンスを解析
-    // result[isbn][systemid] = {status: 'OK', libkey: { ... }} のような構造
-    // 使いやすい形に整形する
     const statusMap = [];
-    const bookData = result[book.isbn]; // その本のデータ
+    
+    // ★修正: result.books の中から ISBN を探すように変更
+    // (念のため result.books があるかチェックを入れています)
+    const bookData = result.books ? result.books[book.isbn] : result[book.isbn]; 
 
     if (bookData) {
         myLibraries.value.forEach(lib => {
             const libStatus = bookData[lib.systemid];
             if (libStatus) {
-                // 貸出状況のテキストを取得 (例: "貸出可", "貸出中", "蔵書なし")
-                // libkeyの中に詳細があるが、statusでおおよそわかる
-                let statusText = libStatus.status;
-                let colorClass = 'text-gray-500';
+                let statusText = '';
+                let colorClass = '';
 
-                if (libStatus.status === 'OK') {
-                    statusText = '貸出可';
-                    colorClass = 'text-green-600 font-bold';
-                } else if (libStatus.status === 'Cache') {
-                    statusText = '確認中...'; // キャッシュなどの場合
-                    colorClass = 'text-yellow-600';
+                // ★ここを修正: status='OK' だけで判断せず、必ず libkey の中身を見る
+                const libkeys = libStatus.libkey || {};
+                const values = Object.values(libkeys);
+
+                if (values.length === 0) {
+                    // libkeyが空っぽ = その図書館には本がない
+                    statusText = '蔵書なし';
+                    colorClass = 'text-gray-400';
                 } else {
-                    // libkeyの中身を見てみる（より詳細なステータス）
-                    const libkeys = libStatus.libkey || {};
-                    const values = Object.values(libkeys);
-                    if (values.length > 0 && values.includes('貸出可')) {
+                    // 何かしらのデータがある場合
+                    if (values.some(v => v === '貸出可')) {
+                        // ひとつでも「貸出可」があればOK
                         statusText = '貸出可';
                         colorClass = 'text-green-600 font-bold';
-                    } else if (values.length > 0) {
+                    } else {
+                        // 本はあるけど、全部貸出中や館内閲覧のみの場合
                         statusText = '貸出中など';
                         colorClass = 'text-red-500';
-                    } else {
-                        statusText = '蔵書なし';
-                        colorClass = 'text-gray-400';
                     }
+                }
+
+                // (補足) もしバックエンドの処理がタイムアウトして 'Running' のまま返ってきた場合の保険
+                if (libStatus.status === 'Running') {
+                    statusText = '確認中...';
+                    colorClass = 'text-yellow-600';
                 }
 
                 statusMap.push({
@@ -228,15 +273,13 @@ const checkAvailability = async (book) => {
         <span>📚</span> 蔵書検索
     </h1>
 
-    <!-- 検索フォームエリア -->
     <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-      <div class="flex flex-col gap-4">
-        <div class="flex gap-2">
+        <div class="flex gap-2 mb-4">
             <input 
             v-model="query" 
             @keyup.enter="searchBooks"
             type="text" 
-            placeholder="本のタイトル、著者、または「元気が出る本」のようなキーワード" 
+            placeholder="本のタイトル、著者など" 
             class="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <button 
@@ -247,52 +290,100 @@ const checkAvailability = async (book) => {
             {{ loading ? '検索中...' : '検索' }}
             </button>
         </div>
-        
-        <!-- AI検索オプション（非表示）: semanticSearch は script setup で true に固定 -->
-      </div>
+
+        <div class="flex items-center justify-between bg-blue-50 p-3 rounded text-sm text-blue-800">
+            <div>
+                <span class="font-bold">検索対象の図書館:</span>
+                <span v-if="myLibraries.length > 0" class="ml-2">
+                    {{ myLibraries[0].formal }} など {{ myLibraries.length }}館
+                </span>
+                <span v-else class="ml-2 text-red-500 font-bold">
+                    選択されていません
+                </span>
+            </div>
+            <button 
+                @click="showLibModal = true"
+                class="text-blue-600 underline hover:text-blue-800 cursor-pointer font-bold"
+            >
+                設定を変更
+            </button>
+        </div>
     </div>
 
-    <!-- エラー表示 -->
     <div v-if="error" class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6" role="alert">
       <p>{{ error }}</p>
     </div>
-
-    <!-- 検索結果リスト -->
     <div v-if="books.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div v-for="book in books" :key="book.isbn" class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-4 flex gap-4 border border-gray-100">
-        <!-- 本の表紙 -->
-        <div class="w-24 flex-shrink-0">
-            <img :src="book.mediumImageUrl || 'https://placehold.co/100x150?text=No+Image'" alt="表紙" class="w-full rounded shadow-sm">
-        </div>
-        
-        <!-- 本の情報 -->
-        <div class="flex-1 flex flex-col justify-between">
-            <div>
-                <h3 class="font-bold text-lg leading-tight mb-1 line-clamp-2">{{ book.title }}</h3>
-                <p class="text-sm text-gray-600 mb-2">{{ book.author }}</p>
-                <p class="text-xs text-gray-400">ISBN: {{ book.isbn }}</p>
+        <div v-for="book in books" :key="book.isbn" class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-4 flex gap-4 border border-gray-100">
+             <div class="w-24 flex-shrink-0">
+                <img :src="book.mediumImageUrl || 'https://placehold.co/100x150?text=No+Image'" alt="表紙" class="w-full rounded shadow-sm">
             </div>
-            
-            <button 
-                @click="checkAvailability(book)"
-                class="mt-3 w-full bg-emerald-500 text-white py-2 px-4 rounded-md text-sm font-bold hover:bg-emerald-600 transition-colors flex items-center justify-center gap-1"
-            >
-                <span>🏢</span> 図書館で探す
-            </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 在庫状況モーダル -->
-    <div v-if="selectedBook" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="selectedBook = null">
-        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden animate-fade-in-up">
-            <div class="p-4 bg-gray-50 border-b flex justify-between items-center">
-                <h3 class="font-bold text-lg truncate pr-4">「{{ selectedBook.title }}」の蔵書状況</h3>
-                <button @click="selectedBook = null" class="text-gray-400 hover:text-gray-600">
-                    ✕
+            <div class="flex-1 flex flex-col justify-between">
+                <div>
+                    <h3 class="font-bold text-lg leading-tight mb-1 line-clamp-2">{{ book.title }}</h3>
+                    <p class="text-sm text-gray-600 mb-2">{{ book.author }}</p>
+                </div>
+                <button 
+                    @click="checkAvailability(book)"
+                    class="mt-3 w-full bg-emerald-500 text-white py-2 px-4 rounded-md text-sm font-bold hover:bg-emerald-600 transition-colors flex items-center justify-center gap-1"
+                >
+                    <span>🏢</span> 図書館で探す
                 </button>
             </div>
-            
+        </div>
+    </div>
+
+
+    <div v-if="showLibModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="showLibModal = false">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full h-[80vh] flex flex-col animate-fade-in-up">
+            <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-xl">
+                <h3 class="font-bold text-lg">検索する図書館を選ぶ</h3>
+                <button @click="showLibModal = false" class="text-gray-400 hover:text-gray-600 font-bold text-xl">✕</button>
+            </div>
+
+            <div class="p-4 border-b bg-white">
+                <input 
+                    v-model="libFilter" 
+                    type="text" 
+                    placeholder="図書館名で絞り込み（例: 長泉、沼津...）" 
+                    class="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 bg-gray-50">
+                <div v-if="filteredAllLibraries.length === 0" class="text-center text-gray-500 py-8">
+                    該当する図書館が見つかりません
+                </div>
+                <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div 
+                        v-for="lib in filteredAllLibraries" 
+                        :key="lib.systemid"
+                        @click="toggleLibrary(lib)"
+                        class="p-3 rounded border cursor-pointer transition-colors flex items-center justify-between"
+                        :class="isSelected(lib) ? 'bg-blue-100 border-blue-500 text-blue-900' : 'bg-white border-gray-200 hover:bg-gray-100'"
+                    >
+                        <span class="text-sm font-medium">{{ lib.formal }}</span>
+                        <span v-if="isSelected(lib)" class="text-blue-600 font-bold">✓</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t bg-white rounded-b-xl flex justify-between items-center">
+                <span class="text-sm text-gray-600">
+                    現在 {{ myLibraries.length }} 館を選択中
+                </span>
+                <button 
+                    @click="showLibModal = false" 
+                    class="px-6 py-2 bg-blue-600 text-white font-bold rounded hover:bg-blue-700"
+                >
+                    完了
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="selectedBook" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="selectedBook = null">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden animate-fade-in-up">
             <div class="p-6">
                 <div v-if="checkingStock" class="flex flex-col items-center justify-center py-8">
                     <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-500 mb-2"></div>
@@ -307,18 +398,13 @@ const checkAvailability = async (book) => {
                     </div>
                 </div>
 
-                <div v-else class="text-center py-6 text-gray-500">
-                    <p>この地域の図書館には蔵書情報が見つかりませんでした。</p>
+                    <div v-else class="text-center py-6 text-gray-500">
+                        <p>この地域の図書館には蔵書情報が見つかりませんでした。</p>
+                    </div>
                 </div>
-            </div>
-            
-            <div class="p-4 bg-gray-50 border-t text-right">
-                <button @click="selectedBook = null" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">閉じる</button>
             </div>
         </div>
     </div>
-
-  </div>
 </template>
 
 <style scoped>
