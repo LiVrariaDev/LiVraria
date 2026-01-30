@@ -37,7 +37,6 @@ print(f"[Mock] Server initialized with Persistent IDm: {PERSISTENT_MOCK_IDM}")
 
 def mock_background_read(timeout):
     """3秒後に成功を返すモック処理"""
-    global nfc_state
     
     print("[Mock] Reading started...")
     time.sleep(3) # 3秒待機
@@ -63,7 +62,7 @@ def health():
 
 @app.post("/start-nfc")
 def start_nfc(request: StartNfcRequest):
-    global nfc_state
+
     
     with nfc_lock:
         if nfc_state["status"] == "reading":
