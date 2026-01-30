@@ -77,23 +77,41 @@
             </div>
           </div>
         </div>
-
-        <div class="pt-6 flex flex-col space-y-4">
+        
+        <div class="pt-2 flex flex-col space-y-4">
+          <!-- 1. 通常のログイン/登録ボタン -->
           <button type="submit" 
-                  :disabled="isLoading"
-                  class="w-full px-4 py-3 text-lg font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transform hover:-translate-y-0.5 transition-all duration-200 shadow-lg hover:shadow-indigo-500/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                :disabled="isLoading"
+                class="w-full px-4 py-3 text-lg font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transform hover:-translate-y-0.5 transition-all duration-200 shadow-lg hover:shadow-indigo-500/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
             <span v-if="isLoading">処理中...</span>
             <span v-else>{{ isRegisterMode ? '登録してはじめる' : 'ログイン' }}</span>
           </button>
-          
-          <div class="relative flex items-center justify-center">
-            <div class="w-full border-t border-gray-300"></div>
+        
+          <!-- 2. NFCログインボタン (ログインモード時のみ表示) -->
+          <div v-if="!isRegisterMode" class="w-full pt-2">
+            <div class="relative flex items-center justify-center mb-4">
+              <div class="w-full border-t border-gray-300"></div>
+              <span class="absolute px-3 bg-white/90 text-xs text-gray-400">または</span>
+            </div>
+
+            <button
+              type="button"
+              @click="startNfcLogin"
+              :disabled="isLoading || isReadingNfc"
+              class="w-full px-4 py-3 text-lg font-bold text-white bg-purple-600 rounded-lg hover:bg-purple-700 transform hover:-translate-y-0.5 transition-all duration-200 shadow-lg hover:shadow-purple-500/30 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+            >
+              <span v-if="!isReadingNfc">💳 NFCでログイン</span>
+              <span v-else class="animate-pulse">📡 カードをかざしてください...</span>
+            </button>
           </div>
 
-          <button type="button" @click="toggleMode"
-                  class="text-sm text-indigo-600 hover:text-indigo-800 font-semibold focus:outline-none underline">
-            {{ isRegisterMode ? 'すでにアカウントをお持ちの方はログイン' : 'アカウントをお持ちでない方は新規登録' }}
-          </button>
+          <!-- 3. 新規登録/ログイン切り替えリンク (一番下) -->
+          <div class="pt-2">
+             <button type="button" @click="toggleMode"
+                  class="w-full text-sm text-indigo-600 hover:text-indigo-800 font-semibold focus:outline-none underline text-center">
+              {{ isRegisterMode ? 'すでにアカウントをお持ちの方はログイン' : 'アカウントをお持ちでない方は新規登録' }}
+            </button>
+          </div>
         </div>
       </form>
     </div>
@@ -120,6 +138,40 @@ const profile = reactive({
   live_pref: '',
   live_city: ''
 });
+
+const isReadingNfc = ref(false);
+
+import { readNfcCard } from '../services/nfc';
+import { signInWithCustomToken } from "firebase/auth";
+
+const startNfcLogin = async () => {
+  errorMessage.value = '';
+  isReadingNfc.value = true;
+
+  try {
+    await readNfcCard(async (idm) => {
+      isReadingNfc.value = false;
+      
+      // 1. バックエンドでNFC認証 -> Custom Token取得
+      const result = await api.authenticateNfc(idm);
+      if (!result.custom_token) {
+        throw new Error('認証トークンの取得に失敗しました');
+      }
+
+      // 2. FirebaseにCustom Tokenでログイン
+      await signInWithCustomToken(auth, result.custom_token);
+      console.log('NFCログイン完了');
+    });
+  } catch (error) {
+    console.error('NFCログインエラー:', error);
+    if (error.message.includes('NFC ID not registered')) {
+      errorMessage.value = 'このカードは未登録です。';
+    } else {
+      errorMessage.value = `NFCログインエラー: ${error.message}`;
+    }
+    isReadingNfc.value = false;
+  }
+};
 
 // BroadcastChannelを作成（MainAppと同じ名前を使うことで通信可能）
 const channel = new BroadcastChannel('livraria_channel');
