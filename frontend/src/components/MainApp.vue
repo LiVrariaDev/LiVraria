@@ -9,6 +9,11 @@
             @load="handleImageLoad"
         />
 
+        <!-- ===== 会員情報ページ ===== -->
+        <div v-if="currentPage === 'member_info'" class="w-full h-full">
+            <MemberInfoPage :onBack="() => currentPage = 'home'" />
+        </div>
+
         <!-- ===== ホームページ表示 ===== -->
         <div v-if="currentPage === 'home'" class="relative flex w-full h-full overflow-hidden">
             <!-- 背景画像エリア -->
@@ -221,6 +226,9 @@ import { api } from '../services/api';
 // ★追加: 蔵書検索コンポーネントをインポート
 import BookSearch from './BookSearch.vue';
 
+import MemberInfoPage from './MemberInfoPage.vue';
+// import bgImage from '../assets/bg.jpg';
+
 // --- 診断用関数 ---
 const handleImageError = () => {
     alert("【画像読み込みエラー】\n publicフォルダに 'bg.jpg' が見つかりません。");
@@ -298,7 +306,7 @@ const currentSessionId = ref(null);
 const mainButtons = ref([ 
     { id: 1, text: '書籍検索', action: 'search', icon: 'search' }, 
     { id: 2, text: '会話集中モード', action: 'focus_chat', icon: 'chat' }, 
-    { id: 3, text: 'ライブラリーサーフィン', action: 'library_surfing', icon: 'grid' }, 
+    { id: 3, text: '会員情報', action: 'member_info', icon: 'grid' }, 
     { id: 4, text: 'グッドスナイパー', action: 'good_sniper', icon: 'star' }
 ]);
 const utilityButtons = ref([ { id: 6, text: 'オプション', action: 'options' } ]); 

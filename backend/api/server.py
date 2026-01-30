@@ -8,7 +8,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
 import uvicorn
 
-from .models import ChatRequest, ChatResponse, Personal, ChatStatus
+from .models import ChatRequest, ChatResponse, Personal, ChatStatus, NfcIdRequest
 from .datastore import DataStore
 from . import chat_function, LLM_BACKEND
 
@@ -148,11 +148,12 @@ class Server:
 
 		# NFC Authentication Endpoints
 		@self.app.post("/nfc/auth")
-		async def nfc_auth(nfc_id: str):
+		async def nfc_auth(request: NfcIdRequest):
 			"""
 			NFC IDで認証し、Firebase Custom Tokenを返す。
 			認証不要（NFCタグの物理的所持が前提）。
 			"""
+			nfc_id = request.nfc_id
 			user_id = self.data_store.get_user_by_nfc(nfc_id)
 			if user_id is None:
 				raise HTTPException(status_code=404, detail="NFC ID not registered")
@@ -173,11 +174,12 @@ class Server:
 				raise HTTPException(status_code=500, detail="Token creation failed")
 		
 		@self.app.post("/nfc/register")
-		async def nfc_register(nfc_id: str, user_id: str = Depends(get_current_user_id)):
+		async def nfc_register(request: NfcIdRequest, user_id: str = Depends(get_current_user_id)):
 			"""
 			NFC IDをユーザーに紐付ける（FirebaseToken認証必須）。
 			"""
 			try:
+				nfc_id = request.nfc_id
 				nfc_user = self.data_store.register_nfc(nfc_id, user_id)
 				return {
 					"detail": "NFC registered successfully",
@@ -187,19 +189,36 @@ class Server:
 			except KeyError as e:
 				raise HTTPException(status_code=404, detail=str(e))
 		
-		@self.app.delete("/nfc/unregister")
-		async def nfc_unregister(nfc_id: str, user_id: str = Depends(get_current_user_id)):
+		@self.app.post("/nfc/unregister")
+		async def nfc_unregister(request: NfcIdRequest, user_id: str = Depends(get_current_user_id)):
 			"""
 			NFC IDの登録を解除する（FirebaseToken認証必須）。
 			"""
 			# 認証チェック: このNFC IDが本当にこのユーザーのものか確認
+			nfc_id = request.nfc_id
 			registered_user_id = self.data_store.get_user_by_nfc(nfc_id)
 			if registered_user_id != user_id:
 				raise HTTPException(status_code=404, detail="NFC ID not found")
 			
 			self.data_store.unregister_nfc(nfc_id)
 			return {"detail": "NFC unregistered successfully"}
-
+		
+		@self.app.get("/users/{user_id}/nfc")
+		async def get_user_nfc(user_id: str, current_user_id: str = Depends(get_current_user_id)):
+			"""
+			ユーザーのNFC IDを取得する（認証必須）。
+			"""
+			# 自分自身の情報のみ取得可能
+			if user_id != current_user_id:
+				raise HTTPException(status_code=403, detail="Forbidden")
+				
+			nfc_id = self.data_store.get_nfc_by_user_id(user_id)
+			if nfc_id is None:
+				return {"nfc_id": None}
+				
+			return {"nfc_id": nfc_id}
+		
+		
 		@self.app.on_event("shutdown")
 		async def shutdown_event():
 			"""サーバー終了時に全アクティブセッションを一時停止して保存"""
