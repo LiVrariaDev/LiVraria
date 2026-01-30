@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'; // computed を追加
 import { getAuth } from 'firebase/auth';
-import api from '../services/api';
+import { api } from '../services/api';
 
 // 既存の変数...
 const query = ref('');
