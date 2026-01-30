@@ -344,6 +344,12 @@ const handleHomeButtonClick = (action) => {
         const msg = "蔵書検索を開始します。";
         homeConversationText.value = msg;
         speakText(msg);
+    } else if (action === 'member_info') {
+        currentPage.value = 'member_info';
+        const msg = "会員情報モードへ切り替えました。";
+        homeConversationText.value = msg;
+        speakText(msg);
+        sendMessageToSecondary(msg);
     } else {
         const msg = `「${action}」機能は準備中です。`;
         homeConversationText.value = msg;
