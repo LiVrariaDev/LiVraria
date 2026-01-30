@@ -100,20 +100,3 @@ onUnmounted(() => {
 <style scoped>
 /* スタイルなし */
 </style>
-```
-
-### 2. Raspberry Pi 側での解決策（コマンドライン）
-
-「ウィンドウが一次ディスプレイに出てしまう」「フルスクリーンにならない」問題を確実に解決するには、ラズベリーパイのターミナルで以下のコマンドを使ってブラウザを起動するのが最適です。
-
-Vueアプリ（`MainApp.vue`）からボタンで開くのではなく、**最初から別プロセスとしてセカンダリ画面を立ち上げておく**方法です。
-
-以下のコマンドをラズベリーパイのターミナルで実行してみてください。
-
-```bash
-# Chromiumブラウザをキオスクモード（全画面）で、指定した位置に起動するコマンド
-chromium-browser --app="http://localhost:5173/?view=secondary" \
-  --window-position=1920,0 \
-  --start-fullscreen \
-  --kiosk \
-  --user-data-dir="/tmp/secondary_display_profile"

@@ -12,7 +12,7 @@ rich==14.2.0  # Beautiful terminal output
 rich-toolkit==0.17.1  # Rich extensions
 
 # CLI Tools
-typer==0.21.0  # CLI application framework
+typer==0.21.1  # CLI application framework
 
 # FastAPI Development Tools
 fastapi-cli==0.0.20  # FastAPI CLI

@@ -18,23 +18,11 @@ raspi/
 ### 0. RasberryPiの起動
 #### ディスプレイ設定
 ディスプレイを接続して起動してください
-RasberryPi用モニターを使う場合，以下の設定を`/boot/firmware/config.txt`に追記してください
-
+RasberryPi用モニターを使う場合，
+以下の設定を`/boot/firmware/cmdline.txt`の**先頭**に追記してください
+また，最後のスペースを忘れずに
 ```text
-# HDMI出力を強制
-hdmi_force_hotplug=1
-# カスタム解像度
-hdmi_cvt 1024 600 60 3 0 0 0
-# カスタムモードを有効化
-hdmi_group=2
-hdmi_mode=87
-```
-
-また，以下の設定を変更してください
-
-```text
-- dtoverlay=vc4-kms-v3d
-+ dtoverlay=vc4-fkms-v3d
+video=HDMI-A-1:1024x600M@60D video=HDMI-A-2:1920x1080M@60D=1 
 ```
 
 ### 日本語入力

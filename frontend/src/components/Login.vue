@@ -1,14 +1,11 @@
 <template>
   <div class="flex items-center justify-center min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 font-sans">
-    <!-- 背景装飾 -->
     <div class="absolute top-20 left-20 w-72 h-72 bg-white rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
     <div class="absolute top-40 right-20 w-72 h-72 bg-yellow-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
     <div class="absolute -bottom-8 left-40 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
 
-    <!-- カードコンテナ -->
-    <div class="relative w-full max-w-lg p-8 bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl transition-all duration-500">
+    <div class="relative w-full max-w-lg p-8 bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl transition-all duration-500 my-10">
       
-      <!-- ヘッダー -->
       <div class="text-center mb-8">
         <h2 class="text-4xl font-extrabold text-gray-900 tracking-tight">Livraria</h2>
         <p class="mt-2 text-sm text-gray-600">
@@ -16,16 +13,13 @@
         </p>
       </div>
       
-      <!-- エラーメッセージ -->
       <div v-if="errorMessage" class="mb-6 p-4 text-sm text-red-700 bg-red-100 border-l-4 border-red-500 rounded" role="alert">
         <p class="font-bold">エラー</p>
         <p>{{ errorMessage }}</p>
       </div>
 
-      <!-- フォーム -->
       <form @submit.prevent="handleSubmit" class="space-y-5">
         
-        <!-- ログイン/登録 共通項目 -->
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
@@ -39,7 +33,6 @@
           </div>
         </div>
 
-        <!-- 新規登録モードのみ表示する追加項目 -->
         <div v-if="isRegisterMode" class="space-y-4 pt-2 animate-fade-in">
           <div class="border-t border-gray-200 pt-4">
             <p class="text-xs text-gray-500 mb-4 text-center">- プロフィール情報 -</p>
@@ -85,7 +78,6 @@
           </div>
         </div>
 
-        <!-- アクションボタン -->
         <div class="pt-6 flex flex-col space-y-4">
           <button type="submit" 
                   :disabled="isLoading"
@@ -98,41 +90,29 @@
             <div class="w-full border-t border-gray-300"></div>
           </div>
 
-          <!-- モード切替ボタン -->
           <button type="button" @click="toggleMode"
                   class="text-sm text-indigo-600 hover:text-indigo-800 font-semibold focus:outline-none underline">
             {{ isRegisterMode ? 'すでにアカウントをお持ちの方はログイン' : 'アカウントをお持ちでない方は新規登録' }}
           </button>
         </div>
       </form>
-  
-          <!-- カード認証ボタン -->
-          <div class="pt-4">
-            <button type="button" @click="startNfc" :disabled="nfcLoading"
-                    class="w-full px-4 py-3 text-lg font-bold text-white bg-green-600 rounded-lg hover:bg-green-700 transform hover:-translate-y-0.5 transition-all duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed">
-              <span v-if="nfcLoading">読み取り中...</span>
-              <span v-else>カードで認証</span>
-            </button>
-          </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from '../firebaseConfig'; 
 import { api } from '../services/api'; 
 
-const isRegisterMode = ref(false); // ログイン/登録モード切替フラグ
+const isRegisterMode = ref(false); 
 const isLoading = ref(false);
 const errorMessage = ref('');
 
-// 認証情報
 const email = ref('');
 const password = ref('');
 
-// プロフィール情報（新規登録用）
 const profile = reactive({
   name: '',
   gender: '',
@@ -141,80 +121,26 @@ const profile = reactive({
   live_city: ''
 });
 
-const nfcLoading = ref(false);
+// BroadcastChannelを作成（MainAppと同じ名前を使うことで通信可能）
+const channel = new BroadcastChannel('livraria_channel');
 
-// カードで認証ボタンの処理
-const startNfc = async () => {
-  errorMessage.value = '';
-  nfcLoading.value = true;
-  
-  try {
-    // 1. NFC読み取り開始
-    const startRes = await fetch('http://localhost:8000/start-nfc', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ timeout: 20 })
+// 画面が表示された時に実行
+onMounted(() => {
+  // アプリ起動時（ログイン画面表示時）に、セカンダリディスプレイを「待機状態」にする
+  // これにより、ラズパイ起動時にセカンダリ画面にも「いらっしゃいませ」が表示されます
+  setTimeout(() => {
+    channel.postMessage({ 
+      type: 'chat', 
+      text: 'いらっしゃいませ。\nログインしてください。', 
+      state: 'idle' 
     });
-    
-    if (!startRes.ok) {
-      throw new Error('NFC読み取り開始に失敗しました');
-    }
-    
-    // 2. ポーリングで読み取り状態を確認
-    const startTime = Date.now();
-    const timeout = 20000; // 20秒
-    
-    const checkNfc = async () => {
-      return new Promise((resolve, reject) => {
-        const interval = setInterval(async () => {
-          try {
-            const checkRes = await fetch('http://localhost:8000/check-nfc');
-            const data = await checkRes.json();
-            
-            if (data.status === 'success') {
-              clearInterval(interval);
-              resolve(data.idm);
-            } else if (data.status === 'timeout') {
-              clearInterval(interval);
-              reject(new Error('タイムアウト: カードが検出されませんでした'));
-            } else if (Date.now() - startTime > timeout) {
-              clearInterval(interval);
-              reject(new Error('タイムアウト'));
-            }
-          } catch (err) {
-            clearInterval(interval);
-            reject(err);
-          }
-        }, 1000); // 1秒ごとにポーリング
-      });
-    };
-    
-    const idm = await checkNfc();
-    console.log('NFC IDm取得:', idm);
-    
-    // 3. バックエンドでNFC認証
-    const authRes = await api.authenticateNfc(idm);
-    
-    if (!authRes || !authRes.custom_token) {
-      throw new Error('NFC認証に失敗しました。カードが登録されていない可能性があります。');
-    }
-    
-    // 4. Firebase Custom Tokenでログイン
-    const { signInWithCustomToken } = await import('firebase/auth');
-    await signInWithCustomToken(auth, authRes.custom_token);
-    
-    console.log('NFC認証成功');
-    // App.vueのリスナーが反応して画面遷移します
-    
-  } catch (err) {
-    console.error('NFC認証エラー:', err);
-    errorMessage.value = err.message || 'NFC認証に失敗しました';
-  } finally {
-    nfcLoading.value = false;
-  }
-};
+  }, 1000); // 念のため1秒待ってから送信（ウィンドウ起動待ち）
+});
 
-// 都道府県リスト
+onUnmounted(() => {
+  channel.close();
+});
+
 const prefectures = [
   "北海道","青森県","岩手県","宮城県","秋田県","山形県","福島県",
   "茨城県","栃木県","群馬県","埼玉県","千葉県","東京都","神奈川県",
@@ -225,14 +151,11 @@ const prefectures = [
   "熊本県","大分県","宮崎県","鹿児島県","沖縄県"
 ];
 
-// モード切替処理
 const toggleMode = () => {
   isRegisterMode.value = !isRegisterMode.value;
   errorMessage.value = '';
-  // フォームリセット等の処理が必要ならここに追加
 };
 
-// フォーム送信時の処理振り分け
 const handleSubmit = async () => {
   if (isRegisterMode.value) {
     await signUp();
@@ -241,42 +164,30 @@ const handleSubmit = async () => {
   }
 };
 
-// 新規登録処理
 const signUp = async () => {
   errorMessage.value = '';
   isLoading.value = true;
   
   try {
-    // 1. Firebaseで認証ユーザー作成
     const userCredential = await createUserWithEmailAndPassword(auth, email.value, password.value);
     const user = userCredential.user;
-    
-    // 2. IDトークンを取得
     const token = await user.getIdToken();
 
-    // 3. Pythonバックエンドにユーザー詳細情報を登録
-    // 入力されたプロフィール情報を使用
     const userData = {
         name: profile.name,
         gender: profile.gender,
         age: profile.age,
         live_pref: profile.live_pref,
-        live_city: profile.live_city || 'unknown' // 任意項目は空ならunknown
+        live_city: profile.live_city || 'unknown'
     };
 
-    console.log("バックエンドに送信するデータ:", userData);
-    
     await api.createUser(userData, token);
     console.log('ユーザー登録完了');
-    
-    // 成功するとApp.vueのリスナーが反応して画面遷移します
 
   } catch (error) {
     console.error('Registration error:', error);
-    // エラーハンドリング
     if (error.message.includes('Failed to create user')) {
         errorMessage.value = '認証には成功しましたが、プロフィールの保存に失敗しました。';
-        // 必要に応じてFirebaseユーザーを削除するロールバック処理などを検討
     } else {
         errorMessage.value = getFirebaseErrorMessage(error.code);
     }
@@ -285,7 +196,6 @@ const signUp = async () => {
   }
 };
 
-// ログイン処理
 const signIn = async () => {
   errorMessage.value = '';
   isLoading.value = true;
@@ -327,13 +237,11 @@ const getFirebaseErrorMessage = (errorCode) => {
 .animation-delay-4000 {
   animation-delay: 4s;
 }
-
-/* フェードインアニメーション */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
-}
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out forwards;
 }
 </style>

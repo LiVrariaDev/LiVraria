@@ -1,4 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+// 修正：プロキシ設定(vite.config.js)を利用するため、空文字にします
+const API_BASE_URL = '' 
 
 export const api = {
     // ========================================
@@ -7,11 +8,9 @@ export const api = {
 
     /*
      * ユーザー作成
-     * @param {Object} userData - { name, gender, age, live_pref, live_city }
-     * @param {string} idToken - Firebase ID Token
      */
     async createUser(userData, idToken) {
-        // 修正：URLパラメータではなく、JSONボディとして送信する
+        // 修正：JSONボディとして送信する
         const response = await fetch(`${API_BASE_URL}/users`, {
             method: 'POST',
             headers: {
@@ -27,8 +26,6 @@ export const api = {
 
     /*
      * ユーザー情報取得
-     * @param {string} userId - ユーザーID
-     * @param {string} idToken - Firebase ID Token
      */
     async getUser(userId, idToken) {
         const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
@@ -44,9 +41,6 @@ export const api = {
 
     /*
      * ユーザー情報更新
-     * @param {string} userId - ユーザーID
-     * @param {Object} updates - 更新するフィールド
-     * @param {string} idToken - Firebase ID Token
      */
     async updateUser(userId, updates, idToken) {
         const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
@@ -68,43 +62,25 @@ export const api = {
 
     /*
      * メッセージ送信
-     * @param {string|null} sessionId - セッションID
-     * @param {string} message - メッセージ内容
-     * @param {string} idToken - Firebase ID Token
-     * @param {string} mode - チャットモード
-     * @returns {Promise<{response: string, session_id: string, recommended_books: Array}>}
      */
     async sendMessage(sessionId, message, idToken, mode = 'default') {
-        // 新規セッションの場合はsession_id="new"を使用
-        const effectiveSessionId = sessionId || 'new'
-        const url = `${API_BASE_URL}/sessions/${effectiveSessionId}/messages?mode=${mode}`
+        const url = sessionId
+            ? `${API_BASE_URL}/sessions/${sessionId}/messages`
+            : `${API_BASE_URL}/sessions/new/messages`
 
+        // 修正：JSONボディとして送信する
+        // modeも念のためボディに含めます
         const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${idToken}`
             },
-            body: JSON.stringify({ message })
+            body: JSON.stringify({ message, mode })
         })
 
         if (!response.ok) throw new Error('Failed to send message')
-        const data = await response.json()
-
-        // レスポンス形式:
-        // {
-        //   response: "AIの応答テキスト",
-        //   session_id: "セッションID",
-        //   recommended_books: [
-        //     {
-        //       title: "書籍タイトル",
-        //       author: "著者",
-        //       isbn: "ISBN",
-        //       recommendation_reason: "推薦理由"
-        //     }
-        //   ]
-        // }
-        return data
+        return response.json()
     },
 
     /*
@@ -125,13 +101,14 @@ export const api = {
     /*
      * セッションクローズ
      */
-    async closeSession(sessionId, idToken) {
+    async closeSession(sessionId, userId, idToken) {
         const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/close`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${idToken}`
-            }
+            },
+            body: JSON.stringify({ user_id: userId })
         })
 
         if (!response.ok) throw new Error('Failed to close session')
@@ -142,9 +119,6 @@ export const api = {
     // NFC認証関連API
     // ========================================
 
-    /*
-     * NFC登録
-     */
     async registerNfc(nfcId, userId, idToken) {
         const response = await fetch(`${API_BASE_URL}/nfc/register`, {
             method: 'POST',
@@ -159,9 +133,6 @@ export const api = {
         return response.json()
     },
 
-    /*
-     * NFC認証
-     */
     async authenticateNfc(nfcId) {
         const response = await fetch(`${API_BASE_URL}/nfc/auth`, {
             method: 'POST',
@@ -175,9 +146,6 @@ export const api = {
         return response.json()
     },
 
-    /*
-     * NFC登録解除
-     */
     async unregisterNfc(nfcId, idToken) {
         const response = await fetch(`${API_BASE_URL}/nfc/unregister`, {
             method: 'POST',
@@ -267,5 +235,3 @@ export const api = {
         return response.json();
     }
 }
-
-export default api
