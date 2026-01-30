@@ -233,7 +233,7 @@ export const api = {
             throw new Error('Book search failed');
         }
         return response.json();
-    }
+    },
 
     async getUserNfc(userId, idToken) {
         const response = await fetch(`${API_BASE_URL}/users/${userId}/nfc`, {
