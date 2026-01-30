@@ -12,6 +12,9 @@ from .models import ChatRequest, ChatResponse, Personal, ChatStatus, NfcIdReques
 from .datastore import DataStore
 from . import chat_function, LLM_BACKEND
 
+# 検索機能
+from backend.api.routers import search
+
 # firebase import
 import firebase_admin
 from firebase_admin import credentials, auth
@@ -294,6 +297,11 @@ class Server:
 				raise HTTPException(status_code=404, detail="Session not found")
 			
 			return {"detail": "Session closed successfully", "session_id": session_id}
+		
+		self.app.include_router(
+            search.router, 
+            dependencies=[Depends(get_current_user_id)]
+        )
 
 
 	async def chat_prompt(self, request: ChatRequest, prompt_file: str, user_id: str) -> ChatResponse:
