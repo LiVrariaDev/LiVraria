@@ -14,7 +14,7 @@ firebase_admin==7.1.0  # Firebase Auth & Firestore
 # ============================================================================
 # AI/LLM
 # ============================================================================
-google-genai==1.60.0  # Gemini API
+google-genai==1.61.0  # Gemini API
 
 # LangChain
 langchain-core==1.2.7  # LangChain core components
