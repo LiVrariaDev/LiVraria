@@ -213,34 +213,6 @@ def create_system_prompt(base_prompt: str, ai_insight: Optional[str] = None) -> 
 	
 	return full_prompt
 
-
-def messages_to_langchain(history: List[Dict[str, str]]) -> List[BaseMessage]:
-	"""辞書形式のメッセージ履歴をLangChainのメッセージに変換"""
-	langchain_messages = []
-	for msg in history:
-		role = msg.get("role", "user")
-		content = msg.get("content", "")
-		
-		if role == "user":
-			langchain_messages.append(HumanMessage(content=content))
-		elif role in ["assistant", "model"]:
-			langchain_messages.append(AIMessage(content=content))
-	
-	return langchain_messages
-
-
-def langchain_to_messages(langchain_messages: List[BaseMessage]) -> List[Dict[str, str]]:
-	"""LangChainのメッセージを辞書形式に変換"""
-	messages = []
-	for msg in langchain_messages:
-		if isinstance(msg, HumanMessage):
-			messages.append({"role": "user", "content": msg.content})
-		elif isinstance(msg, AIMessage):
-			messages.append({"role": "assistant", "content": msg.content})
-	
-	return messages
-
-
 # LangGraph Workflow
 
 def create_agent_workflow(llm, tools):
@@ -295,26 +267,26 @@ def create_agent_workflow(llm, tools):
 def llm_chat(
 	prompt_file: str,
 	message: str,
-	history: Optional[List[Dict[str, str]]] = None,
+	history: Optional[List[BaseMessage]] = None,
 	ai_insight: Optional[str] = None,
 	model: Optional[str] = None,
 	temperature: float = 0.3,
 	max_tokens: int = 512
-) -> tuple[str, List[Dict[str, str]], List[dict]]:
+) -> tuple[str, List[BaseMessage], List[dict]]:
 	"""
 	LangGraphを使ったチャット対話
 	
 	Args:
 		prompt_file: プロンプトファイルのパス
 		message: ユーザーメッセージ
-		history: 会話履歴
+		history: 会話履歴 (List[BaseMessage])
 		ai_insight: ユーザー情報
 		model: 使用するLLMバックエンド
 		temperature: 温度パラメータ
 		max_tokens: 最大トークン数
 		
 	Returns:
-		(応答テキスト, 更新された履歴, 推薦された書籍リスト)
+		(応答テキスト, 更新された履歴(List[BaseMessage]), 推薦された書籍リスト)
 	"""
 	# グローバルステートをクリア
 	_global_state["search_results"] = {}
@@ -337,19 +309,22 @@ def llm_chat(
 	if history is None:
 		history = []
 	
-	langchain_history = messages_to_langchain(history)
-	logger.info(f"[DEBUG] History length: {len(history)}, LangChain history length: {len(langchain_history)}")
+	# historyは既にList[BaseMessage]なのでそのまま使用可能
+	# ただし、Geminiの場合はSystemMessageの使用方法に注意が必要だが、
+	# ここではHumanMessage/AIMessageのリストとして扱う
 	
 	# メッセージリストを構築
-	# Gemini APIではSystemMessageを使わず、最初のメッセージに含める
-	if not langchain_history:
+	if not history:
 		# 履歴がない場合: システムプロンプトを最初のメッセージに含める
 		first_message = f"{system_prompt}\n\n---\n\nユーザー: {message}"
-		messages = [HumanMessage(content=first_message)]
+		# HumanMessageオブジェクトを作成
+		current_message = HumanMessage(content=first_message)
+		messages = [current_message]
 		logger.info(f"[DEBUG] No history, created first message with system prompt")
 	else:
 		# 履歴がある場合: システムプロンプトは最初の会話で既に送信済みなので、通常のメッセージのみ
-		messages = langchain_history + [HumanMessage(content=message)]
+		current_message = HumanMessage(content=message)
+		messages = history + [current_message]
 		logger.info(f"[DEBUG] With history, messages count: {len(messages)}")
 	
 	logger.info(f"[DEBUG] Final messages for LangGraph: {len(messages)} messages")
@@ -384,11 +359,16 @@ def llm_chat(
 			response_text = "申し訳ございません。応答を生成できませんでした。"
 			logger.error("No AI message found in result: %s", result)
 		
-		# 履歴を更新
-		updated_history = history + [
-			{"role": "user", "content": message},
-			{"role": "assistant", "content": response_text}
-		]
+		# 履歴を更新 (BaseMessageオブジェクトのリスト)
+		# ユーザーメッセージ追加済みリスト + AI応答
+		# 注意: messages は既に [history + current_message] なので、これにAI応答を追加する形にはならない
+		# messages[-1] は最後のアクションの結果かもしれないので、
+		# 単純に history + [current_message] + [ai_message] を返すのが安全
+		
+		# AI応答メッセージオブジェクト作成
+		ai_message = AIMessage(content=response_text)
+		
+		updated_history = history + [current_message, ai_message]
 		
 		# 推薦された書籍を取得
 		recommended_books = _global_state.get("recommended_books", [])
@@ -401,10 +381,14 @@ def llm_chat(
 		
 		error_message = "申し訳ございません。応答を生成できませんでした。"
 		logger.error(f"Error in llm_chat: {e}")
-		updated_history = history + [
-			{"role": "user", "content": message},
-			{"role": "assistant", "content": error_message}
-		]
+		
+		# エラー時も履歴オブジェクトを返す
+		ai_message = AIMessage(content=error_message)
+		if 'current_message' in locals():
+			updated_history = history + [current_message, ai_message]
+		else:
+			updated_history = history + [AIMessage(content=error_message)]
+			
 		# errorログは別で保存する → クライアント側に返すと脆弱
 		return error_message, updated_history, []
 
@@ -463,6 +447,7 @@ if __name__ == "__main__":
 	from backend import PROMPT_LIBRARIAN
 	
 	print("Testing LangGraph LLM chat...")
+	# historyはBaseMessageのリスト
 	response, history, recommended_books = llm_chat(
 		prompt_file=str(PROMPT_LIBRARIAN),
 		message=test_message,

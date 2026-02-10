@@ -10,7 +10,8 @@ import uvicorn
 
 from .models import ChatRequest, ChatResponse, Personal, ChatStatus, NfcIdRequest
 from .datastore import DataStore
-from . import chat_function, LLM_BACKEND
+from .llm import llm_chat, LLM_BACKEND
+from langchain_core.messages import messages_to_dict
 
 # 検索機能
 from backend.api.routers import search
@@ -240,7 +241,10 @@ class Server:
 			# user_idとsession_idの組み合わせをチェック
 			if not self.data_store.has_user_session(user_id, session_id):
 				raise HTTPException(status_code=404, detail="Session not found")
-			return {"session_id": session_id, "history": self.data_store.get_history(session_id)}
+			
+			history_objs = self.data_store.get_history(session_id)
+			history_dicts = messages_to_dict(history_objs)
+			return {"session_id": session_id, "history": history_dicts}
 
 		@self.app.post("/sessions/{session_id}/messages", status_code=201)
 		async def send_message(
@@ -350,7 +354,7 @@ class Server:
 
 		# LLMバックエンドを使用してチャット
 		# llm_chatは (response_text, new_history, recommended_books) を返す
-		response_text, new_history, recommended_books = chat_function(
+		response_text, new_history, recommended_books = llm_chat(
 			prompt_file, 
 			request.message, 
 			history, 

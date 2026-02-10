@@ -14,6 +14,15 @@ from .models import (
 # LangChainベースのLLM関数を使用
 from . import summary_function
 
+# LangChain Messages
+from langchain_core.messages import (
+	BaseMessage, 
+	HumanMessage, 
+	AIMessage,
+	messages_to_dict, 
+	messages_from_dict
+)
+
 # ロガー設定
 logger = logging.getLogger("uvicorn.error")
 
@@ -31,7 +40,7 @@ class DataStore:
 		self.users: Dict[str, User] = {}  # pauseセッションのユーザーのみ
 		self.conversations: Dict[str, Conversation] = {}  # pauseのみ
 		# sessions は Gemini とやり取りする「history」をそのまま保持する辞書（メモリ上）
-		self.sessions: Dict[str, Any] = {}
+		self.sessions: Dict[str, List[BaseMessage]] = {}
 		# NFC認証用の辞書（全件）
 		self.nfc_users: Dict[str, NfcUser] = {}
 		# pauseセッションとそのユーザーを復元
@@ -70,9 +79,20 @@ class DataStore:
 		restored_count = 0
 		for session_id, conv in self.conversations.items():
 			if conv.status == ChatStatus.pause:
-				# messagesをin-memoryセッションに復元
-				self.sessions[session_id] = [m for m in conv.messages]
-				restored_count += 1
+				# messagesをin-memoryセッションに復元 (dict -> BaseMessage list)
+				try:
+					# 既存の messages (List[dict]) を LangChain Objects に変換
+					# messages_from_dict は [{"type": "human", ...}] 形式を期待する
+					# 互換性なし設定のため、パース失敗時は空リストまたはエラー
+					if conv.messages:
+						self.sessions[session_id] = messages_from_dict(conv.messages)
+					else:
+						self.sessions[session_id] = []
+					restored_count += 1
+				except Exception as e:
+					logger.warning(f"[WARNING] Failed to restore session {session_id} due to format mismatch: {e}")
+					# フォーマット不整合時は空で初期化（既存データ破棄）
+					self.sessions[session_id] = []
 		
 		if restored_count > 0:
 			logger.info(f"[SUCCESS] Restored {restored_count} paused session(s)")
@@ -248,7 +268,7 @@ class DataStore:
 		session_id = str(uuid.uuid4())
 		conv = Conversation(**{"_id": session_id, "user_id": user_id, "messages": []})
 		self.conversations[session_id] = conv
-		self.sessions[session_id] = []  # history kept as list (Gemini chat history)
+		self.sessions[session_id] = []  # history kept as List[BaseMessage]
 		# In-memory update of user's active_session
 		user = self.users[user_id]
 		if user.active_session:
@@ -273,18 +293,24 @@ class DataStore:
 			return False
 		return session_id == user.active_session or session_id in user.old_session
 
-	def get_history(self, session_id: str) -> Any:
+	def get_history(self, session_id: str) -> List[BaseMessage]:
 		# アクティブセッション（メモリ上）をチェック
 		if session_id in self.sessions:
 			return self.sessions.get(session_id, [])
 		# 過去のセッション（永続化済み）をチェック
 		elif session_id in self.conversations:
-			messages = self.conversations.get(session_id).messages
-			return messages
+			# Dict -> BaseMessage 変換して返す (read-only用途が多いが念のため)
+			messages_dict = self.conversations.get(session_id).messages
+			if messages_dict:
+				try:
+					return messages_from_dict(messages_dict)
+				except Exception:
+					return []
+			return []
 		else:
 			return []
 
-	def update_history(self, session_id: str, history: Any) -> None:
+	def update_history(self, session_id: str, history: List[BaseMessage]) -> None:
 		"""
 		メモリ上の履歴を更新し、最終アクセス時刻を記録する。
 		"""
@@ -309,8 +335,8 @@ class DataStore:
 			raise KeyError("Session not found")
 
 		history = self.sessions.get(session_id, [])
-		# 既に List[dict] なのでそのまま使用
-		messages = history
+		# List[BaseMessage] -> List[dict] に変換して保存
+		messages = messages_to_dict(history)
 
 		conv = self.conversations.get(session_id)
 		if not conv:
@@ -347,8 +373,8 @@ class DataStore:
 			return
 		
 		history = self.sessions.get(session_id, [])
-		# 既に List[dict] なのでそのまま使用
-		messages = history
+		# List[BaseMessage] -> List[dict] に変換して保存
+		messages = messages_to_dict(history)
 
 		conv = self.conversations.get(session_id)
 		if not conv:
@@ -394,10 +420,20 @@ class DataStore:
 					
 					# 会話履歴を文字列形式に変換
 					conversation_text = ""
-					for msg in history:
-						role = msg.role if hasattr(msg, 'role') else msg.get('role', 'unknown')
-						content = msg.content if hasattr(msg, 'content') else msg.get('content', '')
-						conversation_text += f"{role}: {content}\n\n"
+					
+					try:
+						history_objs = messages_from_dict(history)
+						for msg in history_objs:
+							# BaseMessage objects have .content and .type (or logic for role)
+							role = msg.type
+							content = msg.content
+							conversation_text += f"{role}: {content}\n\n"
+					except Exception:
+						# Fallback for old data if any (though we said no compatibility)
+						for msg in history:
+							role = msg.get('role', msg.get('type', 'unknown'))
+							content = msg.get('content', '')
+							conversation_text += f"{role}: {content}\n\n"
 					
 					# summary_function を使って要約を生成（LangChainベース）
 					summary_text = summary_function(str(summary_path), conversation_text, ai_insight=user_insight)
@@ -493,6 +529,12 @@ class DataStore:
 			if conv.status == ChatStatus.pause:
 				conv.status = ChatStatus.active
 				conv.last_accessed = datetime.now()
-				# messagesをin-memoryセッションに復元
-				self.sessions[session_id] = [m for m in conv.messages]
+				# messagesをin-memoryセッションに復元 (dict -> object)
+				try:
+					if conv.messages:
+						self.sessions[session_id] = messages_from_dict(conv.messages)
+					else:
+						self.sessions[session_id] = []
+				except Exception:
+					self.sessions[session_id] = []
 				logger.info(f"[INFO] Session resumed: {session_id}")

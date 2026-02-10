@@ -9,7 +9,8 @@ import logging
 logger = logging.getLogger("uvicorn.error")
 
 # LangChainベースのLLM関数をインポート
-from .llm import llm_chat as chat_function
+# LangChainベースのLLM関数をインポート
+# server.pyなどで直接llm.pyからインポートするため、ここではエイリアス定義のみ削除
 from .llm import llm_summary as summary_function
 
 # LLMバックエンドの選択（GeminiまたはOllama）
@@ -20,4 +21,4 @@ if LLM_BACKEND == "ollama":
 else:
 	logger.info("🔧 [LLM Backend] LangChain + Gemini")
 
-__all__ = ['chat_function', 'summary_function', 'LLM_BACKEND']
+__all__ = ['summary_function', 'LLM_BACKEND']
