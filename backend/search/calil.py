@@ -1,65 +1,93 @@
-import backend
 import os
 import requests
 import time
-import urllib.parse
 import pprint
+from dotenv import load_dotenv
+
+# .envファイルをロード
+load_dotenv()
 
 # Calil API endpoints
 CALIL_LIBRARY_ENDPOINT = "https://api.calil.jp/library"
 CALIL_BOOK_ENDPOINT = "https://api.calil.jp/check"
 
-# Search libraries close to pref
+# デモ用APIキー
+DEMO_API_KEY = "bc3d19b6abbd0af9a59d1011e3098e51"
+
 def search_libraries(pref: str, limit: int = 1) -> list[dict]:
-	headers = {}
+    headers = {}
+    params = {
+        'appkey': os.getenv("CALIL_API_KEY", DEMO_API_KEY),
+        'pref': pref,
+        'format': 'json',
+        'limit': limit,
+        'callback': ''
+    }
 
-	params = {
-		'appkey': os.getenv("CALIL_API_KEY"),
-		'pref': pref,
-		'format': 'json',
-		'limit': limit,
-		'callback': ''
-	}
+    try:
+        response = requests.get(CALIL_LIBRARY_ENDPOINT, headers=headers, params=params)
+        response.raise_for_status()
+        json_data = response.json()
+        return json_data
+    except Exception as e:
+        print(f"[ERROR] Library Search Failed: {e}")
+        return []
 
-	response = requests.get(CALIL_LIBRARY_ENDPOINT, headers=headers, params=params)
-	json_data = response.json()
-
-	return json_data
-
-# Search books by ISBN, and library systemid
 def search_books(isbn: str, systemid: str) -> dict:
-	headers = {}
+    headers = {}
+    clean_systemid = systemid.strip()
 
-	params = {
-		'appkey': os.getenv("CALIL_API_KEY"),
-		'isbn': isbn,
-		'systemid': systemid,
-		'format': 'json',
-		'callback': 'no'
-	}
+    params = {
+        'appkey': os.getenv("CALIL_API_KEY", DEMO_API_KEY),
+        'isbn': isbn,
+        'systemid': clean_systemid,
+        'format': 'json',
+        'callback': 'no'
+    }
 
-	response = requests.get(CALIL_BOOK_ENDPOINT, headers=headers, params=params)
-	json_data = response.json()
+    # ★修正: 絵文字(🔍)を削除しました
+    print(f"[Calil] Searching: ISBN={isbn}, System={clean_systemid}")
 
-	while json_data.get('continue', False):
-		param = {
-			'appkey': os.getenv("CALIL_API_KEY"),
-			'session': json_data.get('session'),
-			'format': 'json',
-		}
-		time.sleep(2) # required more than 2 sec interval
-		response = requests.get(CALIL_BOOK_ENDPOINT, headers=headers, params=param)
-		json_data = response.json()
-	
-	return json_data
+    try:
+        response = requests.get(CALIL_BOOK_ENDPOINT, headers=headers, params=params)
+        
+        if not response.ok:
+            # ★修正: 絵文字(😱, 📝)を削除しました
+            print(f"[ERROR] API Error Status: {response.status_code}")
+            print(f"[DEBUG] Response Body: {response.text}")
+            return {"error": f"API Error {response.status_code}"}
+
+        json_data = response.json()
+
+        retry_count = 0
+        while json_data.get('continue', 0) == 1 and retry_count < 10:
+            # ★修正: 絵文字(⏳)を削除しました
+            print(f"[Calil] Polling... ({retry_count + 1}/10)")
+            time.sleep(2)
+            
+            polling_params = {
+                'appkey': os.getenv("CALIL_API_KEY", DEMO_API_KEY),
+                'session': json_data.get('session'),
+                'format': 'json',
+                'callback': 'no'
+            }
+            
+            response = requests.get(CALIL_BOOK_ENDPOINT, headers=headers, params=polling_params)
+            response.raise_for_status()
+            json_data = response.json()
+            retry_count += 1
+        
+        # ★修正: 絵文字(✅)を削除しました
+        print("[Calil] Search Completed!")
+        return json_data
+
+    except Exception as e:
+        # ★修正: 絵文字(❌)を削除しました
+        print(f"[ERROR] Calil Crash: {e}")
+        return {"error": str(e)}
 
 if __name__ == "__main__":
-	# Example usage
-	pref = "静岡県"
-	libraries = search_libraries(pref, limit=3)
-	pprint.pprint(libraries)
-
-	# isbn = "9784065197280"
-	# systemid = "tokyo"
-	# book_info = search_books(isbn, systemid)
-	# print("Book Info:", book_info)
+    print("Testing Calil...")
+    pref = "東京都"
+    libraries = search_libraries(pref, limit=3)
+    pprint.pprint(libraries)
