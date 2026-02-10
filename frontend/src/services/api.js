@@ -1,5 +1,5 @@
 // 修正：プロキシ設定(vite.config.js)を利用するため、空文字にします
-const API_BASE_URL = '' 
+const API_BASE_URL = ''
 
 export const api = {
     // ========================================
@@ -158,5 +158,94 @@ export const api = {
 
         if (!response.ok) throw new Error('Failed to unregister NFC')
         return response.json()
-    }
+    },
+    
+    // ========================================
+    // 蔵書検索関連API
+    // ========================================
+
+    /*
+     * 図書館検索
+     */
+    async searchLibraries(pref, limit = 5, idToken) {
+        const params = new URLSearchParams({ pref, limit });
+        const response = await fetch(`${API_BASE_URL}/search/libraries?${params}`, {
+            method: 'GET',
+            headers: { 
+                'Content-Type': 'application/json',
+                // ★追加: 認証トークンをヘッダーにセット
+                'Authorization': `Bearer ${idToken}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Library search failed');
+        }
+        return response.json();
+    },
+
+    /*
+     * 貸出状況確認
+     */
+    async checkBookAvailability(isbn, systemid, idToken) {
+        const params = new URLSearchParams({ isbn, systemid });
+        const response = await fetch(`${API_BASE_URL}/search/books/availability?${params}`, {
+            method: 'GET',
+            headers: { 
+                'Content-Type': 'application/json',
+                // ★追加: 認証ヘッダー
+                'Authorization': `Bearer ${idToken}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Book availability check failed');
+        }
+        return response.json();
+    },
+
+    /*
+     * 本検索
+     */
+    // semantic=true にするとAIがキーワードを考えてくれる
+    /*
+     * 本検索
+     */
+    // semantic=true にするとAIがキーワードを考えてくれる
+    // 修正: 第2引数に idToken を追加しました
+    async searchBooks(query, idToken, semantic = false) {
+        // URLパラメータを生成（semanticもここに含める）
+        const params = new URLSearchParams({ 
+            q: query, 
+            semantic: semantic.toString() 
+        });
+        
+        // 修正: params.toString() を使ってURLを組み立てるように変更
+        const response = await fetch(`${API_BASE_URL}/books/search?${params.toString()}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}` // これで正しくトークンが使われます
+            }
+        })
+
+        if (!response.ok) {
+            throw new Error('Book search failed');
+        }
+        return response.json();
+    },
+
+    async getUserNfc(userId, idToken) {
+        const response = await fetch(`${API_BASE_URL}/users/${userId}/nfc`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${idToken}`
+            }
+        })
+
+        if (!response.ok) throw new Error('Failed to get user NFC')
+        return response.json()
+    },
+
+
 }

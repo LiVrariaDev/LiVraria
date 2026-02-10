@@ -8,7 +8,7 @@
 # Development Tools
 # ============================================================================
 # Debug & Logging
-rich==14.2.0  # Beautiful terminal output
+rich==14.3.1  # Beautiful terminal output
 rich-toolkit==0.17.1  # Rich extensions
 
 # CLI Tools
