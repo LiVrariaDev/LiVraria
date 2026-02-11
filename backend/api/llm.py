@@ -274,6 +274,9 @@ def create_agent_workflow(llm, tools):
 			second_last = messages[-2]
 			# ToolMessageかつ、search_booksの結果である場合（nameはToolNodeが設定する）
 			if isinstance(second_last, ToolMessage) and second_last.name == "search_books":
+				# 検索結果が0件（エラーメッセージ）の場合は、強制しない
+				if "申し訳ございません" in str(second_last.content):
+					return "end"
 				return "force_tool"
 				
 		return "end"
@@ -331,9 +334,120 @@ def llm_chat(
 	Returns:
 		(応答テキスト, 更新された履歴(List[BaseMessage]), 推薦された書籍リスト)
 	"""
-	# グローバルステートをクリア
-	_global_state["search_results"] = {}
-	_global_state["recommended_books"] = []
+    # ローカルステート初期化 (スレッドセーフかつ複数回検索に対応)
+	search_results_state = {}     # 全検索結果の累積 (ID -> BookDict)
+	recommended_books_state = []  # 推薦された本のリスト
+	
+    # ツール定義 (クロージャとして実装することでローカルステートにアクセス)
+	
+	@tool
+	def search_books(keywords: list[str], count: int = 30) -> str:
+		"""
+		楽天Books APIを使って書籍を検索
+		
+		検索結果は番号付きリストで返されます。
+		推薦する本を選ぶ際は、この番号を使用してください。
+		
+		Args:
+			keywords: 検索キーワードのリスト（例: ["SF", "初心者", "おすすめ"]）
+			count: 取得する書籍数（デフォルト: 10, 10冊以上を指定すること）
+			
+		Returns:
+			番号付き書籍リスト
+		"""
+		try:
+			logger.info(f"[DEBUG] search_books called with keywords: {keywords}, count: {count}")
+			
+			if not keywords or not isinstance(keywords, list):
+				logger.error(f"[ERROR] Invalid keywords: {keywords}")
+				return "検索キーワードが指定されていません。"
+			
+			# API呼び出し
+			books = rakuten_search_books(keywords, count=max(count, 10), orflag=0)
+			
+			if not books:
+				books = rakuten_search_books(keywords, count=max(count * 2, 20), orflag=1)
+				if not books:
+					logger.error("No books found for keywords: %s", keywords)
+					return "申し訳ございません。該当する書籍が見つかりませんでした。"
+				
+			# 累積されているIDの続きから番号を振る
+			start_id = max(search_results_state.keys()) + 1 if search_results_state else 1
+			
+			book_list = []
+			for i, book in enumerate(books):
+				current_id = start_id + i
+				# ローカルステートに保存
+				search_results_state[current_id] = book
+				
+				title = book.get("title", "不明")
+				authors = book.get("authors", [])
+				author = authors[0] if authors else "不明"
+				book_list.append(f"{current_id}. 『{title}』 - {author}")
+			
+			logger.info(f"[DEBUG] Found {len(books)} books. IDs assigned: {start_id} to {start_id + len(books) - 1}")
+			return f"検索結果（{len(books)}冊）:\n" + "\n".join(book_list) + "\n\nこれらの結果から、ユーザーに合った本を選び、必ず `recommend_books` を呼び出してください。テキストで検索結果を要約しないでください。もし推薦する本がない場合は、空のリスト `[]` を引数にして `recommend_books` を呼び出してください。"
+			
+		except Exception as e:
+			logger.error(f"[ERROR] search_books error: {e}", exc_info=True)
+			return f"検索中にエラーが発生しました: {str(e)}"
+
+	@tool
+	def update_expression(expression_type: str) -> str:
+		"""
+		表情の更新
+	
+		司書アバターの表情（感情）を更新します。
+		Args:
+			expression_type: 'neutral'（通常）', happy'（良い本が見つかった時）, 'thinking'（検索中）, 'sorry'（見つからない時）
+		Returns:
+			表情の変更の有無のメッセージ
+		"""
+		return f"表情を{expression_type}に変更しました。"
+
+	@tool
+	def recommend_books(selections: list[dict]) -> str:
+		"""
+		検索結果から推薦する本を選択
+		
+		Args:
+			selections: 推薦する本のリスト
+				各要素は {"number": 番号, "reason": "推薦理由"} の形式
+				例: [{"number": 1, "reason": "初心者向けで分かりやすい"}, {"number": 3, "reason": "実践的な内容"}]
+			
+		Returns:
+			推薦完了メッセージ
+		"""
+		try:
+			recommended_temp = []
+			
+			for selection in selections:
+				num = selection.get("number")
+				reason = selection.get("reason", "")
+				
+				# ローカルステートから検索
+				if num in search_results_state:
+					book = search_results_state[num].copy()
+					book["recommendation_reason"] = reason
+					recommended_temp.append(book)
+			
+			# 結果リストに追加（上書きせず追加、ただし今回はリクエストごとなので代入でOKに見えるが、念のためextend）
+			# ※仕様として「今回の回答に含まれる推薦本」を返すなら代入でよい。
+			# 過去の会話の推薦本は含めないのが通例。
+			recommended_books_state.clear()
+			recommended_books_state.extend(recommended_temp)
+			
+			if recommended_temp:
+				msg_lines = [f"{len(recommended_temp)}冊の本を推薦リストに追加しました。以下の番号と情報を使って、ユーザーに推薦してください。"]
+				for i, book in enumerate(recommended_temp, 1):
+					msg_lines.append(f"{i}. 『{book['title']}』 (理由: {book['recommendation_reason']})")
+				return "\n".join(msg_lines)
+			else:
+				return "推薦する本が選択されませんでした。ユーザーに「条件に合う本が見つかりませんでした」と報告してください。"
+				
+		except Exception as e:
+			return f"推薦処理中にエラーが発生しました: {str(e)}"
+
 	
 	# プロンプト読み込み
 	base_prompt = load_prompt_text(prompt_file)
@@ -343,7 +457,7 @@ def llm_chat(
 	llm = get_llm(backend=model, temperature=temperature, max_tokens=max_tokens)
 	
 	# ツール定義
-	tools = [search_books, recommend_books]
+	tools = [search_books, recommend_books, update_expression]
 	
 	# ワークフロー作成
 	app = create_agent_workflow(llm, tools)
@@ -351,10 +465,6 @@ def llm_chat(
 	# メッセージ履歴を準備
 	if history is None:
 		history = []
-	
-	# historyは既にList[BaseMessage]なのでそのまま使用可能
-	# ただし、Geminiの場合はSystemMessageの使用方法に注意が必要だが、
-	# ここではHumanMessage/AIMessageのリストとして扱う
 	
 	# メッセージリストを構築
 	if not history:
@@ -374,6 +484,9 @@ def llm_chat(
 	
 	# ワークフロー実行
 	try:
+		# 初期ステートに search_results は空で渡すが、
+		# 実際のデータ管理はツール内のクロージャ変数が担うため、
+		# StateGraph上の search_results は実質ダミーまたはログ用となる
 		result = app.invoke({
 			"messages": messages,
 			"search_results": {},
@@ -421,16 +534,9 @@ def llm_chat(
 			logger.info("[DEBUG] No expression change detected, defaulting to neutral.")
 
 		# 履歴を更新 (BaseMessageオブジェクトのリスト)
-		# ユーザーメッセージ追加済みリスト + AI応答
-		# 注意: messages は既に [history + current_message] なので、これにAI応答を追加する形にはならない
-		# messages[-1] は最後のアクションの結果かもしれないので、
-		# 単純に history + [current_message] + [ai_message] を返すのが安全
-		
-		# AI応答メッセージオブジェクト作成
 		ai_message = AIMessage(content=response_text)
 
 		# 応答に関数名が含まれる場合（ツール呼び出しの幻覚など）、エラーメッセージにする
-		# 再帰呼び出しは無限ループのリスクがあるため、安全なフォールバックメッセージを返す
 		if "search_books" in response_text or "recommend_books" in response_text:
 			logger.warning("[WARNING] Response contains raw function name, replacing with fallback message.")
 			response_text = "申し訳ございません。応答の生成中にエラーが発生しました。もう一度お試しください。"
@@ -438,8 +544,8 @@ def llm_chat(
 		
 		updated_history = history + [current_message, ai_message]
 		
-		# 推薦された書籍を取得
-		recommended_books = _global_state.get("recommended_books", [])
+		# 推薦された書籍を取得 (クロージャ変数から)
+		recommended_books = list(recommended_books_state)
 		
 		return response_text, updated_history, recommended_books, current_expression
 		

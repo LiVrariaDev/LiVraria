@@ -12,7 +12,7 @@
       
       <!-- ヘッダー -->
       <div class="text-center mb-8">
-        <h2 class="text-4xl font-extrabold text-gray-900 tracking-tight">Livraria</h2>
+        <h2 class="text-4xl font-extrabold text-gray-900 tracking-tight">LiVraria</h2>
         <p class="mt-2 text-sm text-gray-600">
           {{ isRegisterMode ? 'アカウントを作成して始める' : 'AI司書との対話へようこそ' }}
         </p>

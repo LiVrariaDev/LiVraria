@@ -52,6 +52,8 @@ def rakuten_search_books(keywords: list[str], count: int = 10, genre_id: str = "
         image_url = item.get("largeImageUrl") # 200x200商品画像
         item_url = item.get("itemUrl")
         genre = item.get("booksGenreId")
+        item_caption = item.get("itemCaption", "")
+        item_price = item.get("itemPrice", 0)
 
         book_info = {
             "title": title,
@@ -61,7 +63,9 @@ def rakuten_search_books(keywords: list[str], count: int = 10, genre_id: str = "
             "isbn": isbn,
             "image_url": image_url,
             "item_url": item_url,
-            "genre": genre
+            "genre": genre,
+            "itemCaption": item_caption,
+            "itemPrice": item_price
         }
         book_list.append(book_info)
 

@@ -19,8 +19,7 @@ export default defineConfig({
     },
   },
   envDir: path.resolve(__dirname, '..'),
-  
-  // ▼▼▼ この設定を追加してください ▼▼▼
+
   server: {
     proxy: {
       '/users': {
@@ -45,5 +44,4 @@ export default defineConfig({
       }
     }
   }
-  // ▲▲▲ ここまで ▲▲▲
 })
