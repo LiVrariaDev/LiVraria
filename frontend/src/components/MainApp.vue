@@ -212,12 +212,11 @@
         <div v-if="currentPage === 'search_mode'" class="flex flex-col h-screen bg-slate-50">
             <header class="bg-white/90 backdrop-blur border-b border-slate-200 p-4 px-8 flex justify-between items-center shadow-sm z-20">
                 <div class="flex items-center space-x-3">
-                    <span class="text-2xl">📚</span>
                     <h1 class="text-xl font-bold text-slate-700">蔵書検索</h1>
                 </div>
                 <div class="flex space-x-3">
                     <button @click="currentPage = 'home'" class="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">
-                        <span>🏠</span> <span>ホームへ</span>
+                        <span>ホームへ</span>
                     </button>
                 </div>
             </header>

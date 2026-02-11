@@ -270,7 +270,7 @@ const checkAvailability = async (book) => {
 <template>
   <div class="p-6 max-w-4xl mx-auto">
     <h1 class="text-3xl font-bold mb-6 text-gray-800 flex items-center gap-2">
-        <span>📚</span> 蔵書検索
+        蔵書検索
     </h1>
 
     <div class="bg-white p-6 rounded-lg shadow-md mb-8">
@@ -327,7 +327,7 @@ const checkAvailability = async (book) => {
                     @click="checkAvailability(book)"
                     class="mt-3 w-full bg-emerald-500 text-white py-2 px-4 rounded-md text-sm font-bold hover:bg-emerald-600 transition-colors flex items-center justify-center gap-1"
                 >
-                    <span>🏢</span> 図書館で探す
+                    図書館で探す
                 </button>
             </div>
         </div>
