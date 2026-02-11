@@ -414,6 +414,10 @@ def llm_chat(
 				for tool_call in msg.tool_calls:
 					if tool_call["name"] == "update_expression":
 						current_expression = tool_call["args"]["expression_type"]
+						logger.info(f"[DEBUG] AI decided to change expression to: {current_expression}")
+						
+		if current_expression == "none":
+			logger.info("[DEBUG] No expression change detected, defaulting to none.")
 
 		# 履歴を更新 (BaseMessageオブジェクトのリスト)
 		# ユーザーメッセージ追加済みリスト + AI応答

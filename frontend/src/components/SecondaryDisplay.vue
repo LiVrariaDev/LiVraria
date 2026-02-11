@@ -2,7 +2,6 @@
   <div class="relative w-screen h-screen overflow-hidden bg-black text-white font-sans">
     
     <!-- Video A (Buffer 1) -->
-    <!-- 修正: :loop="isLooping" を追加し、アクティブな時だけループ属性を有効化 -->
     <video 
       ref="videoA"
       class="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
@@ -51,17 +50,28 @@
 import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 
 // --- 動画ファイルの定義 ---
-// ※ ファイル名が正しいか必ず確認してください
 const VIDEOS = {
+  // 通常 (Neutral)
   idle_loop: '/videos/idle_loop.mp4',
+  neutral_talking: '/videos/neutral_talking.mp4', // 今回は未使用
+
+  // 思考 (Thinking)
   thinking_start: '/videos/thinking_start.mp4',
+  thinking_talking: '/videos/thinking_talking.mp4', // 今回は未使用
   thinking_loop: '/videos/thinking_loop.mp4',
-  happy_action: '/videos/happy_action.mp4',
+  thinking_return: '/videos/thinking_return.mp4',
+
+  // 笑顔 (Happy)
+  happy_start: '/videos/happy_start.mp4',
+  happy_talking: '/videos/happy_talking.mp4', // 今回は未使用
+  happy_loop: '/videos/happy_loop.mp4',
   happy_return: '/videos/happy_return.mp4',
-  sorry_action: '/videos/sorry_action.mp4',
+
+  // 困り顔 (Sorry)
+  sorry_start: '/videos/sorry_start.mp4',
+  sorry_talking: '/videos/sorry_talking.mp4', // 今回は未使用
+  sorry_loop: '/videos/sorry_loop.mp4',
   sorry_return: '/videos/sorry_return.mp4',
-  neutral_action: '/videos/neutral_action.mp4',
-  neutral_return: '/videos/neutral_return.mp4',
 };
 
 // --- ステート管理 ---
@@ -73,7 +83,9 @@ const videoA = ref(null);
 const videoB = ref(null);
 
 const playbackQueue = ref([]);
-const isLooping = ref(true); // 現在再生中の動画をループさせるか
+const isLooping = ref(true); 
+const currentEmotion = ref('neutral'); 
+
 const channel = new BroadcastChannel('livraria_channel');
 
 // --- 通信受信 ---
@@ -81,17 +93,32 @@ channel.onmessage = (event) => {
   const { type, text, state } = event.data;
   if (type !== 'chat') return;
   
-  console.log(`State received: ${state}, Text: ${text}`);
+  console.log(`[Secondary] Received state: ${state}, Text: ${text}, CurrentEmotion: ${currentEmotion.value}`);
 
   if (state === 'thinking') {
     currentMessage.value = '';
     startThinkingSequence();
-  } else if (state === 'idle') {
+  } 
+  else if (state === 'idle') {
     returnToIdle();
-  } else {
+  } 
+  else {
     if (text) currentMessage.value = text;
     playEmotionAction(state);
   }
+};
+
+// --- ヘルパー: 即時再生すべきか判定 ---
+const shouldPlayImmediately = () => {
+  const currentVideo = activeVideo.value === 'A' ? videoA.value : videoB.value;
+  // 1. ループ中ならいつでも割り込みOK
+  if (isLooping.value) return true;
+  
+  // 2. 動画プレイヤーが存在しない、または停止/終了しているならOK
+  if (!currentVideo || currentVideo.paused || currentVideo.ended) return true;
+  
+  // 3. それ以外（再生中のワンショット動画）は割り込まない
+  return false;
 };
 
 // --- 動画制御ロジック ---
@@ -102,13 +129,14 @@ const playNextInQueue = async () => {
   const nextVideoKey = playbackQueue.value.shift();
   const nextSrc = VIDEOS[nextVideoKey];
   
+  console.log(`[Secondary] Playing next: ${nextVideoKey}`);
+
   if (!nextSrc) {
     console.warn(`Video source not found: ${nextVideoKey}`);
+    if (playbackQueue.value.length > 0) playNextInQueue();
     return;
   }
 
-  // ループ設定の更新: ファイル名に 'loop' が含まれていればループ有効
-  // これにより <video :loop="..."> が反応し、ネイティブループになる
   isLooping.value = nextVideoKey.includes('loop');
 
   const nextPlayerId = activeVideo.value === 'A' ? 'B' : 'A';
@@ -123,8 +151,6 @@ const playNextInQueue = async () => {
   
   try {
     await player.play();
-    
-    // 切り替え
     activeVideo.value = nextPlayerId;
     
     // 前のプレイヤーを停止
@@ -134,58 +160,97 @@ const playNextInQueue = async () => {
     
   } catch (e) {
     console.error("Play failed:", e);
+    if (playbackQueue.value.length > 0) playNextInQueue();
   }
 };
 
-// 再生終了時のハンドラ
-// ※ ネイティブループ有効時は発火しないため、ループしない動画の終了検知専用になる
 const handleVideoEnded = (playerId) => {
   if (playerId !== activeVideo.value) return;
 
   if (playbackQueue.value.length > 0) {
     playNextInQueue();
   } else {
-    // キューが空で、かつループ設定でない場合（アクション動画の最後など）
-    // 最後のフレームで停止したままにする（pause状態）
+    // キューが空
     if (!isLooping.value) {
       const current = activeVideo.value === 'A' ? videoA.value : videoB.value;
-      current.pause();
+      current.pause(); // 最後のフレームで停止
     }
   }
 };
 
-// --- シナリオ定義 ---
+// --- シナリオ遷移定義 ---
 
+// 1. 思考中へ遷移
 const startThinkingSequence = () => {
-  // 思考開始：現在の再生を中断して即座に遷移
+  currentEmotion.value = 'thinking';
+  
+  // 修正: talkingをスキップし、start -> loop へ直結
   playbackQueue.value = [
     'thinking_start',
     'thinking_loop'
   ];
-  playNextInQueue(); // 強制割り込み再生
+  // 存在しないキーを除外
+  playbackQueue.value = playbackQueue.value.filter(key => VIDEOS[key]);
+  
+  if (shouldPlayImmediately()) {
+    playNextInQueue();
+  }
 };
 
+// 2. 感情発話アクションへ遷移 (回答受信時)
 const playEmotionAction = (emotion) => {
-  let actionKey = 'neutral_action';
-  if (emotion === 'happy') actionKey = 'happy_action';
-  if (emotion === 'sorry') actionKey = 'sorry_action';
-  if (emotion === 'thinking') actionKey = 'thinking_loop';
+  let transitionQueue = [];
   
-  playbackQueue.value = [actionKey];
-  playNextInQueue(); // 強制割り込み再生
+  if (currentEmotion.value === 'thinking') {
+    transitionQueue.push('thinking_return');
+  } else if (currentEmotion.value !== 'neutral' && currentEmotion.value !== emotion) {
+    const returnKey = `${currentEmotion.value}_return`;
+    if (VIDEOS[returnKey]) transitionQueue.push(returnKey);
+  }
+
+  currentEmotion.value = emotion;
+  let actionSequence = [];
+
+  // 修正: talkingをスキップし、start -> loop へ直結
+  if (emotion === 'happy') {
+    actionSequence = ['happy_start', 'happy_loop'];
+  } else if (emotion === 'sorry') {
+    actionSequence = ['sorry_start', 'sorry_loop'];
+  } else if (emotion === 'neutral') {
+    // neutralの場合は特定のstartモーションがないため、基本待機(idle_loop)に戻す
+    actionSequence = ['idle_loop'];
+  } else {
+    actionSequence = ['idle_loop'];
+  }
+
+  playbackQueue.value = [...transitionQueue, ...actionSequence];
+  
+  if (shouldPlayImmediately()) {
+    playNextInQueue();
+  }
 };
 
+// 3. 待機へ戻る (発話終了時)
 const returnToIdle = () => {
-  const returnKey = 'neutral_return'; 
-  
-  playbackQueue.value = [
-    returnKey,
-    'idle_loop'
-  ];
-  
-  // ここでは強制割り込みせず、現在のアクション（発話）が終わるのを待つ
-  // もし現在がループ動画（思考中など）なら強制遷移させる
-  if (isLooping.value) {
+  let returnSequence = [];
+
+  if (currentEmotion.value === 'happy') {
+    returnSequence = ['happy_return', 'idle_loop'];
+  } else if (currentEmotion.value === 'sorry') {
+    returnSequence = ['sorry_return', 'idle_loop'];
+  } else if (currentEmotion.value === 'thinking') {
+    returnSequence = ['thinking_return', 'idle_loop'];
+  } else {
+    // neutralの場合
+    returnSequence = ['idle_loop'];
+  }
+
+  currentEmotion.value = 'neutral';
+  playbackQueue.value = returnSequence;
+
+  console.log(`[Secondary] Return queue:`, playbackQueue.value);
+
+  if (shouldPlayImmediately()) {
     playNextInQueue();
   }
 };
@@ -194,7 +259,7 @@ const returnToIdle = () => {
 onMounted(async () => {
   const player = videoA.value;
   player.src = VIDEOS.idle_loop;
-  isLooping.value = true; // 初期状態はループ
+  isLooping.value = true;
   await nextTick();
   player.play().catch(e => console.log("Init play error", e));
   videoB.value.src = "";
