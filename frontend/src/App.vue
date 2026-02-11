@@ -127,6 +127,21 @@ watch(user, (newUser) => {
     // ログイン時: 監視開始
     setupActivityListeners();
     resetTimer();
+    
+    // ログイン成功時、Secondaryディスプレイを自動で開く
+    setTimeout(() => {
+      const width = 1920;
+      const height = 1080;
+      const left = window.screen.width;
+      const top = 0;
+      
+      window.open(
+        `${window.location.origin}/?view=secondary`,
+        'SecondaryDisplay',
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+      console.log('[App] Secondary display auto-opened after login');
+    }, 1000); // 1秒遅延でUIの安定化を待つ
   } else {
     // ログアウト時: 監視終了
     removeActivityListeners();

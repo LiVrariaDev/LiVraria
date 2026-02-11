@@ -25,50 +25,54 @@ echo "Starting Livraria..."
 # マウスカーソルを消す (unclutterがインストールされていれば)
 # unclutter -idle 0.1 -root &
 
-# 1. メイン画面 (操作用) を起動
-# --window-position=0,0 : 左上のディスプレイに表示
+# 1. メイン画面 (操作用) のみを起動
+# ログイン後、JavaScriptでSecondaryディスプレイが自動的に開かれる
 chromium \
   --app="$SERVER_URL" \
   --window-position=0,0 \
-  --no-first-run \
-  --noerrdialogs \
-  --disable-infobars \
+  --autoplay-policy=no-user-gesture-required \
   --ozone-platform=x11 \
   --user-data-dir="/tmp/chrome_main_profile" &
 
-echo "Main display launched."
+echo "Main display launched. Waiting for login and secondary window..."
 
-# 少し待機して、ブラウザの競合を防ぐ
-sleep 1
+# 2. Secondaryウィンドウが開くまで待機（busy wait）
+MAX_WAIT=300  # 最大5分待機
+COUNTER=0
 
-# 2. セカンダリ画面 (アバター用) を起動
-# --window-position=$PRIMARY_WIDTH,0 : 右隣のディスプレイに表示
-chromium \
-  --app="$SERVER_URL/?view=secondary" \
-  --window-position=$PRIMARY_WIDTH,0 \
-  --no-first-run \
-  --noerrdialogs \
-  --disable-infobars \
-  --ozone-platform=x11 \
-  --user-data-dir="/tmp/chrome_secondary_profile" &
+while [ $COUNTER -lt $MAX_WAIT ]; do
+    # "Secondary Display" というタイトルのウィンドウを検索
+    SEC_ID=$(wmctrl -l | grep "Secondary Display" | awk '{print $1}')
+    
+    if [ -n "$SEC_ID" ]; then
+        echo "Secondary display detected: $SEC_ID"
+        
+        # 3. Secondaryを右ディスプレイに移動してフルスクリーン化
+        sleep 0.5  # ウィンドウが完全に表示されるまで少し待つ
+        wmctrl -i -r "$SEC_ID" -e 0,$PRIMARY_WIDTH,0,-1,-1
+        wmctrl -i -r "$SEC_ID" -b add,fullscreen
+        
+        echo "Secondary display moved to right screen and set to fullscreen."
+        break
+    fi
+    
+    sleep 1
+    COUNTER=$((COUNTER + 1))
+done
 
-echo "Secondary display launched."
+if [ $COUNTER -eq $MAX_WAIT ]; then
+    echo "Warning: Secondary display not detected within timeout."
+fi
 
-sleep 5
-
-MAIN_ID=$(wmctrl -lx | grep "Chromium" | grep 'Main' | awk '{print $1}')
-SEC_ID=$(wmctrl -lx | grep "Chromium" | grep 'Secondary' | awk '{print $1}')
-
-if [ -z "$MAIN_ID" ] || [ -z "$SEC_ID" ]; then
-    echo "Error: Could not find window IDs."
-else
-    # メインを左へ移動してフルスクリーン
+# 4. Mainもフルスクリーン化
+sleep 2
+MAIN_ID=$(wmctrl -l | grep "LiVraria Main" | awk '{print $1}')
+if [ -n "$MAIN_ID" ]; then
     wmctrl -i -r "$MAIN_ID" -e 0,0,0,-1,-1
     wmctrl -i -r "$MAIN_ID" -b add,fullscreen
-
-    # セカンダリを右へ移動してフルスクリーン
-    wmctrl -i -r "$SEC_ID" -e 0,$PRIMARY_WIDTH,0,-1,-1
-    wmctrl -i -r "$SEC_ID" -b add,fullscreen
+    echo "Main display set to fullscreen."
+else
+    echo "Warning: Main display window not found."
 fi
 
 echo "Livraria system is running."
