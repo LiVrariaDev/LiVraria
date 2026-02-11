@@ -37,7 +37,7 @@ chromium \
 echo "Main display launched. Waiting for login and secondary window..."
 
 # 2. Mainもフルスクリーン化
-sleep 2
+sleep 5
 MAIN_ID=$(wmctrl -l | grep "LiVraria Main" | awk '{print $1}')
 if [ -n "$MAIN_ID" ]; then
     wmctrl -i -r "$MAIN_ID" -e 0,0,0,-1,-1
