@@ -212,6 +212,17 @@ input, textarea {
   user-select: text;
 }
 
+/* Kiosk端末用: 1024x600ディスプレイに最適化 */
+@media (max-width: 1024px) and (max-height: 768px) {
+  #app {
+    transform: scale(0.8);
+    transform-origin: top left;
+    width: 125%; /* 100% / 0.8 = 125% */
+    height: 125%;
+  }
+}
+
+
 
 /* フェードアニメーション */
 .fade-enter-active,

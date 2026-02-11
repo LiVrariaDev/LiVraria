@@ -30,6 +30,7 @@ echo "Starting Livraria..."
 chromium \
   --app="$SERVER_URL" \
   --window-position=0,0 \
+  --force-device-scale-factor=0.6 \
   --autoplay-policy=no-user-gesture-required \
   --ozone-platform=x11 \
   --user-data-dir="/tmp/chrome_main_profile" \
