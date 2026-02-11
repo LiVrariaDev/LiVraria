@@ -10,7 +10,7 @@
         />
 
         <!-- ===== ホームページ表示 ===== -->
-        <div v-if="currentPage === 'home'" class="relative flex flex-col w-full h-full overflow-hidden">
+        <div v-if="currentPage === 'home'" class="relative flex flex-col w-full h-full overflow-auto">
             <!-- 背景画像エリア -->
             <div class="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700"
                  :style="{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('/bg.jpg?v=2')` }">
