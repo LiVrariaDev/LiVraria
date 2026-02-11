@@ -166,6 +166,37 @@ class Server:
 			except ValueError as e:
 				raise HTTPException(status_code=400, detail=str(e))
 		
+		@self.app.post("/users/{user_id}/logout")
+		async def logout(
+			user_id: str, 
+			background_tasks: BackgroundTasks,
+			current_user_id: str = Depends(get_current_user_id)
+		):
+			"""
+			ユーザーをログアウトさせる（RESTful）。
+			自分自身の情報のみログアウト可能。
+			アクティブなセッションがあればクローズし、AI Insightsを生成する。
+			"""
+			# 自分自身の情報のみログアウト可能
+			if user_id != current_user_id:
+				raise HTTPException(status_code=403, detail="Forbidden")
+			
+			user = self.data_store.get_user(user_id)
+			if not user:
+				raise HTTPException(status_code=404, detail="User not found")
+			
+			# アクティブセッションの確認
+			session_id = user.active_session
+			if session_id:
+				# セッションをクローズ（これで user.status も logout になる）
+				self.data_store.close_session(session_id)
+				# ログアウト時は非同期でインサイト生成（ユーザーを待たせない）
+				background_tasks.add_task(self.data_store.generate_summary_and_insights, session_id)
+			else:
+				# セッションがない場合はステータスのみ更新
+				self.data_store.update_user(user_id, status=UserStatus.logout)
+			
+			return {"detail": "User logged out successfully"}
 
 		# NFC Authentication Endpoints
 		@self.app.post("/nfc/auth")

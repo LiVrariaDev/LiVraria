@@ -54,6 +54,22 @@ export const api = {
         return response.json()
     },
 
+    /*
+     * ユーザーログアウト
+     */
+    async logoutUser(userId, idToken) {
+        const response = await fetch(`${API_BASE_URL}/users/${userId}/logout`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            }
+        })
+
+        if (!response.ok) throw new Error('Failed to logout user')
+        return response.json()
+    },
+
     // ========================================
     // セッション・メッセージ関連API
     // ========================================
