@@ -90,7 +90,7 @@ def search_books(keywords: list[str], count: int = 30) -> str:
 	
 	Args:
 		keywords: 検索キーワードのリスト（例: ["SF", "初心者", "おすすめ"]）
-		count: 取得する書籍数（デフォルト: 10）
+		count: 取得する書籍数（デフォルト: 10, 10冊以上を指定すること）
 		
 	Returns:
 		番号付き書籍リスト
@@ -104,10 +104,10 @@ def search_books(keywords: list[str], count: int = 30) -> str:
 			return "検索キーワードが指定されていません。"
 		
 		# rakuten_search_booksは list[dict] を返す
-		books = rakuten_search_books(keywords, count, orflag=0) # AND検索
+		books = rakuten_search_books(keywords, count=max(count, 10), orflag=0) # AND検索
 		
 		if not books:
-			books = rakuten_search_books(keywords, count=max(count * 2, 30), orflag=1) # OR検索
+			books = rakuten_search_books(keywords, count=max(count * 2, 20), orflag=1) # OR検索
 			if not books:
 				logger.error("No books found for keywords: %s", keywords)
 				return "申し訳ございません。該当する書籍が見つかりませんでした。"
