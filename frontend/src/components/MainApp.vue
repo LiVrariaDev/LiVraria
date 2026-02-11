@@ -307,7 +307,7 @@ const utilityButtons = ref([ { id: 6, text: 'オプション', action: 'options'
 const chatHistory = ref([ 
     { sender: 'ai', text: 'こんにちは！AI司書です。本日はどのようなご用件でしょうか？' }
 ]);
-const suggestedBooks = ref(Array.from({ length: 6 }, (_, i) => ({ id: i + 1, title: `未来の図書館 ${i + 1}`, cover: `https://placehold.co/150x220/3b82f6/ffffff?text=Book${i+1}` })));
+const suggestedBooks = ref([]);
 const selectedBook = ref(null);
 const chatHistoryEl = ref(null);
 
