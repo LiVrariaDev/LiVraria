@@ -9,6 +9,11 @@
             @load="handleImageLoad"
         />
 
+        <!-- ===== 会員情報ページ ===== -->
+        <div v-if="currentPage === 'member_info'" class="w-full h-full">
+            <MemberInfoPage :onBack="() => currentPage = 'home'" />
+        </div>
+
         <!-- ===== ホームページ表示 ===== -->
         <div v-if="currentPage === 'home'" class="relative flex flex-col w-full h-full overflow-hidden">
             <!-- 背景画像エリア -->
@@ -98,9 +103,9 @@
                      <button @click="toggleSpeech" class="flex items-center px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl transition-colors duration-200 border border-gray-600" :class="{'text-blue-400 border-blue-500/50': isSpeechEnabled}">
                         <span v-if="isSpeechEnabled">🔊 ON</span>
                         <span v-else>🔇 OFF</span>
-                     </button>
+                      </button>
 
-                     <button v-for="button in utilityButtons" :key="button.id"
+                      <button v-for="button in utilityButtons" :key="button.id"
                              @click="handleHomeButtonClick(button.action)"
                              class="flex items-center px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl transition-colors duration-200 border border-gray-600">
                         <span class="mr-2">⚙️</span> {{ button.text }}
@@ -199,6 +204,26 @@
                 </div>
             </div>
         </div>
+
+        <!-- ===== 蔵書検索モード表示 ===== -->
+        <div v-if="currentPage === 'search_mode'" class="flex flex-col h-screen bg-slate-50">
+            <header class="bg-white/90 backdrop-blur border-b border-slate-200 p-4 px-8 flex justify-between items-center shadow-sm z-20">
+                <div class="flex items-center space-x-3">
+                    <span class="text-2xl">📚</span>
+                    <h1 class="text-xl font-bold text-slate-700">蔵書検索</h1>
+                </div>
+                <div class="flex space-x-3">
+                    <button @click="currentPage = 'home'" class="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">
+                        <span>🏠</span> <span>ホームへ</span>
+                    </button>
+                </div>
+            </header>
+            
+            <div class="flex-1 overflow-auto">
+                <BookSearch />
+            </div>
+        </div>
+
     </div>
 </template>
 
@@ -207,6 +232,11 @@ import { ref, onMounted, nextTick, onUnmounted } from 'vue';
 import { signOut, getIdToken } from "firebase/auth";
 import { auth } from '../firebaseConfig';
 import { api } from '../services/api'; 
+// ★追加: 蔵書検索コンポーネントをインポート
+import BookSearch from './BookSearch.vue';
+
+import MemberInfoPage from './MemberInfoPage.vue';
+// import bgImage from '../assets/bg.jpg';
 
 const handleImageError = () => {
     alert("【画像読み込みエラー】\n publicフォルダに 'bg.jpg' が見つかりません。");
@@ -243,6 +273,7 @@ const toggleSpeech = () => {
 };
 
 const speakText = (text) => {
+    if (!text) return;
     if (!isSpeechEnabled.value) return;
     if (!window.speechSynthesis) return;
     if (!text) return;
@@ -281,7 +312,7 @@ const currentSessionId = ref(null);
 const mainButtons = ref([ 
     { id: 1, text: '書籍検索', action: 'search', icon: 'search' }, 
     { id: 2, text: '会話集中モード', action: 'focus_chat', icon: 'chat' }, 
-    { id: 3, text: 'ライブラリーサーフィン', action: 'library_surfing', icon: 'grid' }, 
+    { id: 3, text: '会員情報', action: 'member_info', icon: 'grid' }, 
     { id: 4, text: 'グッドスナイパー', action: 'good_sniper', icon: 'star' }
 ]);
 const utilityButtons = ref([ { id: 6, text: 'オプション', action: 'options' } ]); 
@@ -311,8 +342,21 @@ const sendMessageToSecondary = (text, state = 'speaking') => {
 };
 
 const handleHomeButtonClick = (action) => {
-    if (action === 'focus_chat') currentPage.value = 'chat_mode';
-    else {
+    if (action === 'focus_chat') {
+        currentPage.value = 'chat_mode';
+    } else if (action === 'search') {
+        // ★修正: 書籍検索モードへ切り替え
+        currentPage.value = 'search_mode';
+        const msg = "蔵書検索を開始します。";
+        homeConversationText.value = msg;
+        speakText(msg);
+    } else if (action === 'member_info') {
+        currentPage.value = 'member_info';
+        const msg = "会員情報モードへ切り替えました。";
+        homeConversationText.value = msg;
+        speakText(msg);
+        sendMessageToSecondary(msg);
+    } else {
         const msg = `「${action}」機能は準備中です。`;
         speakText(msg);
         sendMessageToSecondary(msg, 'neutral');

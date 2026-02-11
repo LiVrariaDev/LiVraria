@@ -1,6 +1,7 @@
 from backend import PROJECT_ROOT
 import os
 import requests
+import random
 import json
 from pathlib import Path
 
@@ -100,4 +101,66 @@ def rakuten_search_info(isbn: str) -> dict:
 if __name__ == "__main__":
     books = rakuten_search_info("9784088807232")
     pprint.pprint(books)
+
+def rakuten_search_books_random(keywords: list[str], count: int = 30) -> list[dict]:
+    """
+    【蔵書検索用】
+    - 人気順(sales)で最大30件取得
+    - 結果をシャッフルして返す
+    - Vueで表示しやすい形式（mediumImageUrlなど）に整形済み
+    """
+    # 環境変数チェック
+    app_id = os.getenv("RAKUTEN_APP_ID")
+    if not app_id:
+        return []
+
+    headers = {}
+    keyword_str = " ".join(keywords)
+
+    # BooksBook API (本・雑誌検索) を使用
+    url = "https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404"
+    
+    params = {
+        "applicationId": app_id,
+        "title": keyword_str,    # タイトルや著者名
+        "format": "json",
+        "formatVersion": "2",
+        "hits": 30,              # 最大30件
+        "sort": "sales",         # 売上順
+        "outOfStockFlag": 1,     # 品切れも含める
+    }
+
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        json_data = response.json().get("Items", [])
+        
+        book_list = []
+        for item in json_data:
+            # 必要な情報を安全に取り出す
+            # Vue側で表示しやすいキー名に変換しておく
+            medium_image_url = item.get("mediumImageUrl", "").replace("?_ex=120x120", "?_ex=200x200")
+            
+            book_info = {
+                "title": item.get("title", ""),
+                "author": item.get("author", ""), # 文字列のまま
+                "publisher": item.get("publisherName", ""),
+                "published_date": item.get("salesDate", ""),
+                "isbn": item.get("isbn", ""),
+                "price": item.get("itemPrice", 0),
+                "description": item.get("itemCaption", ""),
+                "url": item.get("itemUrl", ""),
+                "mediumImageUrl": medium_image_url, 
+                "largeImageUrl": item.get("largeImageUrl", "")
+            }
+            book_list.append(book_info)
+
+        # ランダムにシャッフル！
+        random.shuffle(book_list)
+
+        return book_list
+
+    except Exception as e:
+        print(f"[ERROR] Rakuten random search failed: {e}")
+        return []
     

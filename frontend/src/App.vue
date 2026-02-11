@@ -1,18 +1,17 @@
 <template>
-  <!-- 
-    URLに '?view=secondary' がついている時はセカンダリディスプレイを表示
-    それ以外は通常のログイン・メイン画面を表示
-  -->
-  <SecondaryDisplay v-if="isSecondaryView" />
-  
-  <div v-else>
-    <div v-if="isAuthReady">
+  <!-- 認証状態の読み込みが完了するまで「読み込み中...」を表示 -->
+  <div v-if="isAuthReady">
+    <!-- URLパラメータ '?view=secondary' がある場合はセカンダリディスプレイを表示 -->
+    <SecondaryDisplay v-if="isSecondaryView" />
+    
+    <!-- 通常の画面 -->
+    <div v-else>
       <MainApp v-if="user" />
       <Login v-else />
     </div>
-    <div v-else class="flex items-center justify-center h-screen bg-gray-100">
+  </div>
+  <div v-else class="flex items-center justify-center h-screen bg-gray-100">
       <p class="text-2xl font-semibold text-gray-700">読み込み中...</p>
-    </div>
   </div>
 </template>
 
@@ -49,6 +48,8 @@ onMounted(() => {
       user.value = currentUser;
       isAuthReady.value = true;
     });
+  } else {
+    isAuthReady.value = true; // セカンダリの場合は即表示
   }
 });
 
@@ -59,8 +60,34 @@ onUnmounted(() => {
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 body {
     font-family: 'Inter', 'Noto Sans JP', sans-serif;
-    overflow: hidden;
+    /* 修正：overflow: hidden を削除し、スクロールを許可 */
+    margin: 0;
+    overflow-y: auto; 
+}
+
+/* --- スクロールバーのカスタマイズ --- */
+/* 幅と高さ */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+/* トラック（背景） */
+::-webkit-scrollbar-track {
+    background: #f1f1f1; 
+}
+
+/* つまみ部分 */
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1; 
+    border-radius: 4px;
+}
+
+/* つまみのホバー時 */
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8; 
 }
 </style>

@@ -1,11 +1,16 @@
 <template>
-  <div class="flex items-center justify-center min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 font-sans">
-    <div class="absolute top-20 left-20 w-72 h-72 bg-white rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
-    <div class="absolute top-40 right-20 w-72 h-72 bg-yellow-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
-    <div class="absolute -bottom-8 left-40 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
+  <!-- 修正：上下に十分な余白(py-12)を追加してスクロールしやすくする -->
+  <div class="flex items-center justify-center min-h-screen py-12 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 font-sans">
+    
+    <!-- 背景装飾（スクロールしても位置が固定されるように fixed に変更） -->
+    <div class="fixed top-20 left-20 w-72 h-72 bg-white rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
+    <div class="fixed top-40 right-20 w-72 h-72 bg-yellow-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
+    <div class="fixed -bottom-8 left-40 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
 
-    <div class="relative w-full max-w-lg p-8 bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl transition-all duration-500 my-10">
+    <!-- カードコンテナ（z-indexを指定して背景より手前に表示） -->
+    <div class="relative w-full max-w-lg p-8 bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl transition-all duration-500 z-10 my-4 mx-4">
       
+      <!-- ヘッダー -->
       <div class="text-center mb-8">
         <h2 class="text-4xl font-extrabold text-gray-900 tracking-tight">Livraria</h2>
         <p class="mt-2 text-sm text-gray-600">
@@ -13,13 +18,16 @@
         </p>
       </div>
       
+      <!-- エラーメッセージ -->
       <div v-if="errorMessage" class="mb-6 p-4 text-sm text-red-700 bg-red-100 border-l-4 border-red-500 rounded" role="alert">
         <p class="font-bold">エラー</p>
         <p>{{ errorMessage }}</p>
       </div>
 
+      <!-- フォーム -->
       <form @submit.prevent="handleSubmit" class="space-y-5">
         
+        <!-- ログイン/登録 共通項目 -->
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
@@ -33,6 +41,7 @@
           </div>
         </div>
 
+        <!-- 新規登録モードのみ表示する追加項目 -->
         <div v-if="isRegisterMode" class="space-y-4 pt-2 animate-fade-in">
           <div class="border-t border-gray-200 pt-4">
             <p class="text-xs text-gray-500 mb-4 text-center">- プロフィール情報 -</p>
@@ -77,23 +86,47 @@
             </div>
           </div>
         </div>
-
-        <div class="pt-6 flex flex-col space-y-4">
+        
+        <!-- アクションボタン -->
+        <div class="pt-2 flex flex-col space-y-4">
+          <!-- 1. 通常のログイン/登録ボタン -->
           <button type="submit" 
-                  :disabled="isLoading"
-                  class="w-full px-4 py-3 text-lg font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transform hover:-translate-y-0.5 transition-all duration-200 shadow-lg hover:shadow-indigo-500/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                :disabled="isLoading"
+                class="w-full px-4 py-3 text-lg font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transform hover:-translate-y-0.5 transition-all duration-200 shadow-lg hover:shadow-indigo-500/30 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
             <span v-if="isLoading">処理中...</span>
             <span v-else>{{ isRegisterMode ? '登録してはじめる' : 'ログイン' }}</span>
           </button>
-          
-          <div class="relative flex items-center justify-center">
-            <div class="w-full border-t border-gray-300"></div>
+        
+          <!-- 2. NFCログインボタン (ログインモード時のみ表示) -->
+          <div v-if="!isRegisterMode" class="w-full pt-2">
+            <div class="relative flex items-center justify-center mb-4">
+              <div class="w-full border-t border-gray-300"></div>
+              <span class="absolute px-3 bg-white/90 text-xs text-gray-400">または</span>
+            </div>
+
+            <button
+              type="button"
+              @click="startNfcLogin"
+              :disabled="isLoading || isReadingNfc"
+              class="w-full px-4 py-3 text-lg font-bold text-white bg-purple-600 rounded-lg hover:bg-purple-700 transform hover:-translate-y-0.5 transition-all duration-200 shadow-lg hover:shadow-purple-500/30 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+            >
+              <span v-if="!isReadingNfc">💳 NFCでログイン</span>
+              <span v-else class="animate-pulse">📡 カードをかざしてください...</span>
+            </button>
           </div>
 
+          <!-- モード切替ボタン -->
           <button type="button" @click="toggleMode"
                   class="text-sm text-indigo-600 hover:text-indigo-800 font-semibold focus:outline-none underline">
             {{ isRegisterMode ? 'すでにアカウントをお持ちの方はログイン' : 'アカウントをお持ちでない方は新規登録' }}
           </button>
+          <!-- 3. 新規登録/ログイン切り替えリンク (一番下) -->
+          <div class="pt-2">
+             <button type="button" @click="toggleMode"
+                  class="w-full text-sm text-indigo-600 hover:text-indigo-800 font-semibold focus:outline-none underline text-center">
+              {{ isRegisterMode ? 'すでにアカウントをお持ちの方はログイン' : 'アカウントをお持ちでない方は新規登録' }}
+            </button>
+          </div>
         </div>
       </form>
     </div>
@@ -121,20 +154,53 @@ const profile = reactive({
   live_city: ''
 });
 
+const isReadingNfc = ref(false);
+
+import { readNfcCard } from '../services/nfc';
+import { signInWithCustomToken } from "firebase/auth";
+
+const startNfcLogin = async () => {
+  errorMessage.value = '';
+  isReadingNfc.value = true;
+
+  try {
+    await readNfcCard(async (idm) => {
+      isReadingNfc.value = false;
+      
+      // 1. バックエンドでNFC認証 -> Custom Token取得
+      const result = await api.authenticateNfc(idm);
+      if (!result.custom_token) {
+        throw new Error('認証トークンの取得に失敗しました');
+      }
+
+      // 2. FirebaseにCustom Tokenでログイン
+      await signInWithCustomToken(auth, result.custom_token);
+      console.log('NFCログイン完了');
+    });
+  } catch (error) {
+    console.error('NFCログインエラー:', error);
+    if (error.message.includes('NFC ID not registered')) {
+      errorMessage.value = 'このカードは未登録です。';
+    } else {
+      errorMessage.value = `NFCログインエラー: ${error.message}`;
+    }
+    isReadingNfc.value = false;
+  }
+};
+
 // BroadcastChannelを作成（MainAppと同じ名前を使うことで通信可能）
 const channel = new BroadcastChannel('livraria_channel');
 
 // 画面が表示された時に実行
 onMounted(() => {
   // アプリ起動時（ログイン画面表示時）に、セカンダリディスプレイを「待機状態」にする
-  // これにより、ラズパイ起動時にセカンダリ画面にも「いらっしゃいませ」が表示されます
   setTimeout(() => {
     channel.postMessage({ 
       type: 'chat', 
       text: 'いらっしゃいませ。\nログインしてください。', 
       state: 'idle' 
     });
-  }, 1000); // 念のため1秒待ってから送信（ウィンドウ起動待ち）
+  }, 1000); 
 });
 
 onUnmounted(() => {

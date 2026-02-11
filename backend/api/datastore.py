@@ -164,9 +164,21 @@ class DataStore:
 		user = self.users[user_id]
 		for key, value in kwargs.items():
 			if hasattr(user, key):
-				setattr(user, key, value)
+				# personalフィールドの場合はPersonalモデルに変換してから代入
+				if key == "personal" and isinstance(value, dict):
+					# 既存のpersonalオブジェクトを更新するか、新しく作成
+					if user.personal:
+						updated_personal = user.personal.copy(update=value)
+						setattr(user, "personal", updated_personal)
+					else:
+						setattr(user, "personal", Personal(**value))
+				else:
+					setattr(user, key, value)
 			else:
 				raise ValueError(f"Invalid field: {key}")
+		
+		# 変更を保存
+		self.save_file()
 		
 		return user
 
@@ -186,7 +198,8 @@ class DataStore:
 		"""
 		NFC IDとユーザーIDを紐付ける。
 		"""
-		if user_id not in self.users:
+		# ユーザーが存在するか確認（ディスクからのロード含む）
+		if not self.get_user(user_id):
 			raise KeyError(f"User not found: {user_id}")
 		
 		nfc_user = NfcUser(**{"_id": nfc_id, "user_id": user_id})
@@ -201,6 +214,15 @@ class DataStore:
 		nfc_user = self.nfc_users.get(nfc_id)
 		if nfc_user:
 			return nfc_user.user_id
+		return None
+	
+	def get_nfc_by_user_id(self, user_id: str) -> Optional[str]:
+		"""
+		ユーザーIDからNFC IDを取得する (逆引き)。
+		"""
+		for nfc_user in self.nfc_users.values():
+			if nfc_user.user_id == user_id:
+				return nfc_user.nfc_id
 		return None
 	
 	def unregister_nfc(self, nfc_id: str) -> None:
