@@ -9,70 +9,56 @@
             @load="handleImageLoad"
         />
 
-        <!-- ===== 会員情報ページ ===== -->
-        <div v-if="currentPage === 'member_info'" class="w-full h-full">
-            <MemberInfoPage :onBack="() => currentPage = 'home'" />
-        </div>
-
         <!-- ===== ホームページ表示 ===== -->
         <div v-if="currentPage === 'home'" class="relative flex flex-col w-full h-full overflow-hidden">
             <!-- 背景画像エリア -->
             <div class="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700"
-                 :style="{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), url('/bg.jpg?v=2')` }">
+                 :style="{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('/bg.jpg?v=2')` }">
             </div>
 
-            <!-- 
-                メインコンテンツエリア (全画面使用) 
-                修正: pb-72 (padding-bottom) を大きくして、コンテンツ全体を上に押し上げる
-            -->
-            <div class="relative z-10 flex-grow flex flex-col items-center justify-center w-full px-12 pt-12 pb-72">
+            <!-- メインコンテンツエリア -->
+            <!-- 修正: justify-center で垂直方向中央寄せ、pb-64 で下部に大きな余白（会話バー回避） -->
+            <div class="relative z-10 flex-grow flex flex-col items-center justify-center w-full px-8 pb-64">
                 
-                <!-- ステータス表示エリア (ボタンの上に配置) -->
-                <div class="h-24 mb-8 flex items-center justify-center w-full">
-                    <div v-if="isRecording" class="flex items-center space-x-6 animate-pulse bg-black/40 px-8 py-4 rounded-full border border-red-500/30 backdrop-blur-md">
-                        <div class="p-3 bg-red-500 rounded-full shadow-[0_0_20px_rgba(239,68,68,0.8)]">
-                            <svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                            </svg>
+                <!-- ステータス表示エリア (ボタンの直上に配置) -->
+                <div class="h-20 mb-8 flex items-center justify-center w-full">
+                    <transition name="fade" mode="out-in">
+                        <div v-if="isRecording" class="flex items-center space-x-4 bg-black/60 px-8 py-3 rounded-full border border-red-500/50 backdrop-blur-md animate-pulse">
+                            <div class="w-4 h-4 bg-red-500 rounded-full animate-ping"></div>
+                            <span class="text-2xl font-bold text-red-100 tracking-widest">LISTENING...</span>
                         </div>
-                        <span class="text-3xl font-bold text-white tracking-widest drop-shadow-md">LISTENING...</span>
-                    </div>
-                    <div v-else-if="isLoading" class="flex items-center space-x-6 bg-black/40 px-8 py-4 rounded-full border border-blue-500/30 backdrop-blur-md">
-                        <div class="p-3 bg-blue-500 rounded-full shadow-[0_0_20px_rgba(59,130,246,0.8)] animate-spin-slow">
-                            <svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
+                        <div v-else-if="isLoading" class="flex items-center space-x-4 bg-black/60 px-8 py-3 rounded-full border border-blue-500/50 backdrop-blur-md">
+                            <div class="w-4 h-4 bg-blue-400 rounded-full animate-bounce"></div>
+                            <span class="text-2xl font-bold text-blue-100 tracking-widest">THINKING...</span>
                         </div>
-                        <span class="text-3xl font-bold text-white tracking-widest drop-shadow-md animate-pulse">THINKING...</span>
-                    </div>
-                    <!-- 通常時はタイトルを表示 -->
-                    <div v-else class="text-center opacity-80 hover:opacity-100 transition-opacity duration-500">
-                        <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-purple-200 tracking-tight drop-shadow-sm">LiVraria Menu</h1>
-                    </div>
+                    </transition>
                 </div>
 
-                <!-- 
-                    ボタンエリア 
-                    修正: max-h-[55vh] に少し縮めて間延びを防ぎつつ、上部に配置
-                -->
-                <div class="grid grid-cols-2 gap-8 w-full max-w-7xl flex-grow max-h-[55vh]">
+                <!-- ボタンエリア (2x2 グリッド) -->
+                <div class="grid grid-cols-2 gap-6 w-full max-w-5xl">
                     <button v-for="button in mainButtons" :key="button.id" 
                             @click="handleHomeButtonClick(button.action)"
-                            class="group relative overflow-hidden rounded-3xl shadow-xl transition-all duration-300 flex flex-col items-center justify-center h-full w-full
-                                   bg-transparent border-2 border-white/50 backdrop-blur-sm
-                                   hover:bg-white hover:border-white hover:shadow-[0_0_50px_rgba(255,255,255,0.4)] hover:-translate-y-2">
+                            class="group relative overflow-hidden rounded-2xl transition-all duration-300 flex flex-col items-center justify-center h-48 w-full
+                                   bg-transparent border-2 border-white/40 backdrop-blur-sm
+                                   hover:bg-white hover:border-white hover:shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:-translate-y-1">
                         
-                        <!-- コンテンツ -->
-                        <div class="relative z-10 flex flex-col items-center space-y-6">
-                            <!-- アイコン: 通常は白っぽく、ホバー時は青く -->
-                            <div class="p-8 rounded-full bg-white/10 text-white group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors duration-300 shadow-inner group-hover:shadow-lg group-hover:scale-110 transform transition-transform">
-                                <span v-if="button.icon === 'search'" class="block transform scale-150" v-html="icons.search"></span>
-                                <span v-else-if="button.icon === 'chat'" class="block transform scale-150" v-html="icons.chat"></span>
-                                <span v-else-if="button.icon === 'grid'" class="block transform scale-150" v-html="icons.grid"></span>
-                                <span v-else class="block transform scale-150" v-html="icons.star"></span>
+                        <div class="relative z-10 flex flex-col items-center space-y-4">
+                            <!-- アイコン -->
+                            <div class="p-4 rounded-full transition-colors duration-300
+                                        text-white/80 bg-white/10
+                                        group-hover:text-slate-800 group-hover:bg-slate-200">
+                                <!-- アイコンサイズ調整 -->
+                                <span v-if="button.icon === 'search'" class="block transform scale-125" v-html="icons.search"></span>
+                                <span v-else-if="button.icon === 'chat'" class="block transform scale-125" v-html="icons.chat"></span>
+                                <span v-else-if="button.icon === 'grid'" class="block transform scale-125" v-html="icons.grid"></span>
+                                <span v-else class="block transform scale-125" v-html="icons.star"></span>
                             </div>
-                            <!-- テキスト: 通常は白、ホバー時は濃い色 -->
-                            <span class="text-4xl font-bold text-white group-hover:text-slate-800 transition-colors tracking-wide drop-shadow-md group-hover:drop-shadow-none">{{ button.text }}</span>
+                            <!-- テキスト -->
+                            <span class="text-3xl font-bold tracking-wide transition-colors duration-300
+                                         text-white
+                                         group-hover:text-slate-900">
+                                {{ button.text }}
+                            </span>
                         </div>
                     </button>
                 </div>
@@ -93,7 +79,7 @@
                            class="w-full bg-gray-800 border border-gray-600 rounded-full py-4 px-6 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all shadow-inner text-lg">
                 </div>
                 
-                <div class="flex-grow"></div> <!-- スペーサー -->
+                <div class="flex-grow"></div>
 
                 <div class="flex space-x-4 mr-8 items-center">
                      <button @click="openSecondaryDisplay" class="flex items-center px-6 py-3 bg-teal-600/20 hover:bg-teal-600/40 text-teal-300 font-bold rounded-xl transition-colors duration-200 border border-teal-500/30">
@@ -103,9 +89,9 @@
                      <button @click="toggleSpeech" class="flex items-center px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl transition-colors duration-200 border border-gray-600" :class="{'text-blue-400 border-blue-500/50': isSpeechEnabled}">
                         <span v-if="isSpeechEnabled">🔊 ON</span>
                         <span v-else>🔇 OFF</span>
-                      </button>
+                     </button>
 
-                      <button v-for="button in utilityButtons" :key="button.id"
+                     <button v-for="button in utilityButtons" :key="button.id"
                              @click="handleHomeButtonClick(button.action)"
                              class="flex items-center px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl transition-colors duration-200 border border-gray-600">
                         <span class="mr-2">⚙️</span> {{ button.text }}
@@ -204,26 +190,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- ===== 蔵書検索モード表示 ===== -->
-        <div v-if="currentPage === 'search_mode'" class="flex flex-col h-screen bg-slate-50">
-            <header class="bg-white/90 backdrop-blur border-b border-slate-200 p-4 px-8 flex justify-between items-center shadow-sm z-20">
-                <div class="flex items-center space-x-3">
-                    <span class="text-2xl">📚</span>
-                    <h1 class="text-xl font-bold text-slate-700">蔵書検索</h1>
-                </div>
-                <div class="flex space-x-3">
-                    <button @click="currentPage = 'home'" class="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">
-                        <span>🏠</span> <span>ホームへ</span>
-                    </button>
-                </div>
-            </header>
-            
-            <div class="flex-1 overflow-auto">
-                <BookSearch />
-            </div>
-        </div>
-
     </div>
 </template>
 
@@ -232,11 +198,6 @@ import { ref, onMounted, nextTick, onUnmounted } from 'vue';
 import { signOut, getIdToken } from "firebase/auth";
 import { auth } from '../firebaseConfig';
 import { api } from '../services/api'; 
-// ★追加: 蔵書検索コンポーネントをインポート
-import BookSearch from './BookSearch.vue';
-
-import MemberInfoPage from './MemberInfoPage.vue';
-// import bgImage from '../assets/bg.jpg';
 
 const handleImageError = () => {
     alert("【画像読み込みエラー】\n publicフォルダに 'bg.jpg' が見つかりません。");
@@ -273,15 +234,23 @@ const toggleSpeech = () => {
 };
 
 const speakText = (text) => {
-    if (!text) return;
     if (!isSpeechEnabled.value) return;
     if (!window.speechSynthesis) return;
+    
+    // 修正: 新しい発話リクエストが来たら、現在再生中の音声を即座にキャンセルする
+    window.speechSynthesis.cancel();
+
     if (!text) return;
 
     if (!selectedVoice.value) loadVoices();
 
-    const plainText = typeof text === 'string' ? text.replace(/<[^>]+>/g, '') : '';
-    if (!plainText) return;
+    // 修正: HTMLタグと絵文字を除去
+    const plainText = typeof text === 'string' 
+        ? text.replace(/<[^>]+>/g, '') // HTMLタグ除去
+              .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '') // 絵文字除去
+        : '';
+
+    if (!plainText.trim()) return;
 
     const utterance = new SpeechSynthesisUtterance(plainText);
     if (selectedVoice.value) utterance.voice = selectedVoice.value;
@@ -296,7 +265,6 @@ const speakText = (text) => {
     window.speechSynthesis.speak(utterance);
 };
 
-// アイコンサイズを w-12 h-12 に拡大
 const icons = {
     search: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>`,
     chat: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>`,
@@ -312,7 +280,7 @@ const currentSessionId = ref(null);
 const mainButtons = ref([ 
     { id: 1, text: '書籍検索', action: 'search', icon: 'search' }, 
     { id: 2, text: '会話集中モード', action: 'focus_chat', icon: 'chat' }, 
-    { id: 3, text: '会員情報', action: 'member_info', icon: 'grid' }, 
+    { id: 3, text: 'ライブラリーサーフィン', action: 'library_surfing', icon: 'grid' }, 
     { id: 4, text: 'グッドスナイパー', action: 'good_sniper', icon: 'star' }
 ]);
 const utilityButtons = ref([ { id: 6, text: 'オプション', action: 'options' } ]); 
@@ -342,21 +310,11 @@ const sendMessageToSecondary = (text, state = 'speaking') => {
 };
 
 const handleHomeButtonClick = (action) => {
-    if (action === 'focus_chat') {
-        currentPage.value = 'chat_mode';
-    } else if (action === 'search') {
-        // ★修正: 書籍検索モードへ切り替え
-        currentPage.value = 'search_mode';
-        const msg = "蔵書検索を開始します。";
-        homeConversationText.value = msg;
-        speakText(msg);
-    } else if (action === 'member_info') {
-        currentPage.value = 'member_info';
-        const msg = "会員情報モードへ切り替えました。";
-        homeConversationText.value = msg;
-        speakText(msg);
-        sendMessageToSecondary(msg);
-    } else {
+    if (action === 'focus_chat') currentPage.value = 'chat_mode';
+    else {
+        // 修正: ボタンクリック時の発話開始前にもキャンセルを入れる
+        window.speechSynthesis.cancel();
+        
         const msg = `「${action}」機能は準備中です。`;
         speakText(msg);
         sendMessageToSecondary(msg, 'neutral');
@@ -366,6 +324,7 @@ const handleHomeButtonClick = (action) => {
 const sendHomeMessage = async () => {
     const user = auth.currentUser;
     if (!user) {
+        window.speechSynthesis.cancel();
         const msg = 'エラー：ログインしてください。';
         speakText(msg);
         sendMessageToSecondary(msg, 'neutral');
@@ -373,9 +332,13 @@ const sendHomeMessage = async () => {
     }
     const message = userInput.value;
     userInput.value = '';
+    
+    // 修正: 送信処理開始時に、現在の発話をキャンセルする
+    window.speechSynthesis.cancel();
+    
     isLoading.value = true;
 
-    // 1. 送信直後：思考中ステートを送信 (テキストは空でOK、セカンダリ側で消去される)
+    // 1. 送信直後：思考中ステートを送信
     sendMessageToSecondary('', 'thinking');
 
     try {
@@ -408,6 +371,9 @@ const sendChatMessage = async () => {
 
     const message = userInput.value;
     userInput.value = '';
+    
+    // 修正: チャット送信処理開始時に、現在の発話をキャンセルする
+    window.speechSynthesis.cancel();
     
     chatHistory.value.push({ sender: 'user', text: message });
     scrollToBottom();
@@ -446,6 +412,10 @@ const selectBook = (bookId) => {
 const askAboutBook = async () => {
     if (!selectedBook.value) return;
     const question = `「${selectedBook.value.title}」について教えてください。`;
+    
+    // 修正: 本について質問する際も発話をキャンセル
+    window.speechSynthesis.cancel();
+    
     chatHistory.value.push({ sender: 'user', text: question });
     scrollToBottom();
     const user = auth.currentUser;
@@ -486,35 +456,28 @@ const logout = () => {
   signOut(auth).catch(error => console.error('Logout failed', error));
 };
 
-const fetchUserGreeting = async () => {
+const fetchUserGreeting = () => {
     const user = auth.currentUser;
     if (!user) return;
     
-    try {
-        const token = await getIdToken(user);
-        const userData = await api.getUser(user.uid, token);
-        
-        const userName = userData.name || user.email || 'ゲスト';
-        const greeting = `ようこそ、${userName}さん！<br>今日はどんな本をお探しですか？`;
-        
-        isLoading.value = false;
-        
-        let attempts = 0;
-        const speakGreeting = () => {
-            if (selectedVoice.value || attempts > 10) {
-                speakText(greeting);
-                sendMessageToSecondary(greeting, 'neutral');
-            } else {
-                attempts++;
-                setTimeout(speakGreeting, 100);
-            }
-        };
-        speakGreeting();
-
-    } catch (error) {
-        console.error('挨拶情報の取得に失敗しました:', error);
-        isLoading.value = false;
-    }
+    // 修正: ユーザー名を特定せず、誰にでも通じる司書らしい挨拶に変更
+    // API通信も行わないため、即座に表示・発話が可能
+    const greeting = `いらっしゃいませ。<br>今日はどんな本をお探しですか？`;
+    
+    // homeConversationTextはホーム画面のステータス表示にはもう使われていないが、念のため更新
+    isLoading.value = false;
+    
+    let attempts = 0;
+    const speakGreeting = () => {
+        if (selectedVoice.value || attempts > 10) {
+            speakText(greeting);
+            sendMessageToSecondary(greeting, 'neutral');
+        } else {
+            attempts++;
+            setTimeout(speakGreeting, 100);
+        }
+    };
+    speakGreeting();
 };
 
 // --- 音声認識の実装 ---
@@ -559,6 +522,14 @@ onUnmounted(() => {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
