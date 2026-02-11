@@ -83,21 +83,21 @@
 
                 <div class="flex space-x-4 mr-8 items-center">
                      <button @click="openSecondaryDisplay" class="flex items-center px-6 py-3 bg-teal-600/20 hover:bg-teal-600/40 text-teal-300 font-bold rounded-xl transition-colors duration-200 border border-teal-500/30">
-                        <span class="mr-2 text-xl">📺</span> 動画ウィンドウ
+                        <span class="mr-2 text-xl"></span> 動画ウィンドウ
                      </button>
 
                      <button @click="toggleSpeech" class="flex items-center px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl transition-colors duration-200 border border-gray-600" :class="{'text-blue-400 border-blue-500/50': isSpeechEnabled}">
-                        <span v-if="isSpeechEnabled">🔊 ON</span>
-                        <span v-else>🔇 OFF</span>
+                        <span v-if="isSpeechEnabled">読み上げ ON</span>
+                        <span v-else>読み上げ OFF</span>
                      </button>
 
                      <button v-for="button in utilityButtons" :key="button.id"
                              @click="handleHomeButtonClick(button.action)"
                              class="flex items-center px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl transition-colors duration-200 border border-gray-600">
-                        <span class="mr-2">⚙️</span> {{ button.text }}
+                        <span class="mr-2"></span> {{ button.text }}
                     </button>
                     <button @click="logout" class="flex items-center px-6 py-3 bg-red-900/30 hover:bg-red-900/50 text-red-400 font-bold rounded-xl transition-colors duration-200 border border-red-800/50">
-                        <span>🚪</span> ログアウト
+                        <span></span> ログアウト
                     </button>
                 </div>
             </div>
@@ -107,7 +107,7 @@
         <div v-if="currentPage === 'search_mode'" class="flex flex-col h-screen bg-slate-50">
             <header class="bg-white/90 backdrop-blur border-b border-slate-200 p-4 px-8 flex justify-between items-center shadow-sm z-20">
                 <div class="flex items-center space-x-3">
-                    <span class="text-2xl">📚</span>
+                    <span class="text-2xl"></span>
                     <h1 class="text-xl font-bold text-slate-700">蔵書検索</h1>
                 </div>
                 <div class="flex space-x-3">
@@ -136,10 +136,10 @@
                 </div>
                 <div class="flex space-x-3">
                     <button @click="openSecondaryDisplay" class="flex items-center space-x-2 bg-teal-50 hover:bg-teal-100 text-teal-700 font-semibold py-2 px-4 rounded-lg transition-colors border border-teal-200">
-                        <span class="text-lg">📺</span> <span>動画ウィンドウ</span>
+                        <span class="text-lg"></span> <span>動画ウィンドウ</span>
                     </button>
                     <button @click="currentPage = 'home'" class="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">
-                        <span>🏠</span> <span>ホームへ</span>
+                        <span></span> <span>ホームへ</span>
                     </button>
                 </div>
             </header>
@@ -180,8 +180,8 @@
                         </div>
                         <div class="flex justify-end mt-2">
                              <button @click="toggleSpeech" class="text-sm font-semibold transition-colors duration-200" :class="isSpeechEnabled ? 'text-blue-500' : 'text-gray-400'">
-                                <span v-if="isSpeechEnabled">🔊 読み上げ ON</span>
-                                <span v-else>🔇 読み上げ OFF</span>
+                                <span v-if="isSpeechEnabled">読み上げ ON</span>
+                                <span v-else>読み上げ OFF</span>
                              </button>
                         </div>
                     </div>
@@ -190,7 +190,7 @@
                 <div class="w-1/2 p-6 flex flex-col bg-slate-50">
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex-1 flex flex-col overflow-hidden">
                         <h2 class="text-lg font-bold text-slate-700 mb-6 flex items-center">
-                            <span class="mr-2 text-2xl">📚</span> AIからのおすすめ書籍
+                            <span class="mr-2 text-2xl"></span> AIからのおすすめ書籍
                         </h2>
                         <div class="flex-1 overflow-y-auto custom-scrollbar pr-2">
                             <div class="grid grid-cols-3 gap-6">
@@ -209,7 +209,7 @@
                     </div>
                      <button @click="askAboutBook" :disabled="!selectedBook"
                             class="mt-6 w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-xl hover:from-emerald-600 hover:to-teal-600 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed transition-all transform active:scale-95 flex items-center justify-center">
-                        <span class="mr-2 text-xl">📖</span> この本について詳しく聞く
+                        <span class="mr-2 text-xl"></span> この本について詳しく聞く
                     </button>
                 </div>
             </div>
