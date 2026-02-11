@@ -10,6 +10,10 @@
         />
 
         <!-- ===== ホームページ表示 ===== -->
+        <div v-if="currentPage === 'member_info'" class="w-full h-full">
+            <MemberInfoPage :onBack="() => currentPage = 'home'" />
+        </div>
+
         <div v-if="currentPage === 'home'" class="relative flex flex-col w-full h-full overflow-hidden">
             <!-- 背景画像エリア -->
             <div class="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700"
@@ -218,6 +222,8 @@ import { ref, onMounted, nextTick, onUnmounted } from 'vue';
 import { signOut, getIdToken } from "firebase/auth";
 import { auth } from '../firebaseConfig';
 import { api } from '../services/api'; 
+import BookSearch from './BookSearch.vue';
+import MemberInfoPage from './MemberInfoPage.vue'; 
 
 const handleImageError = () => {
     alert("【画像読み込みエラー】\n publicフォルダに 'bg.jpg' が見つかりません。");
@@ -300,7 +306,7 @@ const currentSessionId = ref(null);
 const mainButtons = ref([ 
     { id: 1, text: '書籍検索', action: 'search', icon: 'search' }, 
     { id: 2, text: '会話集中モード', action: 'focus_chat', icon: 'chat' }, 
-    { id: 3, text: 'ライブラリーサーフィン', action: 'library_surfing', icon: 'grid' }, 
+    { id: 3, text: '会員情報', action: 'member_info', icon: 'grid' },  
     { id: 4, text: 'グッドスナイパー', action: 'good_sniper', icon: 'star' }
 ]);
 const utilityButtons = ref([ { id: 6, text: 'オプション', action: 'options' } ]); 
@@ -330,11 +336,23 @@ const sendMessageToSecondary = (text, state = 'speaking') => {
 };
 
 const handleHomeButtonClick = (action) => {
-    if (action === 'focus_chat') currentPage.value = 'chat_mode';
-    else {
-        // 修正: ボタンクリック時の発話開始前にもキャンセルを入れる
-        window.speechSynthesis.cancel();
-        
+    // 修正: ボタンクリック時の発話開始前にもキャンセルを入れる
+    window.speechSynthesis.cancel();
+
+    if (action === 'focus_chat') {
+        currentPage.value = 'chat_mode';
+    } else if (action === 'search') {
+        // 書籍検索モードへ切り替え
+        currentPage.value = 'search_mode';
+        const msg = "蔵書検索を開始します。";
+        speakText(msg);
+        sendMessageToSecondary(msg, 'neutral');
+    } else if (action === 'member_info') {
+        currentPage.value = 'member_info';
+        const msg = "会員情報モードへ切り替えました。";
+        speakText(msg);
+        sendMessageToSecondary(msg, 'neutral');
+    } else {
         const msg = `「${action}」機能は準備中です。`;
         speakText(msg);
         sendMessageToSecondary(msg, 'neutral');
