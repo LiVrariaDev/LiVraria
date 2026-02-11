@@ -134,6 +134,21 @@ def search_books(keywords: list[str], count: int = 30) -> str:
 
 
 @tool
+def update_expression(expression_type: str) -> str:
+    """
+    表情の更新
+
+	司書アバターの表情（感情）を更新します。
+    Args:
+        expression_type: 'neutral'（通常）', happy'（良い本が見つかった時）, 'thinking'（検索中）, 'sorry'（見つからない時）
+    Returns:
+		表情の変更の有無のメッセージ
+	"""
+    # このツール自体はメッセージを返すだけで、
+    # 実際のState更新はLangGraphのノード内、またはToolNodeの結果を反映して行います。
+    return f"表情を{expression_type}に変更しました。"
+
+@tool
 def recommend_books(selections: list[dict]) -> str:
 	"""
 	検索結果から推薦する本を選択
@@ -392,6 +407,14 @@ def llm_chat(
 			response_text = "申し訳ございません。応答を生成できませんでした。"
 			logger.error("No AI message found in result: %s", result)
 		
+		# ツール呼び出しから表情を取得（なければ none）  
+		current_expression = "none"
+		for msg in result["messages"]:
+			if hasattr(msg, "tool_calls") and msg.tool_calls:
+				for tool_call in msg.tool_calls:
+					if tool_call["name"] == "update_expression":
+						current_expression = tool_call["args"]["expression_type"]
+
 		# 履歴を更新 (BaseMessageオブジェクトのリスト)
 		# ユーザーメッセージ追加済みリスト + AI応答
 		# 注意: messages は既に [history + current_message] なので、これにAI応答を追加する形にはならない
@@ -413,7 +436,7 @@ def llm_chat(
 		# 推薦された書籍を取得
 		recommended_books = _global_state.get("recommended_books", [])
 		
-		return response_text, updated_history, recommended_books
+		return response_text, updated_history, recommended_books, current_expression
 		
 	except Exception as e:
 		import traceback
@@ -430,7 +453,7 @@ def llm_chat(
 			updated_history = history + [AIMessage(content=error_message)]
 			
 		# errorログは別で保存する → クライアント側に返すと脆弱
-		return error_message, updated_history, []
+		return error_message, updated_history, [], "none"
 
 
 def llm_summary(
