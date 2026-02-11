@@ -215,10 +215,17 @@ class DataStore:
 	def register_nfc(self, nfc_id: str, user_id: str) -> NfcUser:
 		"""
 		NFC IDとユーザーIDを紐付ける。
+		1ユーザーにつき1枚のみ登録可能（既存の登録があれば削除）。
 		"""
 		# ユーザーが存在するか確認（ディスクからのロード含む）
 		if not self.get_user(user_id):
 			raise KeyError(f"User not found: {user_id}")
+		
+		# 既存の登録を確認し、削除 (1ユーザー1カード制)
+		old_nfc_id = self.get_nfc_by_user_id(user_id)
+		if old_nfc_id:
+			self.unregister_nfc(old_nfc_id)
+			logger.info(f"[INFO] Removed old NFC card {old_nfc_id} for user {user_id}")
 		
 		nfc_user = NfcUser(**{"_id": nfc_id, "user_id": user_id})
 		self.nfc_users[nfc_id] = nfc_user
