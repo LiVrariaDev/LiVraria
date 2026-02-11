@@ -34,6 +34,14 @@ export default defineConfig({
       '/nfc': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+      },
+      '/search': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/books': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
       }
     }
   }
