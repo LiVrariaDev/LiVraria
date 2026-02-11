@@ -27,7 +27,9 @@ from langchain_core.messages import (
 logger = logging.getLogger("uvicorn.error")
 
 # ファイルパス (DBへ移行するため, 一時的なもの. 本番はENVへまとめる)
-from backend import PROMPTS_DIR, DATA_DIR, USERS_FILE, CONVERSATIONS_FILE, NFC_USERS_FILE, PROMPT_SUMMARY, PROMPT_AI_INSIGHT
+from backend import PROMPTS_DIR, DATA_DIR, USERS_FILE, CONVERSATIONS_FILE, NFC_USERS_FILE, PROMPT_SUMMARY, PROMPT_AI_INSIGHT, SESSION_TIMEOUT
+
+
 
 class DataStore:
 	def __init__(self):
@@ -512,8 +514,10 @@ class DataStore:
 							del self.sessions[session_id]
 						closed_sessions.append(session_id)
 				
-				# ユーザーをメモリから削除
-				del self.users[user_id]
+				# ユーザーをメモリから削除せず、ステータスをlogoutに変更
+				# del self.users[user_id]
+				user.status = UserStatus.logout
+				logger.info(f"[INFO] User timeout: {user_id}, status set to logout")
 				logger.info(f"[INFO] Unloaded inactive user: {user_id}")
 		
 		# 変更を保存
