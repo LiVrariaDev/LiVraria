@@ -268,7 +268,7 @@
                                     閉じる
                                 </button>
                                 <button @click="askAboutBookFromModal" class="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center">
-                                    <span class="mr-2 text-xl">🗣️</span> この本について話す
+                                    <span class="mr-2 text-xl">🔍</span> 関連本を探す
                                 </button>
                             </div>
                         </div>
@@ -580,8 +580,10 @@ const askAboutBookFromModal = async () => {
     // モーダルを閉じる
     closeBookDetail();
     
-    // AIへの質問（あらすじは含めない）
-    const question = `「${bookDetail.value.title}」（著者: ${bookDetail.value.authors ? bookDetail.value.authors.join(', ') : '不明'}）について、あなたの知っている情報を教えてください。`;
+    // AIへの質問: 関連本、著者、類似ジャンルなどを探してもらう
+    const title = bookDetail.value.title;
+    const author = bookDetail.value.authors ? bookDetail.value.authors.join(', ') : '不明';
+    const question = `「${title}」（著者: ${author}）の関連本や、似たようなジャンルのおすすめ本を検索して教えてください。`;
     
     // 発話をキャンセル
     window.speechSynthesis.cancel();
