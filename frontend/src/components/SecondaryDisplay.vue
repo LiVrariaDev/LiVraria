@@ -2,7 +2,6 @@
   <div class="relative w-screen h-screen overflow-hidden bg-black text-white font-sans">
     
     <!-- Video A (Buffer 1) -->
-    <!-- 修正: :loop="isLooping" を追加し、アクティブな時だけループ属性を有効化 -->
     <video 
       ref="videoA"
       class="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
@@ -26,16 +25,17 @@
       @error="handleVideoError"
     ></video>
 
-    <!-- 吹き出しレイヤー -->
-    <div class="absolute inset-0 z-20 flex flex-col items-center justify-end pb-16 pointer-events-none">
-      <transition name="fade">
-        <div v-if="currentMessage" class="max-w-5xl w-full mx-10">
-          <div class="bg-white/95 backdrop-blur-md text-gray-800 p-8 rounded-3xl shadow-2xl border-4 border-blue-100 relative">
-            <div class="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-8 h-8 bg-white/95 rotate-45 border-b-4 border-r-4 border-blue-100"></div>
-            <p class="text-4xl font-bold leading-relaxed text-center font-serif" v-html="currentMessage"></p>
-          </div>
-        </div>
-      </transition>
+    <!-- 字幕レイヤー -->
+    <div class="absolute inset-0 z-20 flex flex-col items-center justify-end pb-8 pointer-events-none">
+      <div class="w-full max-w-6xl px-8 min-h-[120px] flex flex-col justify-end">
+         <transition-group name="subtitle" tag="div" class="flex flex-col space-y-2 items-center">
+            <div v-for="line in visibleLines" :key="line.id" 
+                 class="bg-black/60 backdrop-blur-sm text-white px-6 py-2 rounded-xl text-2xl font-medium tracking-wide shadow-lg border border-white/10"
+                 style="text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">
+              {{ line.text }}
+            </div>
+         </transition-group>
+      </div>
     </div>
     
     <!-- フルスクリーン化ボタン -->
@@ -51,21 +51,33 @@
 import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 
 // --- 動画ファイルの定義 ---
-// ※ ファイル名が正しいか必ず確認してください
 const VIDEOS = {
+  // 通常 (Neutral)
   idle_loop: '/videos/idle_loop.mp4',
+  neutral_talking: '/videos/neutral_talking.mp4', // 今回は未使用
+
+  // 思考 (Thinking)
   thinking_start: '/videos/thinking_start.mp4',
+  thinking_talking: '/videos/thinking_talking.mp4', // 今回は未使用
   thinking_loop: '/videos/thinking_loop.mp4',
-  happy_action: '/videos/happy_action.mp4',
+  thinking_return: '/videos/thinking_return.mp4',
+
+  // 笑顔 (Happy)
+  happy_start: '/videos/happy_start.mp4',
+  happy_talking: '/videos/happy_talking.mp4', // 今回は未使用
+  happy_loop: '/videos/happy_loop.mp4',
   happy_return: '/videos/happy_return.mp4',
-  sorry_action: '/videos/sorry_action.mp4',
+
+  // 困り顔 (Sorry)
+  sorry_start: '/videos/sorry_start.mp4',
+  sorry_talking: '/videos/sorry_talking.mp4', // 今回は未使用
+  sorry_loop: '/videos/sorry_loop.mp4',
   sorry_return: '/videos/sorry_return.mp4',
-  neutral_action: '/videos/neutral_action.mp4',
-  neutral_return: '/videos/neutral_return.mp4',
 };
 
 // --- ステート管理 ---
-const currentMessage = ref('');
+const visibleLines = ref([]);
+const lineIdCounter = ref(0);
 const activeVideo = ref('A');
 const srcA = ref(VIDEOS.idle_loop);
 const srcB = ref('');
@@ -73,25 +85,93 @@ const videoA = ref(null);
 const videoB = ref(null);
 
 const playbackQueue = ref([]);
-const isLooping = ref(true); // 現在再生中の動画をループさせるか
+const isLooping = ref(true); 
+const currentEmotion = ref('neutral'); 
+
 const channel = new BroadcastChannel('livraria_channel');
+
+// --- テキスト処理ロジック ---
+const processTextLines = async (text) => {
+    if (!text) return;
+    
+    // 既存の表示をクリア（あるいは継続させるか？今回は新規発話でクリアする方針）
+    visibleLines.value = [];
+    
+    // 句読点で分割 (。、！ ？ \n)
+    // ただし、分割しすぎると読みづらいので、ある程度の長さでまとめるのが理想だが、
+    // まずは単純に句点と改行で分割し、読点はそのままにするか、長い場合は分割する。
+    // ここでは簡易的に「。, !, ?, \n」で分割し、「、」は分割しない方針で。
+    const rawLines = text.split(/([。！？\n]+)/).reduce((acc, curr, i, arr) => {
+        if (i % 2 === 0) { // 文言
+            if (curr.trim()) acc.push(curr);
+        } else { // 区切り文字
+             if (acc.length > 0) acc[acc.length - 1] += curr;
+        }
+        return acc;
+    }, []);
+
+    // 表示ロジック
+    // 一行ずつ遅延させて表示する
+    for (const lineText of rawLines) {
+        if (!lineText.trim()) continue;
+        
+        // ユニークID生成
+        const id = lineIdCounter.value++;
+        
+        // 配列に追加
+        visibleLines.value.push({ id, text: lineText });
+        
+        // 3行を超えたら古いものを消す
+        if (visibleLines.value.length > 3) {
+            visibleLines.value.shift();
+        }
+        
+        // 読み上げ速度に合わせてウェイトを入れる（簡易計算: 1文字 * 100ms? 少し早めで）
+        // 実際には音声の長さに合わせるのがベストだが、ここでは擬似的に。
+        // 長すぎると待たされるので、最大でも1.5秒くらい待つ
+        const waitTime = Math.min(lineText.length * 80, 1500); 
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+};
 
 // --- 通信受信 ---
 channel.onmessage = (event) => {
   const { type, text, state } = event.data;
   if (type !== 'chat') return;
   
-  console.log(`State received: ${state}, Text: ${text}`);
+  console.log(`[Secondary] Received state: ${state}, Text: ${text}, CurrentEmotion: ${currentEmotion.value}`);
 
   if (state === 'thinking') {
-    currentMessage.value = '';
+    visibleLines.value = [];
     startThinkingSequence();
-  } else if (state === 'idle') {
+  } 
+  else if (state === 'idle') {
     returnToIdle();
-  } else {
-    if (text) currentMessage.value = text;
-    playEmotionAction(state);
+  } 
+  else {
+    if (text) processTextLines(text);
+    // 修正: none が来たら強制的に neutral にする (二重防御)
+    let safeState = state;
+    if (!safeState || safeState === 'none') {
+        console.warn(`[Secondary] Invalid state '${safeState}' detected. Forcing to 'neutral'.`);
+        safeState = 'neutral';
+    }
+    playEmotionAction(safeState);
+
   }
+};
+
+// --- ヘルパー: 即時再生すべきか判定 ---
+const shouldPlayImmediately = () => {
+  const currentVideo = activeVideo.value === 'A' ? videoA.value : videoB.value;
+  // 1. ループ中ならいつでも割り込みOK
+  if (isLooping.value) return true;
+  
+  // 2. 動画プレイヤーが存在しない、または停止/終了しているならOK
+  if (!currentVideo || currentVideo.paused || currentVideo.ended) return true;
+  
+  // 3. それ以外（再生中のワンショット動画）は割り込まない
+  return false;
 };
 
 // --- 動画制御ロジック ---
@@ -102,14 +182,21 @@ const playNextInQueue = async () => {
   const nextVideoKey = playbackQueue.value.shift();
   const nextSrc = VIDEOS[nextVideoKey];
   
+  console.log(`[Secondary] Playing next: ${nextVideoKey}`);
+
   if (!nextSrc) {
     console.warn(`Video source not found: ${nextVideoKey}`);
+    if (playbackQueue.value.length > 0) playNextInQueue();
     return;
   }
 
-  // ループ設定の更新: ファイル名に 'loop' が含まれていればループ有効
-  // これにより <video :loop="..."> が反応し、ネイティブループになる
-  isLooping.value = nextVideoKey.includes('loop');
+  // 修正: キューに続きがある場合は、ループ動画であってもループさせない（1回再生後に次へ進むため）
+  const isLoopVideo = nextVideoKey.includes('loop');
+  if (playbackQueue.value.length > 0) {
+    isLooping.value = false;
+  } else {
+    isLooping.value = isLoopVideo;
+  }
 
   const nextPlayerId = activeVideo.value === 'A' ? 'B' : 'A';
   const nextPlayerRef = nextPlayerId === 'A' ? videoA : videoB;
@@ -123,9 +210,8 @@ const playNextInQueue = async () => {
   
   try {
     await player.play();
-    
-    // 切り替え
     activeVideo.value = nextPlayerId;
+    // videoChangeCount.value++; // カウンタ削除
     
     // 前のプレイヤーを停止
     const prevPlayer = nextPlayerId === 'A' ? videoB.value : videoA.value;
@@ -134,58 +220,118 @@ const playNextInQueue = async () => {
     
   } catch (e) {
     console.error("Play failed:", e);
+    if (playbackQueue.value.length > 0) playNextInQueue();
   }
 };
 
-// 再生終了時のハンドラ
-// ※ ネイティブループ有効時は発火しないため、ループしない動画の終了検知専用になる
 const handleVideoEnded = (playerId) => {
   if (playerId !== activeVideo.value) return;
 
   if (playbackQueue.value.length > 0) {
     playNextInQueue();
   } else {
-    // キューが空で、かつループ設定でない場合（アクション動画の最後など）
-    // 最後のフレームで停止したままにする（pause状態）
+    // キューが空
     if (!isLooping.value) {
       const current = activeVideo.value === 'A' ? videoA.value : videoB.value;
-      current.pause();
+      current.pause(); // 最後のフレームで停止
     }
   }
 };
 
-// --- シナリオ定義 ---
+// --- シナリオ遷移定義 ---
 
+// 1. 思考中へ遷移
 const startThinkingSequence = () => {
-  // 思考開始：現在の再生を中断して即座に遷移
+  currentEmotion.value = 'thinking';
+  
+  // 修正: talkingをスキップせず、start -> talking -> loop へ
   playbackQueue.value = [
     'thinking_start',
+    'thinking_talking',
     'thinking_loop'
   ];
-  playNextInQueue(); // 強制割り込み再生
+  // 存在しないキーを除外
+  playbackQueue.value = playbackQueue.value.filter(key => VIDEOS[key]);
+  
+  if (shouldPlayImmediately()) {
+    playNextInQueue();
+  }
 };
 
+// 2. 感情発話アクションへ遷移 (回答受信時)
 const playEmotionAction = (emotion) => {
-  let actionKey = 'neutral_action';
-  if (emotion === 'happy') actionKey = 'happy_action';
-  if (emotion === 'sorry') actionKey = 'sorry_action';
-  if (emotion === 'thinking') actionKey = 'thinking_loop';
+  let transitionQueue = [];
   
-  playbackQueue.value = [actionKey];
-  playNextInQueue(); // 強制割り込み再生
+  if (currentEmotion.value === 'thinking') {
+    transitionQueue.push('thinking_return');
+  } else if (currentEmotion.value !== 'neutral' && currentEmotion.value !== emotion) {
+    const returnKey = `${currentEmotion.value}_return`;
+    if (VIDEOS[returnKey]) transitionQueue.push(returnKey);
+  }
+
+  currentEmotion.value = emotion;
+  let actionSequence = [];
+
+  // 修正: talkingをスキップせず、start -> talking -> loop へ
+  if (emotion === 'happy') {
+    actionSequence = ['happy_start', 'happy_talking', 'happy_loop'];
+  } else if (emotion === 'sorry') {
+    actionSequence = ['sorry_start', 'sorry_talking', 'sorry_loop'];
+  } else if (emotion === 'neutral') {
+    // neutralの場合もtalkingを挟む
+    actionSequence = ['neutral_talking', 'idle_loop'];
+  } else {
+    actionSequence = ['idle_loop'];
+  }
+
+  playbackQueue.value = [...transitionQueue, ...actionSequence];
+  
+  if (shouldPlayImmediately()) {
+    playNextInQueue();
+  }
 };
 
+// 3. 待機へ戻る (発話終了時)
 const returnToIdle = () => {
-  const returnKey = 'neutral_return'; 
-  
-  playbackQueue.value = [
-    returnKey,
-    'idle_loop'
-  ];
-  
-  // ここでは強制割り込みせず、現在のアクション（発話）が終わるのを待つ
-  // もし現在がループ動画（思考中など）なら強制遷移させる
-  if (isLooping.value) {
+  let returnSequence = [];
+  const emotion = currentEmotion.value;
+
+  // 各感情に対応するループ動画とリターンシーケンスを定義
+  let loopVideo = '';
+
+  if (emotion === 'happy') {
+    loopVideo = 'happy_loop';
+    returnSequence = ['happy_return', 'idle_loop'];
+  } else if (emotion === 'sorry') {
+    loopVideo = 'sorry_loop';
+    returnSequence = ['sorry_return', 'idle_loop'];
+  } else if (emotion === 'thinking') {
+    loopVideo = 'thinking_loop';
+    returnSequence = ['thinking_return', 'idle_loop'];
+  } else {
+    // neutralの場合
+    returnSequence = ['idle_loop'];
+  }
+
+  currentEmotion.value = 'neutral';
+
+  // 修正: キュー内に「その感情のループ動画」がまだ残っているか確認
+  // 残っている場合＝まだその感情の再生が始まっていない、または途中
+  // この場合は、キューを上書きせず、ループ動画の後にリターンシーケンスを追記する
+  const loopIndex = playbackQueue.value.indexOf(loopVideo);
+
+  if (loopIndex !== -1) {
+    // ループ動画までは維持し、その後にリターンシーケンスを結合
+    const preservedQueue = playbackQueue.value.slice(0, loopIndex + 1);
+    playbackQueue.value = [...preservedQueue, ...returnSequence];
+  } else {
+    // ループ動画がない（すでに再生中、または存在しない）場合は、通常通りリターンシーケンスで上書き
+    playbackQueue.value = returnSequence;
+  }
+
+  console.log(`[Secondary] Return queue:`, playbackQueue.value);
+
+  if (shouldPlayImmediately()) {
     playNextInQueue();
   }
 };
@@ -194,7 +340,7 @@ const returnToIdle = () => {
 onMounted(async () => {
   const player = videoA.value;
   player.src = VIDEOS.idle_loop;
-  isLooping.value = true; // 初期状態はループ
+  isLooping.value = true;
   await nextTick();
   player.play().catch(e => console.log("Init play error", e));
   videoB.value.src = "";
@@ -218,13 +364,24 @@ const toggleFullscreen = () => {
 </script>
 
 <style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.5s ease, transform 0.5s ease;
+.subtitle-move,
+.subtitle-enter-active,
+.subtitle-leave-active {
+  transition: all 0.5s ease;
 }
-.fade-enter-from,
-.fade-leave-to {
+
+.subtitle-enter-from {
   opacity: 0;
   transform: translateY(20px);
+}
+
+.subtitle-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
+/* 削除される要素がスライドの邪魔にならないように */
+.subtitle-leave-active {
+  position: absolute;
 }
 </style>

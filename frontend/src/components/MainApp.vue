@@ -10,10 +10,6 @@
         />
 
         <!-- ===== ホームページ表示 ===== -->
-        <div v-if="currentPage === 'member_info'" class="w-full h-full">
-            <MemberInfoPage :onBack="() => currentPage = 'home'" />
-        </div>
-
         <div v-if="currentPage === 'home'" class="relative flex flex-col w-full h-full overflow-hidden">
             <!-- 背景画像エリア -->
             <div class="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700"
@@ -39,26 +35,26 @@
                 </div>
 
                 <!-- ボタンエリア (2x2 グリッド) -->
-                <div class="grid grid-cols-2 gap-6 w-full max-w-5xl">
+                <div class="grid grid-cols-2 gap-8 w-full max-w-5xl">
                     <button v-for="button in mainButtons" :key="button.id" 
                             @click="handleHomeButtonClick(button.action)"
-                            class="group relative overflow-hidden rounded-2xl transition-all duration-300 flex flex-col items-center justify-center h-48 w-full
-                                   bg-transparent border-2 border-white/40 backdrop-blur-sm
-                                   hover:bg-white hover:border-white hover:shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:-translate-y-1">
+                            class="group relative overflow-hidden rounded-3xl transition-all duration-300 flex flex-col items-center justify-center h-48 w-full
+                                   bg-transparent border-4 border-white/60 backdrop-blur-sm
+                                   hover:bg-white hover:border-white hover:shadow-[0_0_50px_rgba(255,255,255,0.5)] hover:-translate-y-2">
                         
                         <div class="relative z-10 flex flex-col items-center space-y-4">
                             <!-- アイコン -->
                             <div class="p-4 rounded-full transition-colors duration-300
-                                        text-white/80 bg-white/10
-                                        group-hover:text-slate-800 group-hover:bg-slate-200">
+                                        text-white
+                                        group-hover:text-slate-900 group-hover:bg-slate-200/50">
                                 <!-- アイコンサイズ調整 -->
-                                <span v-if="button.icon === 'search'" class="block transform scale-125" v-html="icons.search"></span>
-                                <span v-else-if="button.icon === 'chat'" class="block transform scale-125" v-html="icons.chat"></span>
-                                <span v-else-if="button.icon === 'grid'" class="block transform scale-125" v-html="icons.grid"></span>
-                                <span v-else class="block transform scale-125" v-html="icons.star"></span>
+                                <span v-if="button.icon === 'search'" class="block transform scale-150" v-html="icons.search"></span>
+                                <span v-else-if="button.icon === 'chat'" class="block transform scale-150" v-html="icons.chat"></span>
+                                <span v-else-if="button.icon === 'card'" class="block transform scale-150" v-html="icons.card"></span>
+                                <span v-else class="block transform scale-150" v-html="icons.star"></span>
                             </div>
                             <!-- テキスト -->
-                            <span class="text-3xl font-bold tracking-wide transition-colors duration-300
+                            <span class="text-4xl font-bold tracking-wide transition-colors duration-300
                                          text-white
                                          group-hover:text-slate-900">
                                 {{ button.text }}
@@ -105,6 +101,30 @@
                     </button>
                 </div>
             </div>
+        </div>
+
+        <!-- ===== 蔵書検索モード表示 ===== -->
+        <div v-if="currentPage === 'search_mode'" class="flex flex-col h-screen bg-slate-50">
+            <header class="bg-white/90 backdrop-blur border-b border-slate-200 p-4 px-8 flex justify-between items-center shadow-sm z-20">
+                <div class="flex items-center space-x-3">
+                    <span class="text-2xl">📚</span>
+                    <h1 class="text-xl font-bold text-slate-700">蔵書検索</h1>
+                </div>
+                <div class="flex space-x-3">
+                    <button @click="currentPage = 'home'" class="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">
+                        <span>🏠</span> <span>ホームへ</span>
+                    </button>
+                </div>
+            </header>
+            
+            <div class="flex-1 overflow-auto">
+                <BookSearch />
+            </div>
+        </div>
+
+        <!-- ===== 会員情報モード表示 ===== -->
+        <div v-if="currentPage === 'member_info'" class="w-full h-full">
+            <MemberInfoPage :onBack="() => currentPage = 'home'" />
         </div>
 
         <!-- ===== 会話集中モード表示 ===== -->
@@ -370,6 +390,7 @@ const icons = {
     search: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>`,
     chat: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>`,
     grid: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>`,
+    card: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"></path></svg>`,
     star: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>`
 };
 
@@ -381,7 +402,7 @@ const currentSessionId = ref(null);
 const mainButtons = ref([ 
     { id: 1, text: '書籍検索', action: 'search', icon: 'search' }, 
     { id: 2, text: '会話集中モード', action: 'focus_chat', icon: 'chat' }, 
-    { id: 3, text: '会員情報', action: 'member_info', icon: 'grid' },  
+    { id: 3, text: '会員情報', action: 'member_info', icon: 'card' },  
     { id: 4, text: 'グッドスナイパー', action: 'good_sniper', icon: 'star' }
 ]);
 const utilityButtons = ref([ { id: 6, text: 'オプション', action: 'options' } ]); 
@@ -473,7 +494,8 @@ const sendHomeMessage = async () => {
         
         const aiResponse = data.response || data.reply || data.message || '';
         // 2. 受信時：表情フラグと回答を送信
-        const expression = data.expression || 'neutral';
+        let expression = data.expression || data.current_expression || 'neutral';
+        if (expression === 'none') expression = 'neutral';
         
         speakText(aiResponse);
         sendMessageToSecondary(aiResponse, expression);
@@ -516,7 +538,8 @@ const sendChatMessage = async () => {
         if (data.session_id) currentSessionId.value = data.session_id;
         
         const aiResponse = data.response || data.reply || data.message || '';
-        const expression = data.expression || 'neutral';
+        let expression = data.expression || 'neutral';
+        if (expression === 'none') expression = 'neutral';
         
         chatHistory.value.push({ sender: 'ai', text: aiResponse });
         speakText(aiResponse);
@@ -606,7 +629,8 @@ const askAboutBookFromModal = async () => {
         if (data.session_id) currentSessionId.value = data.session_id;
         
         const aiResponse = data.response || data.reply || data.message || '';
-        const expression = data.expression || 'neutral';
+        let expression = data.expression || 'neutral';
+        if (expression === 'none') expression = 'neutral';
         
         chatHistory.value.push({ sender: 'ai', text: aiResponse });
         speakText(aiResponse);
