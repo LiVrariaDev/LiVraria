@@ -341,6 +341,17 @@ const handleHomeButtonClick = (action) => {
     }
 };
 
+const updateSuggestedBooks = (books) => {
+    if (books && books.length > 0) {
+        suggestedBooks.value = books.map((book, index) => ({
+            id: book.isbn || index, // ISBNがあればそれ、なければインデックス
+            title: book.title,
+            cover: book.image_url || `https://placehold.co/150x220/3b82f6/ffffff?text=NoImage`,
+            ...book
+        }));
+    }
+};
+
 const sendHomeMessage = async () => {
     const user = auth.currentUser;
     if (!user) {
@@ -373,6 +384,9 @@ const sendHomeMessage = async () => {
         
         speakText(aiResponse);
         sendMessageToSecondary(aiResponse, expression);
+        
+        // 推薦図書の更新
+        updateSuggestedBooks(data.recommended_books);
         
     } catch (error) {
         console.error(error);
@@ -414,6 +428,9 @@ const sendChatMessage = async () => {
         chatHistory.value.push({ sender: 'ai', text: aiResponse });
         speakText(aiResponse);
         sendMessageToSecondary(aiResponse, expression);
+
+        // 推薦図書の更新
+        updateSuggestedBooks(data.recommended_books);
         
     } catch (error) {
         console.error(error);
@@ -456,6 +473,9 @@ const askAboutBook = async () => {
         chatHistory.value.push({ sender: 'ai', text: aiResponse });
         speakText(aiResponse);
         sendMessageToSecondary(aiResponse, expression);
+        
+        // 推薦図書の更新
+        updateSuggestedBooks(data.recommended_books);
 
     } catch (error) {
         console.error(error);
