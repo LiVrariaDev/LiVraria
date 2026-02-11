@@ -314,9 +314,14 @@ class DataStore:
 		"""
 		self.sessions[session_id] = history
 		
-		# 最終アクセス時刻を更新
+		# 最終アクセス時刻を更新し、ステータスをactiveにする
 		if session_id in self.conversations:
-			self.conversations[session_id].last_accessed = datetime.now()
+			conv = self.conversations[session_id]
+			conv.last_accessed = datetime.now()
+			# pauseから復帰した場合などを考慮してactiveにする
+			if conv.status != ChatStatus.active:
+				conv.status = ChatStatus.active
+
 
 	def close_session(self, session_id: str) -> None:
 		"""

@@ -279,12 +279,19 @@ class Server:
 			# タイムアウト回避のため、各セッションの処理をtry-exceptで囲む
 			for session_id in session_ids:
 				try:
-					# サーバー終了時は時間かかっても良いので、ここで要約とAI Insights生成を行う
-					logger.info(f"[INFO] Generating insights for session: {session_id}")
-					self.data_store.generate_summary_and_insights(session_id)
+					# セッションの状態を確認
+					conv = self.data_store.conversations.get(session_id)
+					if conv and conv.status == ChatStatus.active:
+						# activeなセッションのみ要約とAI Insights生成を行う
+						logger.info(f"[INFO] Generating insights for session: {session_id}")
+						self.data_store.generate_summary_and_insights(session_id)
+					else:
+						# pause等の場合は生成スキップ（前回生成済みのはず）
+						logger.info(f"[INFO] Skipping insights generation for non-active session: {session_id}")
 					
 					# その後、セッションをpause（保存）
 					self.data_store.pause_session(session_id)
+
 				except Exception as e:
 					logger.error(f"[ERROR] Session save failed: {session_id}, Error: {e}")
 			logger.info(f"[SUCCESS] Saved {len(session_ids)} session(s)")
@@ -370,11 +377,26 @@ class Server:
 		# セッション確保
 		session_id = request.session_id
 		logger.info(f"[DEBUG] chat_prompt: request.session_id = {session_id}")
+		
+		# session_idが指定されていない場合、ユーザーの既存のアクティブセッションを探す
 		if session_id is None:
-			# user_id を渡して active_session を in-memory 更新する
-			session_id = self.data_store.create_session(user_id)
-			logger.info(f"[DEBUG] chat_prompt: created session_id = {session_id}")
-			history = []
+			user = self.data_store.get_user(user_id)
+			if user and user.active_session and self.data_store.has_session(user.active_session):
+				# 既存セッションを再開
+				session_id = user.active_session
+				logger.info(f"[INFO] Resuming existing session: {session_id}")
+				# pause状態ならactiveに戻す
+				self.data_store.resume_session(session_id)
+			else:
+				# 既存セッションがなければ新規作成
+				session_id = self.data_store.create_session(user_id)
+				logger.info(f"[INFO] Created new session: {session_id}")
+			
+			# 履歴を取得（新規なら空）
+			if self.data_store.has_session(session_id):
+				history = self.data_store.get_history(session_id)
+			else:
+				history = []
 		else:
 			if not self.data_store.has_session(session_id):
 				raise HTTPException(status_code=404, detail="Session not found")

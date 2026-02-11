@@ -81,7 +81,7 @@ def get_llm(backend: str = None, temperature: float = 0.3, max_tokens: int = 512
 # Tools Definition
 
 @tool
-def search_books(keywords: list[str], count: int = 10) -> str:
+def search_books(keywords: list[str], count: int = 30) -> str:
 	"""
 	楽天Books APIを使って書籍を検索
 	
@@ -199,7 +199,7 @@ def create_system_prompt(base_prompt: str, ai_insight: Optional[str] = None) -> 
 
 ## 書籍推薦の手順
 
-1. ユーザーの要望を理解し、適切なキーワードで `search_books` を実行
+1. ユーザーの要望を理解し、適切なキーワードで `search_books` を実行（**20冊以上**検索すること）
 2. 検索結果から、ユーザーに最適な本を3冊程度選択
 3. `recommend_books` ツールを使って、選んだ本の番号と推薦理由を送信
 4. 推薦理由を**簡潔に**説明（1冊あたり1文程度）。詳細は画面に表示されるので不要です。
@@ -400,6 +400,13 @@ def llm_chat(
 		
 		# AI応答メッセージオブジェクト作成
 		ai_message = AIMessage(content=response_text)
+
+		# 応答に関数名が含まれる場合（ツール呼び出しの幻覚など）、エラーメッセージにする
+		# 再帰呼び出しは無限ループのリスクがあるため、安全なフォールバックメッセージを返す
+		if "search_books" in response_text or "recommend_books" in response_text:
+			logger.warning("[WARNING] Response contains raw function name, replacing with fallback message.")
+			response_text = "申し訳ございません。応答の生成中にエラーが発生しました。もう一度お試しください。"
+			ai_message = AIMessage(content=response_text)
 		
 		updated_history = history + [current_message, ai_message]
 		
