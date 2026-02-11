@@ -254,12 +254,12 @@
                             
                             <!-- 追加: QRコード表示エリア -->
                             <div v-if="qrCodeUrl" class="mb-4 p-4 bg-slate-50 rounded-xl flex items-center space-x-4 border border-slate-100">
-                                <div class="bg-white p-2 rounded-lg shadow-sm">
+                                <div class="bg-white p-2 rounded-lg shadow-sm cursor-pointer hover:opacity-80 transition-opacity" @click="showingEnlargedQRCode = true">
                                     <img :src="qrCodeUrl" alt="商品ページQRコード" class="w-20 h-20">
                                 </div>
                                 <div class="flex-1">
                                     <p class="font-bold text-slate-700 text-sm">楽天ブックスで詳細を見る</p>
-                                    <p class="text-xs text-slate-500 mt-1">スマホでQRコードを読み取ると、商品ページにアクセスできます。</p>
+                                    <p class="text-xs text-slate-500 mt-1">スマホでQRコードを読み取ると、商品ページにアクセスできます。<br><span class="text-blue-500 cursor-pointer" @click="showingEnlargedQRCode = true">クリックで拡大</span></p>
                                 </div>
                             </div>
 
@@ -272,6 +272,18 @@
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
+
+        <!-- 追加: QRコード拡大表示モーダル -->
+        <Teleport to="body">
+            <Transition name="fade">
+                <div v-if="showingEnlargedQRCode" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 cursor-pointer" @click="showingEnlargedQRCode = false">
+                    <div class="relative bg-white p-6 rounded-3xl animate-bounce-in max-w-[90vw] max-h-[80vh] flex flex-col items-center" @click.stop>
+                        <img :src="qrCodeUrl" alt="拡大QRコード" class="max-w-[80vw] max-h-[60vh] object-contain">
+                        <p class="mt-4 text-center text-slate-500 font-bold text-sm sm:text-base">読み取り終わったら背景をクリックして閉じる</p>
                     </div>
                 </div>
             </Transition>
@@ -530,6 +542,7 @@ import QRCode from 'qrcode'; // 追加
 const showingBookDetail = ref(false);
 const bookDetail = ref(null);
 const qrCodeUrl = ref(''); // 追加: QRコードのURL
+const showingEnlargedQRCode = ref(false); // 追加: QRコード拡大表示フラグ
 
 const openBookDetail = async (book) => {
     bookDetail.value = book;
