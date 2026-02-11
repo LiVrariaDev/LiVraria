@@ -449,7 +449,7 @@ class Server:
 			response=response_text, 
 			session_id=session_id,
 			recommended_books=recommended_books,
-			current_expression=current_expression
+			expression=current_expression
 		)
 
 
