@@ -25,25 +25,19 @@
       @error="handleVideoError"
     ></video>
 
-    <!-- 吹き出しレイヤー -->
-    <div class="absolute inset-0 z-20 flex flex-col items-center justify-end pb-16 pointer-events-none">
-      <transition name="fade">
-        <div v-if="currentMessage" class="max-w-5xl w-full mx-10">
-          <div class="bg-white/95 backdrop-blur-md text-gray-800 p-8 rounded-3xl shadow-2xl border-4 border-blue-100 relative">
-            <div class="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-8 h-8 bg-white/95 rotate-45 border-b-4 border-r-4 border-blue-100"></div>
-            <p class="text-4xl font-bold leading-relaxed text-center font-serif" v-html="currentMessage"></p>
-          </div>
-        </div>
-      </transition>
+    <!-- 字幕レイヤー -->
+    <div class="absolute inset-0 z-20 flex flex-col items-center justify-end pb-8 pointer-events-none">
+      <div class="w-full max-w-6xl px-8 min-h-[120px] flex flex-col justify-end">
+         <transition-group name="subtitle" tag="div" class="flex flex-col space-y-2 items-center">
+            <div v-for="line in visibleLines" :key="line.id" 
+                 class="bg-black/60 backdrop-blur-sm text-white px-6 py-2 rounded-xl text-2xl font-medium tracking-wide shadow-lg border border-white/10"
+                 style="text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">
+              {{ line.text }}
+            </div>
+         </transition-group>
+      </div>
     </div>
     
-    <!-- Debug Counter -->
-    <div class="absolute top-4 right-4 z-50 bg-black/50 text-white p-2 rounded text-xl font-mono border border-white/30 pointer-events-none">
-        Count: {{ videoChangeCount }}<br>
-        State: {{ currentEmotion }}<br>
-        Queue: {{ playbackQueue.length }}
-    </div>
-
     <!-- フルスクリーン化ボタン -->
     <button @click="toggleFullscreen" class="absolute bottom-4 right-4 z-50 p-2 bg-gray-800/50 rounded-full hover:bg-gray-800 text-white opacity-0 hover:opacity-100 transition-opacity pointer-events-auto">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -82,7 +76,8 @@ const VIDEOS = {
 };
 
 // --- ステート管理 ---
-const currentMessage = ref('');
+const visibleLines = ref([]);
+const lineIdCounter = ref(0);
 const activeVideo = ref('A');
 const srcA = ref(VIDEOS.idle_loop);
 const srcB = ref('');
@@ -92,9 +87,52 @@ const videoB = ref(null);
 const playbackQueue = ref([]);
 const isLooping = ref(true); 
 const currentEmotion = ref('neutral'); 
-const videoChangeCount = ref(0); // デバッグ用カウンタ
 
 const channel = new BroadcastChannel('livraria_channel');
+
+// --- テキスト処理ロジック ---
+const processTextLines = async (text) => {
+    if (!text) return;
+    
+    // 既存の表示をクリア（あるいは継続させるか？今回は新規発話でクリアする方針）
+    visibleLines.value = [];
+    
+    // 句読点で分割 (。、！ ？ \n)
+    // ただし、分割しすぎると読みづらいので、ある程度の長さでまとめるのが理想だが、
+    // まずは単純に句点と改行で分割し、読点はそのままにするか、長い場合は分割する。
+    // ここでは簡易的に「。, !, ?, \n」で分割し、「、」は分割しない方針で。
+    const rawLines = text.split(/([。！？\n]+)/).reduce((acc, curr, i, arr) => {
+        if (i % 2 === 0) { // 文言
+            if (curr.trim()) acc.push(curr);
+        } else { // 区切り文字
+             if (acc.length > 0) acc[acc.length - 1] += curr;
+        }
+        return acc;
+    }, []);
+
+    // 表示ロジック
+    // 一行ずつ遅延させて表示する
+    for (const lineText of rawLines) {
+        if (!lineText.trim()) continue;
+        
+        // ユニークID生成
+        const id = lineIdCounter.value++;
+        
+        // 配列に追加
+        visibleLines.value.push({ id, text: lineText });
+        
+        // 3行を超えたら古いものを消す
+        if (visibleLines.value.length > 3) {
+            visibleLines.value.shift();
+        }
+        
+        // 読み上げ速度に合わせてウェイトを入れる（簡易計算: 1文字 * 100ms? 少し早めで）
+        // 実際には音声の長さに合わせるのがベストだが、ここでは擬似的に。
+        // 長すぎると待たされるので、最大でも1.5秒くらい待つ
+        const waitTime = Math.min(lineText.length * 80, 1500); 
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+};
 
 // --- 通信受信 ---
 channel.onmessage = (event) => {
@@ -104,14 +142,14 @@ channel.onmessage = (event) => {
   console.log(`[Secondary] Received state: ${state}, Text: ${text}, CurrentEmotion: ${currentEmotion.value}`);
 
   if (state === 'thinking') {
-    currentMessage.value = '';
+    visibleLines.value = [];
     startThinkingSequence();
   } 
   else if (state === 'idle') {
     returnToIdle();
   } 
   else {
-    if (text) currentMessage.value = text;
+    if (text) processTextLines(text);
     // 修正: none が来たら強制的に neutral にする (二重防御)
     let safeState = state;
     if (!safeState || safeState === 'none') {
@@ -152,7 +190,13 @@ const playNextInQueue = async () => {
     return;
   }
 
-  isLooping.value = nextVideoKey.includes('loop');
+  // 修正: キューに続きがある場合は、ループ動画であってもループさせない（1回再生後に次へ進むため）
+  const isLoopVideo = nextVideoKey.includes('loop');
+  if (playbackQueue.value.length > 0) {
+    isLooping.value = false;
+  } else {
+    isLooping.value = isLoopVideo;
+  }
 
   const nextPlayerId = activeVideo.value === 'A' ? 'B' : 'A';
   const nextPlayerRef = nextPlayerId === 'A' ? videoA : videoB;
@@ -167,7 +211,7 @@ const playNextInQueue = async () => {
   try {
     await player.play();
     activeVideo.value = nextPlayerId;
-    videoChangeCount.value++; // カウンタを加算
+    // videoChangeCount.value++; // カウンタ削除
     
     // 前のプレイヤーを停止
     const prevPlayer = nextPlayerId === 'A' ? videoB.value : videoA.value;
@@ -200,9 +244,10 @@ const handleVideoEnded = (playerId) => {
 const startThinkingSequence = () => {
   currentEmotion.value = 'thinking';
   
-  // 修正: talkingをスキップし、start -> loop へ直結
+  // 修正: talkingをスキップせず、start -> talking -> loop へ
   playbackQueue.value = [
     'thinking_start',
+    'thinking_talking',
     'thinking_loop'
   ];
   // 存在しないキーを除外
@@ -227,14 +272,14 @@ const playEmotionAction = (emotion) => {
   currentEmotion.value = emotion;
   let actionSequence = [];
 
-  // 修正: talkingをスキップし、start -> loop へ直結
+  // 修正: talkingをスキップせず、start -> talking -> loop へ
   if (emotion === 'happy') {
-    actionSequence = ['happy_start', 'happy_loop'];
+    actionSequence = ['happy_start', 'happy_talking', 'happy_loop'];
   } else if (emotion === 'sorry') {
-    actionSequence = ['sorry_start', 'sorry_loop'];
+    actionSequence = ['sorry_start', 'sorry_talking', 'sorry_loop'];
   } else if (emotion === 'neutral') {
-    // neutralの場合は特定のstartモーションがないため、基本待機(idle_loop)に戻す
-    actionSequence = ['idle_loop'];
+    // neutralの場合もtalkingを挟む
+    actionSequence = ['neutral_talking', 'idle_loop'];
   } else {
     actionSequence = ['idle_loop'];
   }
@@ -319,13 +364,24 @@ const toggleFullscreen = () => {
 </script>
 
 <style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.5s ease, transform 0.5s ease;
+.subtitle-move,
+.subtitle-enter-active,
+.subtitle-leave-active {
+  transition: all 0.5s ease;
 }
-.fade-enter-from,
-.fade-leave-to {
+
+.subtitle-enter-from {
   opacity: 0;
   transform: translateY(20px);
+}
+
+.subtitle-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
+/* 削除される要素がスライドの邪魔にならないように */
+.subtitle-leave-active {
+  position: absolute;
 }
 </style>
