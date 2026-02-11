@@ -349,8 +349,8 @@ class Server:
 						ai_insight = ai_insights_text
 
 		# LLMバックエンドを使用してチャット
-		# llm_chatは (response_text, new_history, recommended_books) を返す
-		response_text, new_history, recommended_books = chat_function(
+		# llm_chatは (response_text, new_history, recommended_books, current_expression) を返す
+		response_text, new_history, recommended_books, current_expression = chat_function(
 			prompt_file, 
 			request.message, 
 			history, 
@@ -362,11 +362,13 @@ class Server:
 		
 		logger.info(f"[DEBUG] chat_prompt returning session_id: {session_id}")
 		logger.info(f"[DEBUG] recommended_books count: {len(recommended_books)}")
-		
+		logger.info(f"[DEBUG] current_expression: {current_expression}")
+
 		return ChatResponse(
 			response=response_text, 
 			session_id=session_id,
-			recommended_books=recommended_books
+			recommended_books=recommended_books,
+			current_expression=current_expression
 		)
 
 

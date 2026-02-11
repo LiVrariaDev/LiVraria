@@ -1,7 +1,7 @@
 <template>
     <div class="w-screen h-screen font-sans text-gray-800 bg-gray-900">
 
-        <!-- ===== 診断用（画面には表示されませんが、裏で画像をチェックします） ===== -->
+        <!-- ===== 診断用 ===== -->
         <img 
             src="/bg.jpg" 
             style="display: none;" 
@@ -15,93 +15,102 @@
         </div>
 
         <!-- ===== ホームページ表示 ===== -->
-        <div v-if="currentPage === 'home'" class="relative flex w-full h-full overflow-hidden">
+        <div v-if="currentPage === 'home'" class="relative flex flex-col w-full h-full overflow-hidden">
             <!-- 背景画像エリア -->
             <div class="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700"
-                 :style="{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('/bg.jpg?v=2')` }">
+                 :style="{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), url('/bg.jpg?v=2')` }">
             </div>
 
-            <!-- 左側: アバターと会話エリア -->
-            <div class="relative z-10 w-1/3 flex flex-col items-center justify-center p-8">
-                <div class="relative group">
-                    <!-- アバター本体 -->
-                    <div class="avatar-container relative w-64 h-80 flex items-center justify-center transition-transform duration-500">
-                        <div class="avatar-glow absolute inset-0 bg-gradient-to-tr from-blue-400 to-purple-400 rounded-[60%_40%_30%_70%/60%_30%_70%_40%] blur-xl opacity-30 animate-pulse-slow"></div>
-                        <div class="avatar-shape w-full h-full bg-gradient-to-br from-white to-blue-50 border-4 border-blue-200 shadow-2xl flex items-center justify-center overflow-hidden relative animate-float">
-                            <svg class="w-32 h-32 text-blue-300 opacity-50" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+            <!-- 
+                メインコンテンツエリア (全画面使用) 
+                修正: pb-72 (padding-bottom) を大きくして、コンテンツ全体を上に押し上げる
+            -->
+            <div class="relative z-10 flex-grow flex flex-col items-center justify-center w-full px-12 pt-12 pb-72">
+                
+                <!-- ステータス表示エリア (ボタンの上に配置) -->
+                <div class="h-24 mb-8 flex items-center justify-center w-full">
+                    <div v-if="isRecording" class="flex items-center space-x-6 animate-pulse bg-black/40 px-8 py-4 rounded-full border border-red-500/30 backdrop-blur-md">
+                        <div class="p-3 bg-red-500 rounded-full shadow-[0_0_20px_rgba(239,68,68,0.8)]">
+                            <svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                             </svg>
                         </div>
+                        <span class="text-3xl font-bold text-white tracking-widest drop-shadow-md">LISTENING...</span>
                     </div>
-                    
-                    <!-- 吹き出し -->
-                    <div class="speech-bubble absolute -top-12 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur border border-blue-100 rounded-2xl p-6 shadow-lg min-w-[280px] text-center z-20 transition-all duration-300 hover:scale-105">
-                        <p v-if="isRecording" class="font-bold text-red-500 animate-pulse">
-                            🎤 お話しください...
-                        </p>
-                        <p v-else-if="!isLoading" class="font-medium text-gray-700 leading-relaxed" v-html="homeConversationText"></p>
-                        <div v-else class="flex justify-center items-center space-x-2 h-6">
-                            <div class="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
-                            <div class="w-2 h-2 bg-blue-400 rounded-full animate-bounce delay-75"></div>
-                            <div class="w-2 h-2 bg-blue-400 rounded-full animate-bounce delay-150"></div>
+                    <div v-else-if="isLoading" class="flex items-center space-x-6 bg-black/40 px-8 py-4 rounded-full border border-blue-500/30 backdrop-blur-md">
+                        <div class="p-3 bg-blue-500 rounded-full shadow-[0_0_20px_rgba(59,130,246,0.8)] animate-spin-slow">
+                            <svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
                         </div>
-                        <div class="absolute -bottom-3 left-1/2 transform -translate-x-1/2 w-6 h-6 bg-white border-b border-r border-blue-100 rotate-45"></div>
+                        <span class="text-3xl font-bold text-white tracking-widest drop-shadow-md animate-pulse">THINKING...</span>
+                    </div>
+                    <!-- 通常時はタイトルを表示 -->
+                    <div v-else class="text-center opacity-80 hover:opacity-100 transition-opacity duration-500">
+                        <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-purple-200 tracking-tight drop-shadow-sm">LiVraria Menu</h1>
                     </div>
                 </div>
-            </div>
 
-            <!-- 右側: ボタンエリア -->
-            <div class="relative z-10 w-2/3 flex flex-col justify-center px-16">
-                <h1 class="text-4xl font-bold text-white mb-8 tracking-tight drop-shadow-md">Main Menu</h1>
-                <div class="grid grid-cols-2 gap-6 max-w-2xl">
+                <!-- 
+                    ボタンエリア 
+                    修正: max-h-[55vh] に少し縮めて間延びを防ぎつつ、上部に配置
+                -->
+                <div class="grid grid-cols-2 gap-8 w-full max-w-7xl flex-grow max-h-[55vh]">
                     <button v-for="button in mainButtons" :key="button.id" 
                             @click="handleHomeButtonClick(button.action)"
-                            class="group relative overflow-hidden bg-white/90 backdrop-blur-sm p-6 rounded-2xl shadow-lg hover:shadow-2xl border border-white/50 transition-all duration-300 hover:-translate-y-1 text-left">
-                        <div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-50 to-transparent rounded-bl-full opacity-50 transition-transform group-hover:scale-150"></div>
-                        <div class="relative z-10 flex items-center space-x-4">
-                            <div class="p-3 rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
-                                <span v-if="button.icon === 'search'" v-html="icons.search"></span>
-                                <span v-else-if="button.icon === 'chat'" v-html="icons.chat"></span>
-                                <span v-else-if="button.icon === 'grid'" v-html="icons.grid"></span>
-                                <span v-else v-html="icons.star"></span>
+                            class="group relative overflow-hidden rounded-3xl shadow-xl transition-all duration-300 flex flex-col items-center justify-center h-full w-full
+                                   bg-transparent border-2 border-white/50 backdrop-blur-sm
+                                   hover:bg-white hover:border-white hover:shadow-[0_0_50px_rgba(255,255,255,0.4)] hover:-translate-y-2">
+                        
+                        <!-- コンテンツ -->
+                        <div class="relative z-10 flex flex-col items-center space-y-6">
+                            <!-- アイコン: 通常は白っぽく、ホバー時は青く -->
+                            <div class="p-8 rounded-full bg-white/10 text-white group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors duration-300 shadow-inner group-hover:shadow-lg group-hover:scale-110 transform transition-transform">
+                                <span v-if="button.icon === 'search'" class="block transform scale-150" v-html="icons.search"></span>
+                                <span v-else-if="button.icon === 'chat'" class="block transform scale-150" v-html="icons.chat"></span>
+                                <span v-else-if="button.icon === 'grid'" class="block transform scale-150" v-html="icons.grid"></span>
+                                <span v-else class="block transform scale-150" v-html="icons.star"></span>
                             </div>
-                            <span class="text-lg font-bold text-slate-700 group-hover:text-blue-600 transition-colors">{{ button.text }}</span>
+                            <!-- テキスト: 通常は白、ホバー時は濃い色 -->
+                            <span class="text-4xl font-bold text-white group-hover:text-slate-800 transition-colors tracking-wide drop-shadow-md group-hover:drop-shadow-none">{{ button.text }}</span>
                         </div>
                     </button>
                 </div>
             </div>
 
             <!-- 下部: 入力とオプションエリア -->
-            <div class="absolute bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-white/20 p-6 flex items-center shadow-lg z-20">
-                <div class="flex-grow mx-8 relative flex items-center">
+            <div class="absolute bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-md border-t border-white/10 p-6 flex items-center shadow-2xl z-20 h-24">
+                <div class="flex-grow mx-8 relative flex items-center max-w-4xl">
                     <button @click="toggleSpeechRecognition" 
-                            class="mr-2 p-3 rounded-full transition-colors duration-200 focus:outline-none"
-                            :class="isRecording ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'">
+                            class="mr-4 p-4 rounded-full transition-all duration-200 focus:outline-none shadow-lg hover:scale-105 active:scale-95 border border-white/10"
+                            :class="isRecording ? 'bg-red-600 text-white hover:bg-red-700 animate-pulse' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'">
                         <svg v-if="!isRecording" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
                         <svg v-else class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
                     </button>
 
                     <input type="text" v-model="userInput" @keydown.enter.prevent="sendHomeMessage" 
                            placeholder="AI司書に話しかける..."
-                           class="w-full bg-white/80 border border-slate-300 rounded-full py-4 px-6 pl-6 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all shadow-inner text-lg">
+                           class="w-full bg-gray-800 border border-gray-600 rounded-full py-4 px-6 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all shadow-inner text-lg">
                 </div>
-                <div class="flex space-x-4 mr-8 items-center">
-                      <!-- 動画ウィンドウボタン -->
-                      <button @click="openSecondaryDisplay" class="flex items-center px-4 py-3 bg-teal-50 hover:bg-teal-100 text-teal-700 font-semibold rounded-full transition-colors duration-200 border border-teal-200 shadow-sm">
-                        <span class="mr-2">📺</span> 動画ウィンドウ
-                      </button>
+                
+                <div class="flex-grow"></div> <!-- スペーサー -->
 
-                      <button @click="toggleSpeech" class="flex items-center px-4 py-3 mr-2 bg-white hover:bg-slate-100 text-slate-600 font-semibold rounded-full transition-colors duration-200 shadow-sm" :class="{'text-blue-500': isSpeechEnabled}">
+                <div class="flex space-x-4 mr-8 items-center">
+                     <button @click="openSecondaryDisplay" class="flex items-center px-6 py-3 bg-teal-600/20 hover:bg-teal-600/40 text-teal-300 font-bold rounded-xl transition-colors duration-200 border border-teal-500/30">
+                        <span class="mr-2 text-xl">📺</span> 動画ウィンドウ
+                     </button>
+
+                     <button @click="toggleSpeech" class="flex items-center px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl transition-colors duration-200 border border-gray-600" :class="{'text-blue-400 border-blue-500/50': isSpeechEnabled}">
                         <span v-if="isSpeechEnabled">🔊 ON</span>
                         <span v-else>🔇 OFF</span>
                       </button>
 
                       <button v-for="button in utilityButtons" :key="button.id"
                              @click="handleHomeButtonClick(button.action)"
-                             class="flex items-center px-6 py-3 bg-white hover:bg-slate-100 text-slate-600 font-semibold rounded-full transition-colors duration-200 shadow-sm">
+                             class="flex items-center px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl transition-colors duration-200 border border-gray-600">
                         <span class="mr-2">⚙️</span> {{ button.text }}
                     </button>
-                    <button @click="logout" class="flex items-center px-6 py-3 bg-red-50 hover:bg-red-100 text-red-600 font-semibold rounded-full transition-colors duration-200 border border-red-200 shadow-sm">
+                    <button @click="logout" class="flex items-center px-6 py-3 bg-red-900/30 hover:bg-red-900/50 text-red-400 font-bold rounded-xl transition-colors duration-200 border border-red-800/50">
                         <span>🚪</span> ログアウト
                     </button>
                 </div>
@@ -229,16 +238,13 @@ import BookSearch from './BookSearch.vue';
 import MemberInfoPage from './MemberInfoPage.vue';
 // import bgImage from '../assets/bg.jpg';
 
-// --- 診断用関数 ---
 const handleImageError = () => {
     alert("【画像読み込みエラー】\n publicフォルダに 'bg.jpg' が見つかりません。");
 };
 const handleImageLoad = () => {
     console.log("画像の読み込みに成功しました！");
 };
-// ----------------
 
-// --- 音声合成の実装（女性ボイス固定） ---
 const isSpeechEnabled = ref(true);
 const selectedVoice = ref(null);
 
@@ -270,38 +276,38 @@ const speakText = (text) => {
     if (!text) return;
     if (!isSpeechEnabled.value) return;
     if (!window.speechSynthesis) return;
-    // 修正：テキストが空の場合は何もしない（undefinedエラー回避）
     if (!text) return;
 
     if (!selectedVoice.value) loadVoices();
 
-    // 修正：文字列であることを確認してからreplaceする
     const plainText = typeof text === 'string' ? text.replace(/<[^>]+>/g, '') : '';
-    
-    if (!plainText) return; // 空なら終了
+    if (!plainText) return;
 
     const utterance = new SpeechSynthesisUtterance(plainText);
     if (selectedVoice.value) utterance.voice = selectedVoice.value;
     utterance.lang = 'ja-JP';
     utterance.rate = 1.0;
-    utterance.pitch = 1.0; 
-    utterance.volume = 1.0;
+    
+    // 発話終了時に「待機(idle)」ステートを送信
+    utterance.onend = () => {
+        sendMessageToSecondary(null, 'idle');
+    };
+
     window.speechSynthesis.speak(utterance);
 };
-// ---------------------
 
+// アイコンサイズを w-12 h-12 に拡大
 const icons = {
-    search: `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>`,
-    chat: `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>`,
-    grid: `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>`,
-    star: `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>`
+    search: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>`,
+    chat: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>`,
+    grid: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>`,
+    star: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>`
 };
 
 const currentPage = ref('home');
 const userInput = ref('');
 const isLoading = ref(false);
 const secondaryWindow = ref(null);
-const homeConversationText = ref('AI司書に接続中...');
 const currentSessionId = ref(null); 
 const mainButtons = ref([ 
     { id: 1, text: '書籍検索', action: 'search', icon: 'search' }, 
@@ -317,7 +323,7 @@ const suggestedBooks = ref(Array.from({ length: 6 }, (_, i) => ({ id: i + 1, tit
 const selectedBook = ref(null);
 const chatHistoryEl = ref(null);
 
-const channel = new BroadcastChannel('livraria_channel'); // チャンネル作成
+const channel = new BroadcastChannel('livraria_channel'); 
 
 const openSecondaryDisplay = () => {
     if (secondaryWindow.value && !secondaryWindow.value.closed) {
@@ -352,9 +358,8 @@ const handleHomeButtonClick = (action) => {
         sendMessageToSecondary(msg);
     } else {
         const msg = `「${action}」機能は準備中です。`;
-        homeConversationText.value = msg;
         speakText(msg);
-        sendMessageToSecondary(msg);
+        sendMessageToSecondary(msg, 'neutral');
     }
 };
 
@@ -362,14 +367,16 @@ const sendHomeMessage = async () => {
     const user = auth.currentUser;
     if (!user) {
         const msg = 'エラー：ログインしてください。';
-        homeConversationText.value = msg;
         speakText(msg);
-        sendMessageToSecondary(msg);
+        sendMessageToSecondary(msg, 'neutral');
         return;
     }
     const message = userInput.value;
     userInput.value = '';
     isLoading.value = true;
+
+    // 1. 送信直後：思考中ステートを送信 (テキストは空でOK、セカンダリ側で消去される)
+    sendMessageToSecondary('', 'thinking');
 
     try {
         const token = await getIdToken(user);
@@ -377,19 +384,18 @@ const sendHomeMessage = async () => {
         
         if (data.session_id) currentSessionId.value = data.session_id;
         
-        // 修正：APIレスポンスのキー名の不一致に対応
         const aiResponse = data.response || data.reply || data.message || '';
+        // 2. 受信時：表情フラグと回答を送信
+        const expression = data.expression || 'neutral';
         
-        homeConversationText.value = aiResponse;
         speakText(aiResponse);
-        sendMessageToSecondary(aiResponse);
+        sendMessageToSecondary(aiResponse, expression);
         
     } catch (error) {
         console.error(error);
         const msg = 'エラーが発生しました。';
-        homeConversationText.value = msg;
         speakText(msg);
-        sendMessageToSecondary(msg);
+        sendMessageToSecondary(msg, 'sorry');
     } finally {
         isLoading.value = false;
     }
@@ -407,22 +413,26 @@ const sendChatMessage = async () => {
     scrollToBottom();
     isLoading.value = true;
 
+    // 1. 送信直後：思考中ステートを送信
+    sendMessageToSecondary('', 'thinking');
+
     try {
         const token = await getIdToken(user);
         const data = await api.sendMessage(currentSessionId.value, message, token, 'default');
         
         if (data.session_id) currentSessionId.value = data.session_id;
         
-        // 修正：APIレスポンスのキー名の不一致に対応
         const aiResponse = data.response || data.reply || data.message || '';
+        const expression = data.expression || 'neutral';
         
         chatHistory.value.push({ sender: 'ai', text: aiResponse });
         speakText(aiResponse);
-        sendMessageToSecondary(aiResponse);
+        sendMessageToSecondary(aiResponse, expression);
         
     } catch (error) {
         console.error(error);
         chatHistory.value.push({ sender: 'ai', text: 'エラーが発生しました。' });
+        sendMessageToSecondary('エラーです', 'sorry');
     } finally {
         isLoading.value = false;
         scrollToBottom();
@@ -442,6 +452,7 @@ const askAboutBook = async () => {
     if (!user) return;
     
     isLoading.value = true;
+    sendMessageToSecondary('', 'thinking'); 
 
     try {
         const token = await getIdToken(user);
@@ -449,16 +460,17 @@ const askAboutBook = async () => {
         
         if (data.session_id) currentSessionId.value = data.session_id;
         
-        // 修正：APIレスポンスのキー名の不一致に対応
         const aiResponse = data.response || data.reply || data.message || '';
+        const expression = data.expression || 'neutral';
         
         chatHistory.value.push({ sender: 'ai', text: aiResponse });
         speakText(aiResponse);
-        sendMessageToSecondary(aiResponse);
+        sendMessageToSecondary(aiResponse, expression);
 
     } catch (error) {
         console.error(error);
         chatHistory.value.push({ sender: 'ai', text: 'エラーが発生しました。' });
+        sendMessageToSecondary('エラーです', 'sorry');
     } finally {
         isLoading.value = false;
         scrollToBottom();
@@ -482,18 +494,16 @@ const fetchUserGreeting = async () => {
         const token = await getIdToken(user);
         const userData = await api.getUser(user.uid, token);
         
-        // バックエンドがデータを返さなかった場合のフォールバック
         const userName = userData.name || user.email || 'ゲスト';
         const greeting = `ようこそ、${userName}さん！<br>今日はどんな本をお探しですか？`;
         
-        homeConversationText.value = greeting;
         isLoading.value = false;
         
         let attempts = 0;
         const speakGreeting = () => {
             if (selectedVoice.value || attempts > 10) {
                 speakText(greeting);
-                sendMessageToSecondary(greeting);
+                sendMessageToSecondary(greeting, 'neutral');
             } else {
                 attempts++;
                 setTimeout(speakGreeting, 100);
@@ -503,7 +513,6 @@ const fetchUserGreeting = async () => {
 
     } catch (error) {
         console.error('挨拶情報の取得に失敗しました:', error);
-        homeConversationText.value = '接続エラー';
         isLoading.value = false;
     }
 };
@@ -544,11 +553,13 @@ onUnmounted(() => {
 
 <style>
 /* アニメーション定義 */
-.avatar-shape { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
-@keyframes float { 0%, 100% { transform: translateY(0px); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; } 50% { transform: translateY(-15px); border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; } }
-.animate-float { animation: float 6s ease-in-out infinite; }
-@keyframes pulse-slow { 0%, 100% { transform: scale(1); opacity: 0.3; } 50% { transform: scale(1.1); opacity: 0.5; } }
-.animate-pulse-slow { animation: pulse-slow 4s ease-in-out infinite; }
+.animate-spin-slow {
+  animation: spin 3s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }

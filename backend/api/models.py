@@ -28,6 +28,7 @@ class ChatResponse(BaseModel):
 	response: str
 	session_id: str
 	recommended_books: List[dict] = Field(default_factory=list, description="推薦された書籍リスト")
+	expression: str = Field("none", description="司書の表情ステータス")
 
 # Data Models
 # Message Class : 廃止, LangChainの方へ合わせる
