@@ -274,6 +274,9 @@ def create_agent_workflow(llm, tools):
 			second_last = messages[-2]
 			# ToolMessageかつ、search_booksの結果である場合（nameはToolNodeが設定する）
 			if isinstance(second_last, ToolMessage) and second_last.name == "search_books":
+				# 検索結果が0件（エラーメッセージ）の場合は、強制しない
+				if "申し訳ございません" in str(second_last.content):
+					return "end"
 				return "force_tool"
 				
 		return "end"
