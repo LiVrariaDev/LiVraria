@@ -9,6 +9,30 @@
       <MainApp v-if="user" />
       <Login v-else />
     </div>
+
+    <!-- 自動ログアウト警告モーダル -->
+    <transition name="fade">
+      <div v-if="showLogoutModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl border-4 border-red-500 text-center animate-pulse-border">
+          <div class="mb-6">
+            <svg class="w-16 h-16 mx-auto text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 class="text-2xl font-bold text-gray-800 mb-4">自動ログアウトします</h3>
+          <p class="text-gray-600 mb-6">
+            一定時間操作がなかったため、セキュリティ保護のためログアウトします。<br>
+            継続するには画面を操作してください。
+          </p>
+          <div class="text-5xl font-mono font-bold text-red-600 mb-8">
+            {{ countdownValue }}
+          </div>
+          <button @click="resetTimer" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-8 rounded-full transition-colors w-full">
+            キャンセル
+          </button>
+        </div>
+      </div>
+    </transition>
   </div>
   <div v-else class="flex items-center justify-center h-screen bg-gray-100">
       <p class="text-2xl font-semibold text-gray-700">読み込み中...</p>
@@ -16,8 +40,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
-import { onAuthStateChanged } from "firebase/auth";
+import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from './firebaseConfig';
 
 // コンポーネント
@@ -30,31 +54,113 @@ const isAuthReady = ref(false);
 const isSecondaryView = ref(false);
 let unsubscribe = null;
 
+// --- 自動ログアウト設定 ---
+// 本番設定: トータル3分 (2分50秒待機 + 10秒カウントダウン)
+const IDLE_TIMEOUT = 170 * 1000; // 警告が出るまでの時間 (ミリ秒)
+const COUNTDOWN_DURATION = 10;  // カウントダウンする秒数
+
+const showLogoutModal = ref(false);
+const countdownValue = ref(COUNTDOWN_DURATION);
+let idleTimer = null;
+let countdownInterval = null;
+
+// タイマーリセット（ユーザーの操作があった時に呼ぶ）
+const resetTimer = () => {
+  // ログインしていない、またはセカンダリ画面なら何もしない
+  if (!user.value || isSecondaryView.value) return;
+
+  // 既存のタイマーをクリア
+  if (idleTimer) clearTimeout(idleTimer);
+  if (countdownInterval) clearInterval(countdownInterval);
+
+  // モーダルを閉じてカウントダウンをリセット
+  showLogoutModal.value = false;
+  countdownValue.value = COUNTDOWN_DURATION;
+
+  // 新しい放置タイマーをセット
+  idleTimer = setTimeout(() => {
+    startCountdown();
+  }, IDLE_TIMEOUT);
+};
+
+// カウントダウン開始
+const startCountdown = () => {
+  showLogoutModal.value = true;
+  countdownValue.value = COUNTDOWN_DURATION;
+
+  countdownInterval = setInterval(() => {
+    countdownValue.value--;
+    if (countdownValue.value <= 0) {
+      performLogout();
+    }
+  }, 1000);
+};
+
+// ログアウト実行
+const performLogout = () => {
+  clearInterval(countdownInterval);
+  showLogoutModal.value = false;
+  signOut(auth).catch(error => console.error('Auto logout failed', error));
+  // タイマーのクリアは watch(user) 側で行われます
+};
+
+// イベントリスナーの登録/解除
+const setupActivityListeners = () => {
+  window.addEventListener('mousemove', resetTimer);
+  window.addEventListener('mousedown', resetTimer);
+  window.addEventListener('keydown', resetTimer);
+  window.addEventListener('scroll', resetTimer);
+  window.addEventListener('touchstart', resetTimer);
+};
+
+const removeActivityListeners = () => {
+  window.removeEventListener('mousemove', resetTimer);
+  window.removeEventListener('mousedown', resetTimer);
+  window.removeEventListener('keydown', resetTimer);
+  window.removeEventListener('scroll', resetTimer);
+  window.removeEventListener('touchstart', resetTimer);
+};
+
+// ユーザー状態の監視とタイマー制御
+watch(user, (newUser) => {
+  if (newUser && !isSecondaryView.value) {
+    // ログイン時: 監視開始
+    setupActivityListeners();
+    resetTimer();
+  } else {
+    // ログアウト時: 監視終了
+    removeActivityListeners();
+    if (idleTimer) clearTimeout(idleTimer);
+    if (countdownInterval) clearInterval(countdownInterval);
+    showLogoutModal.value = false;
+  }
+});
+
 onMounted(() => {
-  // URLパラメータをチェック (?view=secondary があるか？)
   const urlParams = new URLSearchParams(window.location.search);
   isSecondaryView.value = urlParams.get('view') === 'secondary';
 
-  // タブ名（タイトル）を設定
   if (isSecondaryView.value) {
     document.title = "Secondary Display";
   } else {
     document.title = "LiVraria Main";
   }
 
-  // セカンダリ画面でない場合のみ、認証監視を行う
   if (!isSecondaryView.value) {
     unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       user.value = currentUser;
       isAuthReady.value = true;
     });
   } else {
-    isAuthReady.value = true; // セカンダリの場合は即表示
+    isAuthReady.value = true;
   }
 });
 
 onUnmounted(() => {
   if (unsubscribe) unsubscribe();
+  removeActivityListeners();
+  if (idleTimer) clearTimeout(idleTimer);
+  if (countdownInterval) clearInterval(countdownInterval);
 });
 </script>
 
@@ -63,31 +169,33 @@ onUnmounted(() => {
 
 body {
     font-family: 'Inter', 'Noto Sans JP', sans-serif;
-    /* 修正：overflow: hidden を削除し、スクロールを許可 */
     margin: 0;
     overflow-y: auto; 
 }
 
-/* --- スクロールバーのカスタマイズ --- */
-/* 幅と高さ */
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+/* スクロールバー設定 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+
+/* フェードアニメーション */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
-/* トラック（背景） */
-::-webkit-scrollbar-track {
-    background: #f1f1f1; 
+/* 赤枠のパルスアニメーション（警告用） */
+@keyframes pulse-border {
+  0% { border-color: rgba(239, 68, 68, 0.5); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { border-color: rgba(239, 68, 68, 1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { border-color: rgba(239, 68, 68, 0.5); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
-
-/* つまみ部分 */
-::-webkit-scrollbar-thumb {
-    background: #c1c1c1; 
-    border-radius: 4px;
-}
-
-/* つまみのホバー時 */
-::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8; 
+.animate-pulse-border {
+  animation: pulse-border 2s infinite;
 }
 </style>
