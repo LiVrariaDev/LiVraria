@@ -407,8 +407,8 @@ def llm_chat(
 			response_text = "申し訳ございません。応答を生成できませんでした。"
 			logger.error("No AI message found in result: %s", result)
 		
-		# ツール呼び出しから表情を取得（なければ none）  
-		current_expression = "none"
+		# ツール呼び出しから表情を取得（なければ neutral）  
+		current_expression = "neutral"
 		for msg in result["messages"]:
 			if hasattr(msg, "tool_calls") and msg.tool_calls:
 				for tool_call in msg.tool_calls:
@@ -417,7 +417,8 @@ def llm_chat(
 						logger.info(f"[DEBUG] AI decided to change expression to: {current_expression}")
 						
 		if current_expression == "none":
-			logger.info("[DEBUG] No expression change detected, defaulting to none.")
+			current_expression = "neutral"
+			logger.info("[DEBUG] No expression change detected, defaulting to neutral.")
 
 		# 履歴を更新 (BaseMessageオブジェクトのリスト)
 		# ユーザーメッセージ追加済みリスト + AI応答
@@ -457,7 +458,7 @@ def llm_chat(
 			updated_history = history + [AIMessage(content=error_message)]
 			
 		# errorログは別で保存する → クライアント側に返すと脆弱
-		return error_message, updated_history, [], "none"
+		return error_message, updated_history, [], "neutral"
 
 
 def llm_summary(

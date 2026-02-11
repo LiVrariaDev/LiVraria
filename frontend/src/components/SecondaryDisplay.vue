@@ -37,6 +37,13 @@
       </transition>
     </div>
     
+    <!-- Debug Counter -->
+    <div class="absolute top-4 right-4 z-50 bg-black/50 text-white p-2 rounded text-xl font-mono border border-white/30 pointer-events-none">
+        Count: {{ videoChangeCount }}<br>
+        State: {{ currentEmotion }}<br>
+        Queue: {{ playbackQueue.length }}
+    </div>
+
     <!-- フルスクリーン化ボタン -->
     <button @click="toggleFullscreen" class="absolute bottom-4 right-4 z-50 p-2 bg-gray-800/50 rounded-full hover:bg-gray-800 text-white opacity-0 hover:opacity-100 transition-opacity pointer-events-auto">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -85,6 +92,7 @@ const videoB = ref(null);
 const playbackQueue = ref([]);
 const isLooping = ref(true); 
 const currentEmotion = ref('neutral'); 
+const videoChangeCount = ref(0); // デバッグ用カウンタ
 
 const channel = new BroadcastChannel('livraria_channel');
 
@@ -104,7 +112,14 @@ channel.onmessage = (event) => {
   } 
   else {
     if (text) currentMessage.value = text;
-    playEmotionAction(state);
+    // 修正: none が来たら強制的に neutral にする (二重防御)
+    let safeState = state;
+    if (!safeState || safeState === 'none') {
+        console.warn(`[Secondary] Invalid state '${safeState}' detected. Forcing to 'neutral'.`);
+        safeState = 'neutral';
+    }
+    playEmotionAction(safeState);
+
   }
 };
 
@@ -152,6 +167,7 @@ const playNextInQueue = async () => {
   try {
     await player.play();
     activeVideo.value = nextPlayerId;
+    videoChangeCount.value++; // カウンタを加算
     
     // 前のプレイヤーを停止
     const prevPlayer = nextPlayerId === 'A' ? videoB.value : videoA.value;
@@ -233,12 +249,19 @@ const playEmotionAction = (emotion) => {
 // 3. 待機へ戻る (発話終了時)
 const returnToIdle = () => {
   let returnSequence = [];
+  const emotion = currentEmotion.value;
 
-  if (currentEmotion.value === 'happy') {
+  // 各感情に対応するループ動画とリターンシーケンスを定義
+  let loopVideo = '';
+
+  if (emotion === 'happy') {
+    loopVideo = 'happy_loop';
     returnSequence = ['happy_return', 'idle_loop'];
-  } else if (currentEmotion.value === 'sorry') {
+  } else if (emotion === 'sorry') {
+    loopVideo = 'sorry_loop';
     returnSequence = ['sorry_return', 'idle_loop'];
-  } else if (currentEmotion.value === 'thinking') {
+  } else if (emotion === 'thinking') {
+    loopVideo = 'thinking_loop';
     returnSequence = ['thinking_return', 'idle_loop'];
   } else {
     // neutralの場合
@@ -246,7 +269,20 @@ const returnToIdle = () => {
   }
 
   currentEmotion.value = 'neutral';
-  playbackQueue.value = returnSequence;
+
+  // 修正: キュー内に「その感情のループ動画」がまだ残っているか確認
+  // 残っている場合＝まだその感情の再生が始まっていない、または途中
+  // この場合は、キューを上書きせず、ループ動画の後にリターンシーケンスを追記する
+  const loopIndex = playbackQueue.value.indexOf(loopVideo);
+
+  if (loopIndex !== -1) {
+    // ループ動画までは維持し、その後にリターンシーケンスを結合
+    const preservedQueue = playbackQueue.value.slice(0, loopIndex + 1);
+    playbackQueue.value = [...preservedQueue, ...returnSequence];
+  } else {
+    // ループ動画がない（すでに再生中、または存在しない）場合は、通常通りリターンシーケンスで上書き
+    playbackQueue.value = returnSequence;
+  }
 
   console.log(`[Secondary] Return queue:`, playbackQueue.value);
 

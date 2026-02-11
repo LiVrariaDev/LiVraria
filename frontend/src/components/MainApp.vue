@@ -399,7 +399,8 @@ const sendHomeMessage = async () => {
         
         const aiResponse = data.response || data.reply || data.message || '';
         // 2. 受信時：表情フラグと回答を送信
-        const expression = data.expression || data.current_expression || 'neutral';
+        let expression = data.expression || data.current_expression || 'neutral';
+        if (expression === 'none') expression = 'neutral';
         
         speakText(aiResponse);
         sendMessageToSecondary(aiResponse, expression);
@@ -442,7 +443,8 @@ const sendChatMessage = async () => {
         if (data.session_id) currentSessionId.value = data.session_id;
         
         const aiResponse = data.response || data.reply || data.message || '';
-        const expression = data.expression || 'neutral';
+        let expression = data.expression || 'neutral';
+        if (expression === 'none') expression = 'neutral';
         
         chatHistory.value.push({ sender: 'ai', text: aiResponse });
         speakText(aiResponse);
@@ -487,7 +489,8 @@ const askAboutBook = async () => {
         if (data.session_id) currentSessionId.value = data.session_id;
         
         const aiResponse = data.response || data.reply || data.message || '';
-        const expression = data.expression || 'neutral';
+        let expression = data.expression || 'neutral';
+        if (expression === 'none') expression = 'neutral';
         
         chatHistory.value.push({ sender: 'ai', text: aiResponse });
         speakText(aiResponse);
