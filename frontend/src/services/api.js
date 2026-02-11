@@ -1,4 +1,3 @@
-// 修正：プロキシ設定(vite.config.js)を利用するため、空文字にします
 const API_BASE_URL = ''
 
 export const api = {
@@ -10,7 +9,6 @@ export const api = {
      * ユーザー作成
      */
     async createUser(userData, idToken) {
-        // 修正：JSONボディとして送信する
         const response = await fetch(`${API_BASE_URL}/users`, {
             method: 'POST',
             headers: {
@@ -56,6 +54,22 @@ export const api = {
         return response.json()
     },
 
+    /*
+     * ユーザーログアウト
+     */
+    async logoutUser(userId, idToken) {
+        const response = await fetch(`${API_BASE_URL}/users/${userId}/logout`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            }
+        })
+
+        if (!response.ok) throw new Error('Failed to logout user')
+        return response.json()
+    },
+
     // ========================================
     // セッション・メッセージ関連API
     // ========================================
@@ -68,7 +82,6 @@ export const api = {
             ? `${API_BASE_URL}/sessions/${sessionId}/messages`
             : `${API_BASE_URL}/sessions/new/messages`
 
-        // 修正：JSONボディとして送信する
         // modeも念のためボディに含めます
         const response = await fetch(url, {
             method: 'POST',
@@ -159,7 +172,7 @@ export const api = {
         if (!response.ok) throw new Error('Failed to unregister NFC')
         return response.json()
     },
-    
+
     // ========================================
     // 蔵書検索関連API
     // ========================================
@@ -171,13 +184,13 @@ export const api = {
         const params = new URLSearchParams({ pref, limit });
         const response = await fetch(`${API_BASE_URL}/search/libraries?${params}`, {
             method: 'GET',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
                 // ★追加: 認証トークンをヘッダーにセット
                 'Authorization': `Bearer ${idToken}`
             }
         });
-        
+
         if (!response.ok) {
             throw new Error('Library search failed');
         }
@@ -191,7 +204,7 @@ export const api = {
         const params = new URLSearchParams({ isbn, systemid });
         const response = await fetch(`${API_BASE_URL}/search/books/availability?${params}`, {
             method: 'GET',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
                 // ★追加: 認証ヘッダー
                 'Authorization': `Bearer ${idToken}`
@@ -208,19 +221,13 @@ export const api = {
      * 本検索
      */
     // semantic=true にするとAIがキーワードを考えてくれる
-    /*
-     * 本検索
-     */
-    // semantic=true にするとAIがキーワードを考えてくれる
-    // 修正: 第2引数に idToken を追加しました
     async searchBooks(query, idToken, semantic = false) {
         // URLパラメータを生成（semanticもここに含める）
-        const params = new URLSearchParams({ 
-            q: query, 
-            semantic: semantic.toString() 
+        const params = new URLSearchParams({
+            q: query,
+            semantic: semantic.toString()
         });
-        
-        // 修正: params.toString() を使ってURLを組み立てるように変更
+
         const response = await fetch(`${API_BASE_URL}/books/search?${params.toString()}`, {
             method: 'GET',
             headers: {

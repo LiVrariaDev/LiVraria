@@ -6,7 +6,7 @@ import logging
 
 # LangChain
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage, ToolMessage
 from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_ollama import ChatOllama
@@ -81,7 +81,7 @@ def get_llm(backend: str = None, temperature: float = 0.3, max_tokens: int = 512
 # Tools Definition
 
 @tool
-def search_books(keywords: list[str], count: int = 10) -> str:
+def search_books(keywords: list[str], count: int = 30) -> str:
 	"""
 	楽天Books APIを使って書籍を検索
 	
@@ -96,7 +96,7 @@ def search_books(keywords: list[str], count: int = 10) -> str:
 		番号付き書籍リスト
 	"""
 	try:
-		logger.info(f"[DEBUG] search_books called with keywords: {keywords}, type: {type(keywords)}")
+		logger.info(f"[DEBUG] search_books called with keywords: {keywords}, count: {count}")
 		
 		# キーワードのバリデーション
 		if not keywords or not isinstance(keywords, list):
@@ -104,12 +104,14 @@ def search_books(keywords: list[str], count: int = 10) -> str:
 			return "検索キーワードが指定されていません。"
 		
 		# rakuten_search_booksは list[dict] を返す
-		books = rakuten_search_books(keywords, count)
+		books = rakuten_search_books(keywords, count, orflag=0) # AND検索
 		
 		if not books:
-			logger.error("No books found for keywords: %s", keywords)
-			return "申し訳ございません。該当する書籍が見つかりませんでした。"
-		
+			books = rakuten_search_books(keywords, count=max(count * 2, 30), orflag=1) # OR検索
+			if not books:
+				logger.error("No books found for keywords: %s", keywords)
+				return "申し訳ございません。該当する書籍が見つかりませんでした。"
+			
 		# グローバルステートに保存（番号 → 書籍データ）
 		_global_state["search_results"] = {i+1: book for i, book in enumerate(books)}
 		
@@ -123,7 +125,8 @@ def search_books(keywords: list[str], count: int = 10) -> str:
 			book_list.append(f"{i}. 『{title}』 - {author}")
 		
 		logger.info(f"[DEBUG] Found {len(books)} books")
-		return f"検索結果（{len(books)}冊）:\n" + "\n".join(book_list)
+		logger.info(f"[DEBUG] Found {len(books)} books")
+		return f"検索結果（{len(books)}冊）:\n" + "\n".join(book_list) + "\n\nこれらの結果から、ユーザーに合った本を選び、必ず `recommend_books` を呼び出してください。テキストで検索結果を要約しないでください。もし推薦する本がない場合は、空のリスト `[]` を引数にして `recommend_books` を呼び出してください。"
 		
 	except Exception as e:
 		logger.error(f"[ERROR] search_books error: {e}", exc_info=True)
@@ -174,9 +177,14 @@ def recommend_books(selections: list[dict]) -> str:
 		_global_state["recommended_books"] = recommended
 		
 		if recommended:
-			return f"{len(recommended)}冊の本を推薦しました。推薦理由と共にユーザーに提示してください。"
+			# LLMに返すメッセージを作成（番号を振り直して提示）
+			msg_lines = [f"{len(recommended)}冊の本を推薦リストに追加しました。以下の番号と情報を使って、ユーザーに推薦してください。"]
+			for i, book in enumerate(recommended, 1):
+				msg_lines.append(f"{i}. 『{book['title']}』 (理由: {book['recommendation_reason']})")
+			
+			return "\n".join(msg_lines)
 		else:
-			return "推薦する本が選択されませんでした。"
+			return "推薦する本が選択されませんでした。ユーザーに「条件に合う本が見つかりませんでした」と報告してください。"
 			
 	except Exception as e:
 		return f"推薦処理中にエラーが発生しました: {str(e)}"
@@ -206,10 +214,10 @@ def create_system_prompt(base_prompt: str, ai_insight: Optional[str] = None) -> 
 
 ## 書籍推薦の手順
 
-1. ユーザーの要望を理解し、適切なキーワードで `search_books` を実行
+1. ユーザーの要望を理解し、適切なキーワードで `search_books` を実行（**20冊以上**検索すること）
 2. 検索結果から、ユーザーに最適な本を3冊程度選択
 3. `recommend_books` ツールを使って、選んだ本の番号と推薦理由を送信
-4. 推薦理由をユーザーに分かりやすく説明
+4. 推薦理由を**簡潔に**説明（1冊あたり1文程度）。詳細は画面に表示されるので不要です。
 
 **重要**: 書籍情報（タイトル、著者など）は検索結果の番号で参照してください。
 書籍の詳細情報を自分で作成したり、変更したりしないでください。
@@ -228,34 +236,6 @@ def create_system_prompt(base_prompt: str, ai_insight: Optional[str] = None) -> 
 	
 	return full_prompt
 
-
-def messages_to_langchain(history: List[Dict[str, str]]) -> List[BaseMessage]:
-	"""辞書形式のメッセージ履歴をLangChainのメッセージに変換"""
-	langchain_messages = []
-	for msg in history:
-		role = msg.get("role", "user")
-		content = msg.get("content", "")
-		
-		if role == "user":
-			langchain_messages.append(HumanMessage(content=content))
-		elif role in ["assistant", "model"]:
-			langchain_messages.append(AIMessage(content=content))
-	
-	return langchain_messages
-
-
-def langchain_to_messages(langchain_messages: List[BaseMessage]) -> List[Dict[str, str]]:
-	"""LangChainのメッセージを辞書形式に変換"""
-	messages = []
-	for msg in langchain_messages:
-		if isinstance(msg, HumanMessage):
-			messages.append({"role": "user", "content": msg.content})
-		elif isinstance(msg, AIMessage):
-			messages.append({"role": "assistant", "content": msg.content})
-	
-	return messages
-
-
 # LangGraph Workflow
 
 def create_agent_workflow(llm, tools):
@@ -273,12 +253,29 @@ def create_agent_workflow(llm, tools):
 			raise ValueError("Messages list is empty in agent_node")
 		response = llm_with_tools.invoke(messages)
 		return {"messages": [response]}
+
+	def force_tool_node(state: AgentState):
+		"""強制的にツール呼び出しを促すノード"""
+		logger.info("[DEBUG] force_tool_node: Enforcing recommend_books call")
+		message = HumanMessage(content="検索結果から本を選んで、必ず `recommend_books` を呼び出してください。もし推薦する本がない場合は、空のリスト `[]` を引数にしてください。")
+		return {"messages": [message]}
 	
 	def should_continue(state: AgentState):
 		"""次のノードを決定"""
-		last_message = state["messages"][-1]
+		messages = state["messages"]
+		last_message = messages[-1]
+		
+		# ツール呼び出しがある場合
 		if hasattr(last_message, "tool_calls") and last_message.tool_calls:
 			return "tools"
+			
+		# 直前が検索結果(ToolMessage)で、今回ツール呼び出しをしなかった場合
+		if len(messages) >= 2:
+			second_last = messages[-2]
+			# ToolMessageかつ、search_booksの結果である場合（nameはToolNodeが設定する）
+			if isinstance(second_last, ToolMessage) and second_last.name == "search_books":
+				return "force_tool"
+				
 		return "end"
 	
 	# グラフ構築
@@ -287,6 +284,7 @@ def create_agent_workflow(llm, tools):
 	# ノード追加
 	workflow.add_node("agent", agent_node)
 	workflow.add_node("tools", ToolNode(tools))
+	workflow.add_node("force_tool", force_tool_node)
 	
 	# エントリーポイント設定
 	workflow.set_entry_point("agent")
@@ -297,10 +295,12 @@ def create_agent_workflow(llm, tools):
 		should_continue,
 		{
 			"tools": "tools",
+			"force_tool": "force_tool",
 			"end": END
 		}
 	)
 	workflow.add_edge("tools", "agent")
+	workflow.add_edge("force_tool", "agent")
 	
 	return workflow.compile()
 
@@ -310,26 +310,26 @@ def create_agent_workflow(llm, tools):
 def llm_chat(
 	prompt_file: str,
 	message: str,
-	history: Optional[List[Dict[str, str]]] = None,
+	history: Optional[List[BaseMessage]] = None,
 	ai_insight: Optional[str] = None,
 	model: Optional[str] = None,
 	temperature: float = 0.3,
 	max_tokens: int = 512
-) -> tuple[str, List[Dict[str, str]], List[dict]]:
+) -> tuple[str, List[BaseMessage], List[dict]]:
 	"""
 	LangGraphを使ったチャット対話
 	
 	Args:
 		prompt_file: プロンプトファイルのパス
 		message: ユーザーメッセージ
-		history: 会話履歴
+		history: 会話履歴 (List[BaseMessage])
 		ai_insight: ユーザー情報
 		model: 使用するLLMバックエンド
 		temperature: 温度パラメータ
 		max_tokens: 最大トークン数
 		
 	Returns:
-		(応答テキスト, 更新された履歴, 推薦された書籍リスト)
+		(応答テキスト, 更新された履歴(List[BaseMessage]), 推薦された書籍リスト)
 	"""
 	# グローバルステートをクリア
 	_global_state["search_results"] = {}
@@ -352,19 +352,22 @@ def llm_chat(
 	if history is None:
 		history = []
 	
-	langchain_history = messages_to_langchain(history)
-	logger.info(f"[DEBUG] History length: {len(history)}, LangChain history length: {len(langchain_history)}")
+	# historyは既にList[BaseMessage]なのでそのまま使用可能
+	# ただし、Geminiの場合はSystemMessageの使用方法に注意が必要だが、
+	# ここではHumanMessage/AIMessageのリストとして扱う
 	
 	# メッセージリストを構築
-	# Gemini APIではSystemMessageを使わず、最初のメッセージに含める
-	if not langchain_history:
+	if not history:
 		# 履歴がない場合: システムプロンプトを最初のメッセージに含める
 		first_message = f"{system_prompt}\n\n---\n\nユーザー: {message}"
-		messages = [HumanMessage(content=first_message)]
+		# HumanMessageオブジェクトを作成
+		current_message = HumanMessage(content=first_message)
+		messages = [current_message]
 		logger.info(f"[DEBUG] No history, created first message with system prompt")
 	else:
 		# 履歴がある場合: システムプロンプトは最初の会話で既に送信済みなので、通常のメッセージのみ
-		messages = langchain_history + [HumanMessage(content=message)]
+		current_message = HumanMessage(content=message)
+		messages = history + [current_message]
 		logger.info(f"[DEBUG] With history, messages count: {len(messages)}")
 	
 	logger.info(f"[DEBUG] Final messages for LangGraph: {len(messages)} messages")
@@ -395,6 +398,11 @@ def llm_chat(
 				response_text = ''.join(text_parts) if text_parts else str(last_message.content)
 			else:
 				response_text = str(last_message.content)
+			
+			# 空の応答の場合のフォールバック
+			if not response_text.strip():
+				logger.warning("[WARNING] Empty response from LLM")
+				response_text = "申し訳ございません。応答を生成できませんでした（空の応答）。"
 		else:
 			response_text = "申し訳ございません。応答を生成できませんでした。"
 			logger.error("No AI message found in result: %s", result)
@@ -407,16 +415,28 @@ def llm_chat(
 					if tool_call["name"] == "update_expression":
 						current_expression = tool_call["args"]["expression_type"]
 
-		# 履歴を更新
-		updated_history = history + [
-			{"role": "user", "content": message},
-			{"role": "assistant", "content": response_text}
-		]
+		# 履歴を更新 (BaseMessageオブジェクトのリスト)
+		# ユーザーメッセージ追加済みリスト + AI応答
+		# 注意: messages は既に [history + current_message] なので、これにAI応答を追加する形にはならない
+		# messages[-1] は最後のアクションの結果かもしれないので、
+		# 単純に history + [current_message] + [ai_message] を返すのが安全
+		
+		# AI応答メッセージオブジェクト作成
+		ai_message = AIMessage(content=response_text)
+
+		# 応答に関数名が含まれる場合（ツール呼び出しの幻覚など）、エラーメッセージにする
+		# 再帰呼び出しは無限ループのリスクがあるため、安全なフォールバックメッセージを返す
+		if "search_books" in response_text or "recommend_books" in response_text:
+			logger.warning("[WARNING] Response contains raw function name, replacing with fallback message.")
+			response_text = "申し訳ございません。応答の生成中にエラーが発生しました。もう一度お試しください。"
+			ai_message = AIMessage(content=response_text)
+		
+		updated_history = history + [current_message, ai_message]
 		
 		# 推薦された書籍を取得
 		recommended_books = _global_state.get("recommended_books", [])
 		
-		return response_text, updated_history, recommended_books,current_expression
+		return response_text, updated_history, recommended_books, current_expression
 		
 	except Exception as e:
 		import traceback
@@ -424,10 +444,14 @@ def llm_chat(
 		
 		error_message = "申し訳ございません。応答を生成できませんでした。"
 		logger.error(f"Error in llm_chat: {e}")
-		updated_history = history + [
-			{"role": "user", "content": message},
-			{"role": "assistant", "content": error_message}
-		]
+		
+		# エラー時も履歴オブジェクトを返す
+		ai_message = AIMessage(content=error_message)
+		if 'current_message' in locals():
+			updated_history = history + [current_message, ai_message]
+		else:
+			updated_history = history + [AIMessage(content=error_message)]
+			
 		# errorログは別で保存する → クライアント側に返すと脆弱
 		return error_message, updated_history, [], "none"
 
@@ -486,6 +510,7 @@ if __name__ == "__main__":
 	from backend import PROMPT_LIBRARIAN
 	
 	print("Testing LangGraph LLM chat...")
+	# historyはBaseMessageのリスト
 	response, history, recommended_books = llm_chat(
 		prompt_file=str(PROMPT_LIBRARIAN),
 		message=test_message,

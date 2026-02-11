@@ -115,11 +115,6 @@
             </button>
           </div>
 
-          <!-- モード切替ボタン -->
-          <button type="button" @click="toggleMode"
-                  class="text-sm text-indigo-600 hover:text-indigo-800 font-semibold focus:outline-none underline">
-            {{ isRegisterMode ? 'すでにアカウントをお持ちの方はログイン' : 'アカウントをお持ちでない方は新規登録' }}
-          </button>
           <!-- 3. 新規登録/ログイン切り替えリンク (一番下) -->
           <div class="pt-2">
              <button type="button" @click="toggleMode"
