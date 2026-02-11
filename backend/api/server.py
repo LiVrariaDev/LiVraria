@@ -7,10 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
 import uvicorn
+import asyncio
 
-from .models import ChatRequest, ChatResponse, Personal, ChatStatus, NfcIdRequest
+
+from .models import ChatRequest, ChatResponse, Personal, ChatStatus, UserStatus, NfcIdRequest
 from .datastore import DataStore
-from . import chat_function, LLM_BACKEND
+from .llm import llm_chat
+from . import LLM_BACKEND
+from langchain_core.messages import messages_to_dict
 
 # 検索機能
 from backend.api.routers import search
@@ -33,6 +37,23 @@ async def startup_event():
 		logger.info(f"🤖 [LLM Backend] Using Ollama (model: {os.getenv('OLLAMA_MODEL', 'llama3.2')})")
 	else:
 		logger.info("🤖 [LLM Backend] Using Gemini API")
+
+	# バックグラウンドでタイムアウト監視を開始
+	asyncio.create_task(monitor_timeouts())
+
+async def monitor_timeouts():
+	"""
+	60秒ごとにセッションのタイムアウトをチェックするバックグラウンドタスク
+	"""
+	while True:
+		try:
+			# ブロッキング処理（LLM呼び出し含む）なのでスレッドで実行
+			await asyncio.to_thread(data_store.check_user_timeout)
+		except Exception as e:
+			logger.error(f"[ERROR] Timeout monitor failed: {e}")
+		
+		await asyncio.sleep(60)
+
 
 # CORS設定（フロントエンドからのアクセスを許可）
 # 開発環境のオリジン（デフォルト）
@@ -145,6 +166,37 @@ class Server:
 			except ValueError as e:
 				raise HTTPException(status_code=400, detail=str(e))
 		
+		@self.app.post("/users/{user_id}/logout")
+		async def logout(
+			user_id: str, 
+			background_tasks: BackgroundTasks,
+			current_user_id: str = Depends(get_current_user_id)
+		):
+			"""
+			ユーザーをログアウトさせる（RESTful）。
+			自分自身の情報のみログアウト可能。
+			アクティブなセッションがあればクローズし、AI Insightsを生成する。
+			"""
+			# 自分自身の情報のみログアウト可能
+			if user_id != current_user_id:
+				raise HTTPException(status_code=403, detail="Forbidden")
+			
+			user = self.data_store.get_user(user_id)
+			if not user:
+				raise HTTPException(status_code=404, detail="User not found")
+			
+			# アクティブセッションの確認
+			session_id = user.active_session
+			if session_id:
+				# セッションをクローズ（これで user.status も logout になる）
+				self.data_store.close_session(session_id)
+				# ログアウト時は非同期でインサイト生成（ユーザーを待たせない）
+				background_tasks.add_task(self.data_store.generate_summary_and_insights, session_id)
+			else:
+				# セッションがない場合はステータスのみ更新
+				self.data_store.update_user(user_id, status=UserStatus.logout)
+			
+			return {"detail": "User logged out successfully"}
 
 		# NFC Authentication Endpoints
 		@self.app.post("/nfc/auth")
@@ -224,9 +276,22 @@ class Server:
 			"""サーバー終了時に全アクティブセッションを一時停止して保存"""
 			logger.info("[INFO] Server shutdown: Saving active sessions...")
 			session_ids = list(self.data_store.sessions.keys())
+			# タイムアウト回避のため、各セッションの処理をtry-exceptで囲む
 			for session_id in session_ids:
 				try:
+					# セッションの状態を確認
+					conv = self.data_store.conversations.get(session_id)
+					if conv and conv.status == ChatStatus.active:
+						# activeなセッションのみ要約とAI Insights生成を行う
+						logger.info(f"[INFO] Generating insights for session: {session_id}")
+						self.data_store.generate_summary_and_insights(session_id)
+					else:
+						# pause等の場合は生成スキップ（前回生成済みのはず）
+						logger.info(f"[INFO] Skipping insights generation for non-active session: {session_id}")
+					
+					# その後、セッションをpause（保存）
 					self.data_store.pause_session(session_id)
+
 				except Exception as e:
 					logger.error(f"[ERROR] Session save failed: {session_id}, Error: {e}")
 			logger.info(f"[SUCCESS] Saved {len(session_ids)} session(s)")
@@ -240,7 +305,10 @@ class Server:
 			# user_idとsession_idの組み合わせをチェック
 			if not self.data_store.has_user_session(user_id, session_id):
 				raise HTTPException(status_code=404, detail="Session not found")
-			return {"session_id": session_id, "history": self.data_store.get_history(session_id)}
+			
+			history_objs = self.data_store.get_history(session_id)
+			history_dicts = messages_to_dict(history_objs)
+			return {"session_id": session_id, "history": history_dicts}
 
 		@self.app.post("/sessions/{session_id}/messages", status_code=201)
 		async def send_message(
@@ -305,17 +373,30 @@ class Server:
 
 
 	async def chat_prompt(self, request: ChatRequest, prompt_file: str, user_id: str) -> ChatResponse:
-		# タイムアウトチェック（ユーザー単位）
-		self.data_store.check_user_timeout()
 		
 		# セッション確保
 		session_id = request.session_id
 		logger.info(f"[DEBUG] chat_prompt: request.session_id = {session_id}")
+		
+		# session_idが指定されていない場合、ユーザーの既存のアクティブセッションを探す
 		if session_id is None:
-			# user_id を渡して active_session を in-memory 更新する
-			session_id = self.data_store.create_session(user_id)
-			logger.info(f"[DEBUG] chat_prompt: created session_id = {session_id}")
-			history = []
+			user = self.data_store.get_user(user_id)
+			if user and user.active_session and self.data_store.has_session(user.active_session):
+				# 既存セッションを再開
+				session_id = user.active_session
+				logger.info(f"[INFO] Resuming existing session: {session_id}")
+				# pause状態ならactiveに戻す
+				self.data_store.resume_session(session_id)
+			else:
+				# 既存セッションがなければ新規作成
+				session_id = self.data_store.create_session(user_id)
+				logger.info(f"[INFO] Created new session: {session_id}")
+			
+			# 履歴を取得（新規なら空）
+			if self.data_store.has_session(session_id):
+				history = self.data_store.get_history(session_id)
+			else:
+				history = []
 		else:
 			if not self.data_store.has_session(session_id):
 				raise HTTPException(status_code=404, detail="Session not found")
@@ -350,7 +431,7 @@ class Server:
 
 		# LLMバックエンドを使用してチャット
 		# llm_chatは (response_text, new_history, recommended_books, current_expression) を返す
-		response_text, new_history, recommended_books, current_expression = chat_function(
+		response_text, new_history, recommended_books, current_expression = llm_chat(
 			prompt_file, 
 			request.message, 
 			history, 

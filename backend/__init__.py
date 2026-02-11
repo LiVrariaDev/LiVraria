@@ -79,6 +79,10 @@ NFC_USERS_FILE = Path(DATA_DIR, "nfc_users.json")
 # Prompt file paths
 # LLMバックエンドに応じてdefaultプロンプトを切り替え
 LLM_BACKEND = os.getenv("LLM_BACKEND", "gemini")
+# セッションタイムアウト時間（秒）
+# 30分 = 1800秒
+SESSION_TIMEOUT = int(os.getenv("SESSION_TIMEOUT", "1800"))
+
 if LLM_BACKEND == "ollama":
 	PROMPT_DEFAULT = Path(PROMPTS_DIR, os.getenv("PROMPT_DEFAULT", "default_llama.md"))
 	PROMPT_SUMMARY = Path(PROMPTS_DIR, os.getenv("PROMPT_SUMMARY", "summary_llama.md"))
