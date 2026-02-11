@@ -1,6 +1,6 @@
 <template>
   <!-- 認証状態の読み込みが完了するまで「読み込み中...」を表示 -->
-  <div v-if="isAuthReady">
+  <div v-if="isAuthReady" class="select-none">
     <!-- URLパラメータ '?view=secondary' がある場合はセカンダリディスプレイを表示 -->
     <SecondaryDisplay v-if="isSecondaryView" />
     

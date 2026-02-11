@@ -32,7 +32,10 @@ chromium \
   --window-position=0,0 \
   --autoplay-policy=no-user-gesture-required \
   --ozone-platform=x11 \
-  --user-data-dir="/tmp/chrome_main_profile" &
+  --user-data-dir="/tmp/chrome_main_profile" \
+  --touch-events=enabled \
+  --disable-touch-drag-drop \
+  --overscroll-history-navigation=0 &
 
 echo "Main display launched. Waiting for login and secondary window..."
 
