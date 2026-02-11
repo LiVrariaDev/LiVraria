@@ -10,7 +10,7 @@ import uvicorn
 import asyncio
 
 
-from .models import ChatRequest, ChatResponse, Personal, ChatStatus, NfcIdRequest
+from .models import ChatRequest, ChatResponse, Personal, ChatStatus, UserStatus, NfcIdRequest
 from .datastore import DataStore
 from .llm import llm_chat
 from . import LLM_BACKEND
