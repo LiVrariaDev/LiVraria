@@ -23,7 +23,7 @@ def genreid_to_genre(genre_id: str) -> str:
                 return genre["fullPath"]
         return ""
 
-def rakuten_search_books(keywords: list[str], count: int = 4, genre_id: str = "001") -> list[dict]:
+def rakuten_search_books(keywords: list[str], count: int = 10, genre_id: str = "001", orflag: int = 0) -> list[dict]:
     headers = {}
 
     params = {
@@ -33,6 +33,7 @@ def rakuten_search_books(keywords: list[str], count: int = 4, genre_id: str = "0
         "formatVersion": "2",
         "keyword": " ".join(keywords),
         "hits": min(count, 30),
+        "orFlag": orflag,
         "page": 1,
     }
 
@@ -48,6 +49,8 @@ def rakuten_search_books(keywords: list[str], count: int = 4, genre_id: str = "0
         publisher = item.get("publisherName")
         published_date = item.get("salesDate")  # YYYY-MM-DD形式
         isbn = item.get("isbn")
+        image_url = item.get("largeImageUrl") # 200x200商品画像
+        item_url = item.get("itemUrl")
         genre = item.get("booksGenreId")
 
         book_info = {
@@ -56,6 +59,8 @@ def rakuten_search_books(keywords: list[str], count: int = 4, genre_id: str = "0
             "publisher": publisher,
             "published_date": published_date,
             "isbn": isbn,
+            "image_url": image_url,
+            "item_url": item_url,
             "genre": genre
         }
         book_list.append(book_info)
@@ -85,7 +90,7 @@ def rakuten_search_info(isbn: str) -> dict:
     category = item.get("booksGenreId")  # ジャンルID
     review = item.get("reviewAverage")  # レビュー平均
     review_count = item.get("reviewCount")  # レビュー数
-    thumbnail_url = item.get("mediumImageUrl")  # 画像URL
+    thumbnail_url = item.get("largeImageUrl")  # 画像URL
     preview_url = item.get("itemUrl")  # 商品ページURL
     
     info_data = {
@@ -99,7 +104,7 @@ def rakuten_search_info(isbn: str) -> dict:
     return info_data
 
 if __name__ == "__main__":
-    books = rakuten_search_info("9784088807232")
+    books = rakuten_search_books(["Rust", "プログラミング"])
     pprint.pprint(books)
 
 def rakuten_search_books_random(keywords: list[str], count: int = 30) -> list[dict]:
@@ -116,9 +121,6 @@ def rakuten_search_books_random(keywords: list[str], count: int = 30) -> list[di
 
     headers = {}
     keyword_str = " ".join(keywords)
-
-    # BooksBook API (本・雑誌検索) を使用
-    url = "https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404"
     
     params = {
         "applicationId": app_id,
@@ -131,7 +133,7 @@ def rakuten_search_books_random(keywords: list[str], count: int = 30) -> list[di
     }
 
     try:
-        response = requests.get(url, headers=headers, params=params)
+        response = requests.get(RAKUTEN_BOOK_ENDPOINT, headers=headers, params=params)
         response.raise_for_status()
         json_data = response.json().get("Items", [])
         

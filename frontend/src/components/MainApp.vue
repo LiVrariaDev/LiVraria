@@ -185,6 +185,9 @@
                                     </div>
                                     <h3 class="mt-3 font-bold text-sm text-slate-700 text-center group-hover:text-blue-600 transition-colors line-clamp-2">{{ book.title }}</h3>
                                 </div>
+                                <div v-if="suggestedBooks.length === 0" class="col-span-3 text-center text-gray-400 py-10">
+                                    まだおすすめの本はありません
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -313,7 +316,7 @@ const utilityButtons = ref([ { id: 6, text: 'オプション', action: 'options'
 const chatHistory = ref([ 
     { sender: 'ai', text: 'こんにちは！AI司書です。本日はどのようなご用件でしょうか？' }
 ]);
-const suggestedBooks = ref(Array.from({ length: 6 }, (_, i) => ({ id: i + 1, title: `未来の図書館 ${i + 1}`, cover: `https://placehold.co/150x220/3b82f6/ffffff?text=Book${i+1}` })));
+const suggestedBooks = ref([]);
 const selectedBook = ref(null);
 const chatHistoryEl = ref(null);
 
@@ -358,6 +361,17 @@ const handleHomeButtonClick = (action) => {
     }
 };
 
+const updateSuggestedBooks = (books) => {
+    if (books && books.length > 0) {
+        suggestedBooks.value = books.map((book, index) => ({
+            id: book.isbn || index, // ISBNがあればそれ、なければインデックス
+            title: book.title,
+            cover: book.image_url || `https://placehold.co/150x220/3b82f6/ffffff?text=NoImage`,
+            ...book
+        }));
+    }
+};
+
 const sendHomeMessage = async () => {
     const user = auth.currentUser;
     if (!user) {
@@ -383,6 +397,9 @@ const sendHomeMessage = async () => {
         homeConversationText.value = aiResponse;
         speakText(aiResponse);
         sendMessageToSecondary(aiResponse);
+
+        // 推薦図書の更新
+        updateSuggestedBooks(data.recommended_books);
         
     } catch (error) {
         console.error(error);
@@ -419,6 +436,9 @@ const sendChatMessage = async () => {
         chatHistory.value.push({ sender: 'ai', text: aiResponse });
         speakText(aiResponse);
         sendMessageToSecondary(aiResponse);
+
+        // 推薦図書の更新
+        updateSuggestedBooks(data.recommended_books);
         
     } catch (error) {
         console.error(error);
@@ -455,6 +475,9 @@ const askAboutBook = async () => {
         chatHistory.value.push({ sender: 'ai', text: aiResponse });
         speakText(aiResponse);
         sendMessageToSecondary(aiResponse);
+
+        // 推薦図書の更新
+        updateSuggestedBooks(data.recommended_books);
 
     } catch (error) {
         console.error(error);

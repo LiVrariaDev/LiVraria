@@ -10,7 +10,8 @@ import uvicorn
 
 from .models import ChatRequest, ChatResponse, Personal, ChatStatus, NfcIdRequest
 from .datastore import DataStore
-from .llm import llm_chat, LLM_BACKEND
+from .llm import llm_chat
+from . import LLM_BACKEND
 from langchain_core.messages import messages_to_dict
 
 # 検索機能
@@ -225,8 +226,14 @@ class Server:
 			"""サーバー終了時に全アクティブセッションを一時停止して保存"""
 			logger.info("[INFO] Server shutdown: Saving active sessions...")
 			session_ids = list(self.data_store.sessions.keys())
+			# タイムアウト回避のため、各セッションの処理をtry-exceptで囲む
 			for session_id in session_ids:
 				try:
+					# サーバー終了時は時間かかっても良いので、ここで要約とAI Insights生成を行う
+					logger.info(f"[INFO] Generating insights for session: {session_id}")
+					self.data_store.generate_summary_and_insights(session_id)
+					
+					# その後、セッションをpause（保存）
 					self.data_store.pause_session(session_id)
 				except Exception as e:
 					logger.error(f"[ERROR] Session save failed: {session_id}, Error: {e}")
