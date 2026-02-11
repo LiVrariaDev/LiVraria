@@ -36,7 +36,18 @@ chromium \
 
 echo "Main display launched. Waiting for login and secondary window..."
 
-# 2. Secondaryウィンドウが開くまで待機（busy wait）
+# 2. Mainもフルスクリーン化
+sleep 2
+MAIN_ID=$(wmctrl -l | grep "LiVraria Main" | awk '{print $1}')
+if [ -n "$MAIN_ID" ]; then
+    wmctrl -i -r "$MAIN_ID" -e 0,0,0,-1,-1
+    wmctrl -i -r "$MAIN_ID" -b add,fullscreen
+    echo "Main display set to fullscreen."
+else
+    echo "Warning: Main display window not found."
+fi
+
+# 3. Secondaryウィンドウが開くまで待機（busy wait）
 MAX_WAIT=300  # 最大5分待機
 COUNTER=0
 
@@ -47,7 +58,7 @@ while [ $COUNTER -lt $MAX_WAIT ]; do
     if [ -n "$SEC_ID" ]; then
         echo "Secondary display detected: $SEC_ID"
         
-        # 3. Secondaryを右ディスプレイに移動してフルスクリーン化
+        # 4. Secondaryを右ディスプレイに移動してフルスクリーン化
         sleep 0.5  # ウィンドウが完全に表示されるまで少し待つ
         wmctrl -i -r "$SEC_ID" -e 0,$PRIMARY_WIDTH,0,-1,-1
         wmctrl -i -r "$SEC_ID" -b add,fullscreen
@@ -62,17 +73,6 @@ done
 
 if [ $COUNTER -eq $MAX_WAIT ]; then
     echo "Warning: Secondary display not detected within timeout."
-fi
-
-# 4. Mainもフルスクリーン化
-sleep 2
-MAIN_ID=$(wmctrl -l | grep "LiVraria Main" | awk '{print $1}')
-if [ -n "$MAIN_ID" ]; then
-    wmctrl -i -r "$MAIN_ID" -e 0,0,0,-1,-1
-    wmctrl -i -r "$MAIN_ID" -b add,fullscreen
-    echo "Main display set to fullscreen."
-else
-    echo "Warning: Main display window not found."
 fi
 
 echo "Livraria system is running."
