@@ -472,8 +472,17 @@ const scrollToBottom = async () => {
     if(chatHistoryEl.value) chatHistoryEl.value.scrollTop = chatHistoryEl.value.scrollHeight;
 };
 
-const logout = () => {
-  signOut(auth).catch(error => console.error('Logout failed', error));
+const logout = async () => {
+    const user = auth.currentUser;
+    if (user) {
+        try {
+            const token = await getIdToken(user);
+            await api.logoutUser(user.uid, token);
+        } catch (e) {
+            console.error("Backend logout failed:", e);
+        }
+  }
+    signOut(auth).catch(error => console.error('Logout failed', error));
 };
 
 const fetchUserGreeting = () => {

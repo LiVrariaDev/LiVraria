@@ -1,4 +1,4 @@
-const API_BASE_URL = ''
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
 export const api = {
     // ========================================
@@ -232,7 +232,7 @@ export const api = {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${idToken}` // これで正しくトークンが使われます
+                'Authorization': `Bearer ${idToken}`
             }
         })
 
