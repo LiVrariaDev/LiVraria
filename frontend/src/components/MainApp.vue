@@ -207,13 +207,108 @@
                             </div>
                         </div>
                     </div>
+                    <!-- モーダル化に伴い非表示化（必要なら削除） 
                      <button @click="askAboutBook" :disabled="!selectedBook"
                             class="mt-6 w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-xl hover:from-emerald-600 hover:to-teal-600 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed transition-all transform active:scale-95 flex items-center justify-center">
                         <span class="mr-2 text-xl">📖</span> この本について詳しく聞く
                     </button>
+                    -->
+                    <p class="mt-4 text-center text-sm text-slate-400">本をクリックして詳細を表示</p>
                 </div>
             </div>
         </div>
+
+        <!-- ===== 蔵書検索モード表示 ===== -->
+        <div v-if="currentPage === 'search_mode'" class="flex flex-col h-screen bg-slate-50">
+            <header class="bg-white/90 backdrop-blur border-b border-slate-200 p-4 px-8 flex justify-between items-center shadow-sm z-20">
+                <div class="flex items-center space-x-3">
+                    <span class="text-2xl">📚</span>
+                    <h1 class="text-xl font-bold text-slate-700">蔵書検索</h1>
+                </div>
+                <div class="flex space-x-3">
+                    <button @click="currentPage = 'home'" class="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">
+                        <span>🏠</span> <span>ホームへ</span>
+                    </button>
+                </div>
+            </header>
+            
+            <div class="flex-1 overflow-auto">
+                <BookSearch />
+            </div>
+        </div>
+
+        <!-- ===== 書籍詳細モーダル ===== -->
+        <Teleport to="body">
+            <Transition name="modal">
+                <div v-if="showingBookDetail && bookDetail" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" @click.self="closeBookDetail">
+                    <div class="modal-content bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row relative">
+                        
+                        <!-- 閉じるボタン -->
+                        <button @click="closeBookDetail" class="absolute top-4 right-4 z-10 p-2 bg-black/20 hover:bg-black/40 rounded-full text-white transition-colors">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+
+                        <!-- 左側: 画像エリア -->
+                        <div class="w-full md:w-1/3 bg-slate-100 p-8 flex items-center justify-center">
+                            <div class="relative w-48 aspect-[2/3] shadow-lg rotate-1 transform hover:rotate-0 transition-transform duration-500">
+                                <img :src="bookDetail.cover" :alt="bookDetail.title" class="w-full h-full object-cover rounded-sm">
+                                <div class="absolute inset-0 ring-1 ring-inset ring-black/10 rounded-sm"></div>
+                            </div>
+                        </div>
+
+                        <!-- 右側: 情報エリア -->
+                        <div class="w-full md:w-2/3 p-8 flex flex-col overflow-y-auto custom-scrollbar">
+                            <h2 class="text-2xl font-bold text-slate-800 mb-2 leading-tight">{{ bookDetail.title }}</h2>
+                            <p class="text-lg text-slate-600 mb-4">{{ bookDetail.authors ? bookDetail.authors.join(', ') : '著者不明' }}</p>
+
+                            <div class="flex flex-wrap gap-4 mb-6 text-sm text-slate-500">
+                                <span v-if="bookDetail.publisher" class="bg-slate-100 px-3 py-1 rounded-full">出版社: {{ bookDetail.publisher }}</span>
+                                <span v-if="bookDetail.published_date" class="bg-slate-100 px-3 py-1 rounded-full">発売日: {{ bookDetail.published_date }}</span>
+                                <span v-if="bookDetail.itemPrice" class="bg-slate-100 px-3 py-1 rounded-full">価格: ¥{{ bookDetail.itemPrice.toLocaleString() }}</span>
+                            </div>
+
+                            <div class="prose prose-slate max-w-none mb-8 flex-1">
+                                <h3 class="text-lg font-semibold text-slate-700 mb-2">あらすじ・内容</h3>
+                                <p class="text-slate-600 leading-relaxed whitespace-pre-wrap">{{ bookDetail.itemCaption || 'あらすじ等の詳細情報は登録されていません。' }}</p>
+                            </div>
+                            
+                            <!-- 追加: QRコード表示エリア -->
+                            <div v-if="qrCodeUrl" class="mb-4 p-4 bg-slate-50 rounded-xl flex items-center space-x-4 border border-slate-100">
+                                <div class="bg-white p-2 rounded-lg shadow-sm cursor-pointer hover:opacity-80 transition-opacity" @click="showingEnlargedQRCode = true">
+                                    <img :src="qrCodeUrl" alt="商品ページQRコード" class="w-20 h-20">
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-bold text-slate-700 text-sm">楽天ブックスで詳細を見る</p>
+                                    <p class="text-xs text-slate-500 mt-1">スマホでQRコードを読み取ると、商品ページにアクセスできます。<br><span class="text-blue-500 cursor-pointer" @click="showingEnlargedQRCode = true">クリックで拡大</span></p>
+                                </div>
+                            </div>
+
+                            <div class="mt-auto pt-6 border-t border-slate-100 flex justify-end space-x-4">
+                                <button @click="closeBookDetail" class="px-6 py-3 rounded-xl border border-slate-300 text-slate-600 font-bold hover:bg-slate-50 transition-colors">
+                                    閉じる
+                                </button>
+                                <button @click="askAboutBookFromModal" class="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center">
+                                    <span class="mr-2 text-xl">🔍</span> 関連本を探す
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
+
+        <!-- 追加: QRコード拡大表示モーダル -->
+        <Teleport to="body">
+            <Transition name="fade">
+                <div v-if="showingEnlargedQRCode" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 cursor-pointer" @click="showingEnlargedQRCode = false">
+                    <div class="relative bg-white p-6 rounded-3xl animate-bounce-in max-w-[90vw] max-h-[80vh] flex flex-col items-center" @click.stop>
+                        <img :src="qrCodeUrl" alt="拡大QRコード" class="max-w-[80vw] max-h-[60vh] object-contain">
+                        <p class="mt-4 text-center text-slate-500 font-bold text-sm sm:text-base">読み取り終わったら背景をクリックして閉じる</p>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
+
     </div>
 </template>
 
@@ -463,15 +558,57 @@ const sendChatMessage = async () => {
     }
 };
 
-const selectBook = (bookId) => {
-    selectedBook.value = suggestedBooks.value.find(b => b.id === bookId);
+import QRCode from 'qrcode'; // 追加
+
+// ... (既存のコード) ...
+
+const showingBookDetail = ref(false);
+const bookDetail = ref(null);
+const qrCodeUrl = ref(''); // 追加: QRコードのURL
+const showingEnlargedQRCode = ref(false); // 追加: QRコード拡大表示フラグ
+
+const openBookDetail = async (book) => {
+    bookDetail.value = book;
+    showingBookDetail.value = true;
+    qrCodeUrl.value = ''; // リセット
+    
+    const url = book.itemUrl || book.item_url; // 両方のパターンに対応
+    if (url) {
+        try {
+            // QRコード生成
+            qrCodeUrl.value = await QRCode.toDataURL(url);
+        } catch (err) {
+            console.error('QR Code generation failed:', err);
+        }
+    }
 };
 
-const askAboutBook = async () => {
-    if (!selectedBook.value) return;
-    const question = `「${selectedBook.value.title}」について教えてください。`;
+const closeBookDetail = () => {
+    showingBookDetail.value = false;
+    // bookDetail.value = null; // アニメーション中消えないように残す or 遅延させる
+};
+
+const selectBook = (bookId) => {
+    // 既存の選択ロジック（青枠表示用）は残しつつ、詳細モーダルを開く
+    const book = suggestedBooks.value.find(b => b.id === bookId);
+    if (book) {
+        selectedBook.value = book;
+        openBookDetail(book);
+    }
+};
+
+const askAboutBookFromModal = async () => {
+    if (!bookDetail.value) return;
     
-    // 修正: 本について質問する際も発話をキャンセル
+    // モーダルを閉じる
+    closeBookDetail();
+    
+    // AIへの質問: 関連本、著者、類似ジャンルなどを探してもらう
+    const title = bookDetail.value.title;
+    const author = bookDetail.value.authors ? bookDetail.value.authors.join(', ') : '不明';
+    const question = `「${title}」（著者: ${author}）の関連本や、似たようなジャンルのおすすめ本を検索して教えてください。`;
+    
+    // 発話をキャンセル
     window.speechSynthesis.cancel();
     
     chatHistory.value.push({ sender: 'user', text: question });
@@ -479,6 +616,9 @@ const askAboutBook = async () => {
     const user = auth.currentUser;
     if (!user) return;
     
+    // チャットモードに切り替え（もしホームにいたら）
+    // currentPage.value = 'chat_mode'; // 必要ならコメントアウト解除
+
     isLoading.value = true;
     sendMessageToSecondary('', 'thinking'); 
 
@@ -507,6 +647,12 @@ const askAboutBook = async () => {
         isLoading.value = false;
         scrollToBottom();
     }
+};
+
+const askAboutBook = async () => {
+    if (!selectedBook.value) return;
+    // 既存ボタンの後方互換（今はモーダルからの呼び出しが主になるが残しておく）
+    openBookDetail(selectedBook.value);
 };
 
 const scrollToBottom = async () => {
@@ -606,4 +752,28 @@ onUnmounted(() => {
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+</style>
+
+<!-- 追加: モーダル用のスタイル -->
+<style scoped>
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-active .modal-content,
+.modal-leave-active .modal-content {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal-enter-from .modal-content,
+.modal-leave-to .modal-content {
+  transform: scale(0.8);
+  opacity: 0;
+}
 </style>
