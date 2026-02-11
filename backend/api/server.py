@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
 import uvicorn
+import asyncio
+
 
 from .models import ChatRequest, ChatResponse, Personal, ChatStatus, NfcIdRequest
 from .datastore import DataStore
@@ -35,6 +37,23 @@ async def startup_event():
 		logger.info(f"🤖 [LLM Backend] Using Ollama (model: {os.getenv('OLLAMA_MODEL', 'llama3.2')})")
 	else:
 		logger.info("🤖 [LLM Backend] Using Gemini API")
+
+	# バックグラウンドでタイムアウト監視を開始
+	asyncio.create_task(monitor_timeouts())
+
+async def monitor_timeouts():
+	"""
+	60秒ごとにセッションのタイムアウトをチェックするバックグラウンドタスク
+	"""
+	while True:
+		try:
+			# ブロッキング処理（LLM呼び出し含む）なのでスレッドで実行
+			await asyncio.to_thread(data_store.check_user_timeout)
+		except Exception as e:
+			logger.error(f"[ERROR] Timeout monitor failed: {e}")
+		
+		await asyncio.sleep(60)
+
 
 # CORS設定（フロントエンドからのアクセスを許可）
 # 開発環境のオリジン（デフォルト）
@@ -316,8 +335,6 @@ class Server:
 
 
 	async def chat_prompt(self, request: ChatRequest, prompt_file: str, user_id: str) -> ChatResponse:
-		# タイムアウトチェック（ユーザー単位）
-		self.data_store.check_user_timeout()
 		
 		# セッション確保
 		session_id = request.session_id

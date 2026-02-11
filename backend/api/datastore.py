@@ -29,10 +29,6 @@ logger = logging.getLogger("uvicorn.error")
 # ファイルパス (DBへ移行するため, 一時的なもの. 本番はENVへまとめる)
 from backend import PROMPTS_DIR, DATA_DIR, USERS_FILE, CONVERSATIONS_FILE, NFC_USERS_FILE, PROMPT_SUMMARY, PROMPT_AI_INSIGHT
 
-# セッションタイムアウト時間（秒）
-SESSION_TIMEOUT = int(os.getenv("SESSION_TIMEOUT", "1800"))  # デフォルト30分
-
-
 class DataStore:
 	def __init__(self):
 		DATA_DIR.mkdir(exist_ok=True)
@@ -502,6 +498,13 @@ class DataStore:
 				for session_id, conv in list(self.conversations.items()):
 					if conv.user_id == user_id and conv.status == ChatStatus.active:
 						logger.info(f"[INFO] User timeout: {user_id}, closing session: {session_id}")
+						
+						# タイムアウト時も要約とAI Insightsを生成する
+						try:
+							self.generate_summary_and_insights(session_id)
+						except Exception as e:
+							logger.error(f"[ERROR] Failed to generate insights during timeout for session {session_id}: {e}")
+						
 						# active → closed
 						conv.status = ChatStatus.closed
 						# メモリから削除
