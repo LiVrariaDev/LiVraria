@@ -347,5 +347,8 @@ Copyright (c) 2025 LiVrariaDev
 このプロジェクトは以下のオープンソースライブラリを使用しています：
 - **Frontend**: Vue.js, Firebase, Vite, TailwindCSS
 - **Backend**: FastAPI, Firebase Admin SDK, Google Gemini AI, Pydantic, nfcpy
+- **Raspberry Pi (音声処理)**: 
+  - **Open JTalk** - 日本語音声合成エンジン（Modified BSD License）
+  - **VOSK** - オフライン音声認識ライブラリ（Apache License 2.0）
 
 各ライブラリのライセンスについては[NOTICE](NOTICE)を参照してください。
