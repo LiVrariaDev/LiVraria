@@ -112,7 +112,8 @@ const processTextLines = async (text) => {
     // ここでは簡易的に「。, !, ?, \n」で分割し、「、」は分割しない方針で。
     const rawLines = plainText.split(/([。！？\n]+)/).reduce((acc, curr, i, arr) => {
         if (i % 2 === 0) { // 文言
-            if (curr.trim()) acc.push(curr);
+            const trimmed = curr.trim();
+            if (trimmed) acc.push(trimmed);
         } else { // 区切り文字
              if (acc.length > 0) acc[acc.length - 1] += curr;
         }
