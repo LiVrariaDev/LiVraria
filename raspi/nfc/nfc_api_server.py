@@ -106,6 +106,7 @@ def background_read_nfc(timeout):
 def synthesize_speech(text: str) -> str:
     """
     OpenJTalkを使用してテキストを音声ファイルに変換
+    先頭に無音を追加してデバイス初期化遅延に対応
     
     Args:
         text: 合成するテキスト
@@ -116,12 +117,16 @@ def synthesize_speech(text: str) -> str:
     Raises:
         RuntimeError: 音声合成に失敗した場合
     """
+    import wave
+    import struct
+    
     # 一時ファイルを作成
     with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as txt_file:
         txt_file.write(text)
         txt_path = txt_file.name
     
-    wav_path = tempfile.mktemp(suffix='.wav')
+    temp_wav_path = tempfile.mktemp(suffix='.wav')
+    final_wav_path = tempfile.mktemp(suffix='.wav')
     
     try:
         # OpenJTalkコマンドを実行
@@ -129,7 +134,7 @@ def synthesize_speech(text: str) -> str:
             'open_jtalk',
             '-x', OPENJTALK_DICT,
             '-m', OPENJTALK_VOICE,
-            '-ow', wav_path,
+            '-ow', temp_wav_path,
             txt_path
         ]
         
@@ -138,10 +143,29 @@ def synthesize_speech(text: str) -> str:
         if result.returncode != 0:
             raise RuntimeError(f"OpenJTalk failed: {result.stderr}")
         
-        if not os.path.exists(wav_path):
+        if not os.path.exists(temp_wav_path):
             raise RuntimeError("WAV file was not generated")
         
-        return wav_path
+        # 先頭に無音を追加（0.2秒）
+        with wave.open(temp_wav_path, 'rb') as wav_in:
+            params = wav_in.getparams()
+            frames = wav_in.readframes(wav_in.getnframes())
+            
+            # 無音データを生成（0で埋める）
+            silence_duration = 0.2  # 秒
+            silence_frames = int(params.framerate * silence_duration)
+            silence_data = struct.pack('h' * silence_frames * params.nchannels, 
+                                       *([0] * silence_frames * params.nchannels))
+            
+            # 無音 + 元の音声データを結合
+            with wave.open(final_wav_path, 'wb') as wav_out:
+                wav_out.setparams(params)
+                wav_out.writeframes(silence_data + frames)
+        
+        # 一時ファイルを削除
+        os.remove(temp_wav_path)
+        
+        return final_wav_path
     
     finally:
         # テキストファイルを削除
