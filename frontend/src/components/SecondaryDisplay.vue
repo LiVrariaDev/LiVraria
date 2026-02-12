@@ -3,6 +3,7 @@
     
     <!-- 背景画像 (ユーザー指定: 16:9 PNG) -->
     <img src="/bg.jpg" class="absolute inset-0 w-full h-full object-cover z-0" alt="Background" onerror="this.style.display='none'" />
+    <div class="absolute inset-0 bg-black/40 z-10 pointer-events-none"></div>
     
     <!-- Video A (Buffer 1) -->
 
@@ -29,14 +30,12 @@
       @error="handleVideoError"
     ></video>
 
-    <!-- Video B (Buffer 2) -->
-
     <!-- 字幕レイヤー -->
-    <div class="absolute inset-0 z-20 flex flex-col items-center justify-end pb-8 pointer-events-none">
-      <div class="w-full max-w-6xl px-8 min-h-[120px] flex flex-col justify-end">
-         <transition-group name="subtitle" tag="div" class="flex flex-col space-y-2 items-center">
+    <div class="absolute inset-0 z-40 flex flex-col items-center justify-end pb-8 pointer-events-none">
+      <div class="w-full max-w-[90vw] px-[2vw] min-h-[15vh] flex flex-col justify-end">
+         <transition-group name="subtitle" tag="div" class="flex flex-col space-y-[0.8vh] items-center">
             <div v-for="line in visibleLines" :key="line.id" 
-                 class="bg-black/60 backdrop-blur-sm text-white px-6 py-2 rounded-xl text-2xl font-medium tracking-wide shadow-lg border border-white/10"
+                 class="bg-black/60 backdrop-blur-sm text-white px-[1.2vw] py-[0.8vh] rounded-[0.8vw] text-[2.5vw] font-medium tracking-wide shadow-lg border border-white/10"
                  style="text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">
               {{ line.text }}
             </div>
@@ -107,10 +106,8 @@ const processTextLines = async (text) => {
     visibleLines.value = [];
     
     // 句読点で分割 (。、！ ？ \n)
-    // ただし、分割しすぎると読みづらいので、ある程度の長さでまとめるのが理想だが、
-    // まずは単純に句点と改行で分割し、読点はそのままにするか、長い場合は分割する。
-    // ここでは簡易的に「。, !, ?, \n」で分割し、「、」は分割しない方針で。
-    const rawLines = plainText.split(/([。！？\n]+)/).reduce((acc, curr, i, arr) => {
+    // 分割文字に「、」を追加
+    const rawLines = plainText.split(/([。、！？\n]+)/).reduce((acc, curr, i, arr) => {
         if (i % 2 === 0) { // 文言
             const trimmed = curr.trim();
             if (trimmed) acc.push(trimmed);
