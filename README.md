@@ -67,6 +67,42 @@ pnpm run dev:back
 - **Backend**: http://localhost:8000
 - **Frontend**: http://localhost:5173
 
+### HTTPS対応（マイク入力を使用する場合）
+
+マイク入力を使用するには、ブラウザのセキュリティ要件によりHTTPSが必要です。
+開発環境では自己署名証明書（オレオレ証明書）を使用します。
+
+#### 1. 証明書の生成
+
+```bash
+# プロジェクトルートで実行
+mkdir -p certs
+openssl req -x509 -newkey rsa:4096 -nodes \
+  -keyout certs/key.pem \
+  -out certs/cert.pem \
+  -days 365 \
+  -subj "/CN=localhost"
+```
+
+#### 2. バックエンドをHTTPSで起動
+
+環境変数`USE_SSL=true`を設定してバックエンドを起動します：
+
+```bash
+# .envファイルに追加
+USE_SSL=true
+
+# または、コマンドラインで指定
+USE_SSL=true pnpm run dev:back
+```
+
+- **Backend (HTTPS)**: https://localhost:8000
+- **Frontend**: http://localhost:5173
+
+> [!WARNING]
+> 自己署名証明書を使用するため、ブラウザで「安全ではない」という警告が表示されます。
+> 開発環境では「詳細設定」→「localhost にアクセスする（安全ではありません）」を選択して続行してください。
+
 ## Docker での起動
 
 ```bash
