@@ -1,0 +1,37 @@
+sequenceDiagram
+    autonumber
+    participant U as 利用者 (UI)
+    participant B as バックエンドAPI (FastAPI)
+    participant LG as LangGraph (Agent Workflow)
+    participant Tool as Tools (Rakuten/Expression)
+    participant G as Gemini API (LLM)
+    participant DB as データストア (UserData)
+    participant T as Open JTalk (Local TTS)
+
+    Note over U, B: 【リクエストフェーズ】
+    U->>B: チャットメッセージ送信 (Text)
+    B->>DB: 会話履歴 & ユーザー情報の取得
+    B->>LG: app.invoke (State初期化)
+
+    rect rgb(240, 248, 255)
+        Note right of LG: LangGraph Loop (agent_node)
+        LG->>G: メッセージ履歴 + プロンプト送信
+        G-->>LG: 応答 (テキスト or ツール呼び出し指示)
+        
+        alt ツールが必要な場合 (search_books / update_expression)
+            LG->>Tool: ツールの実行
+            Tool-->>LG: 実行結果 (検索結果/表情ステータス)
+            LG->>G: 結果を付加して再推論
+            G-->>LG: 最終的な回答テキスト
+        end
+    end
+
+    LG-->>B: 最終State (回答, 推薦書籍, 表情)
+    
+    Note over B, T: 【レスポンス生成フェーズ】
+    B->>DB: 履歴と推薦書籍を保存
+    B->>T: 回答を音声合成 (Open JTalk)
+    T-->>B: 音声データ生成
+
+    B-->>U: AI司書の応答 (音声 + テキスト + 書籍リスト + 表情)
+    Note over U: アバターが感情豊かに本を紹介する
