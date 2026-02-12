@@ -92,8 +92,15 @@ USE_SSL=true
 USE_SSL=true pnpm run dev:back
 ```
 
+フロントエンドも同じ環境変数を読み取り、自動的にHTTPSで起動します：
+
+```bash
+# フロントエンド・バックエンド同時起動（両方HTTPS）
+USE_SSL=true pnpm run start
+```
+
 - **Backend (HTTPS)**: https://localhost:8000
-- **Frontend**: http://localhost:5173
+- **Frontend (HTTPS)**: https://localhost:5173
 
 > [!WARNING]
 > 自己署名証明書を使用するため、ブラウザで「安全ではない」という警告が表示されます。
