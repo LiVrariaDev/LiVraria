@@ -13,7 +13,7 @@
     <!-- フォーム -->
     <div v-else class="bg-white rounded-2xl shadow-md p-8">
       <h2 class="text-2xl font-bold text-slate-700 mb-2">
-        <span class="text-3xl mr-2">👤</span>基本情報を変更
+        基本情報を変更
       </h2>
       <p class="text-sm text-slate-500 mb-6">初回登録時の情報を編集できます</p>
 
@@ -129,7 +129,6 @@
             :disabled="isSaving"
             class="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg hover:from-purple-600 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-400 transition-all transform active:scale-95 flex items-center justify-center space-x-2"
           >
-            <span v-if="!isSaving" class="text-xl">💾</span>
             <span v-if="!isSaving">変更を保存</span>
             <span v-else>⏳ 保存中...</span>
           </button>
