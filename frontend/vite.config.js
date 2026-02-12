@@ -35,6 +35,7 @@ export default defineConfig({
   envDir: path.resolve(__dirname, '..'),
 
   server: {
+    host: true, // ネットワーク上の他端末（ラズパイ）からのアクセスを許可
     https: httpsConfig,
     proxy: {
       '/users': {
@@ -58,6 +59,11 @@ export default defineConfig({
         secure: false,
       },
       '/books': {
+        target: proxyTarget,
+        changeOrigin: true,
+        secure: false,
+      },
+      '/speech': {
         target: proxyTarget,
         changeOrigin: true,
         secure: false,

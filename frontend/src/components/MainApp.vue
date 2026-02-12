@@ -35,6 +35,10 @@
                             <div class="w-[2vh] h-[2vh] bg-red-500 rounded-full animate-ping"></div>
                             <span class="text-[1.5vw] font-bold text-red-100 tracking-widest">LISTENING...</span>
                         </div>
+                        <div v-else-if="isProcessingAudio" class="flex items-center space-x-[1vw] bg-black/60 px-[2vw] py-[1vh] rounded-full border border-yellow-500/50 backdrop-blur-md">
+                             <div class="w-[2vh] h-[2vh] bg-yellow-400 rounded-full animate-bounce"></div>
+                             <span class="text-[1.5vw] font-bold text-yellow-100 tracking-widest">PROCESSING...</span>
+                        </div>
                         <div v-else-if="isLoading" class="flex items-center space-x-[1vw] bg-black/60 px-[2vw] py-[1vh] rounded-full border border-blue-500/50 backdrop-blur-md">
                             <div class="w-[2vh] h-[2vh] bg-blue-400 rounded-full animate-bounce"></div>
                             <span class="text-[1.5vw] font-bold text-blue-100 tracking-widest">THINKING...</span>
@@ -700,23 +704,105 @@ const fetchUserGreeting = () => {
     sendMessageToSecondary(greeting, 'neutral');
 };
 
-// --- 音声認識の実装 ---
+// --- 音声認識の実装 (MediaRecorder + Server-Side Gemini) ---
 const isRecording = ref(false);
-let recognition = null;
-if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognition = new SpeechRecognition();
-    recognition.lang = 'ja-JP'; recognition.interimResults = false; recognition.continuous = false; 
-    recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        if (userInput.value) userInput.value += ' ' + transcript; else userInput.value = transcript;
-    };
-    recognition.onend = () => { isRecording.value = false; };
-    recognition.onerror = (event) => { console.error('音声認識エラー:', event.error); isRecording.value = false; alert('音声認識でエラーが発生しました: ' + event.error); };
-}
+const isProcessingAudio = ref(false); // 音声処理中フラグ
+let mediaRecorder = null;
+let audioChunks = [];
+
+const startRecording = async () => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = async () => {
+            // ストリームのトラックを停止（マイク解放）
+            stream.getTracks().forEach(track => track.stop());
+            
+            if (audioChunks.length === 0) return;
+
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            await sendAudioToServer(audioBlob);
+        };
+
+        mediaRecorder.start();
+        isRecording.value = true;
+        console.log("Recording started...");
+
+    } catch (err) {
+        console.error("Error accessing microphone:", err);
+        alert("マイクへのアクセスに失敗しました。");
+        isRecording.value = false;
+    }
+};
+
+const stopRecording = () => {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        isRecording.value = false;
+        isProcessingAudio.value = true; // 処理開始
+        console.log("Recording stopped, processing...");
+    }
+};
+
+const sendAudioToServer = async (audioBlob) => {
+    try {
+        const formData = new FormData();
+        formData.append("file", audioBlob, "recording.webm");
+
+        // ローカル環境の場合はlocalhost:8000、その他は適宜変更
+        // VITE_API_BASE_URL等の環境変数を使うのがベストだが、ここでは簡易的に実装
+        // 空文字にすることで、Viteのプロキシ (`vite.config.js`) を経由させる
+        const apiUrl = import.meta.env.VITE_API_BASE_URL || '';
+        
+        const response = await fetch(`${apiUrl}/speech/transcribe`, {
+            method: "POST",
+            body: formData,
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data.status === 'ok' && data.text) {
+            // テキストを入力欄に追加
+            if (userInput.value) {
+                userInput.value += ' ' + data.text;
+            } else {
+                userInput.value = data.text;
+            }
+            // 自動送信
+            if (currentPage.value === 'chat_mode') {
+                sendChatMessage();
+            } else {
+                sendHomeMessage();
+            } 
+        } else {
+            console.warn("Transcription failed:", data);
+        }
+
+    } catch (error) {
+        console.error("Error sending audio to server:", error);
+        alert("音声認識に失敗しました。");
+    } finally {
+        isProcessingAudio.value = false;
+    }
+};
+
 const toggleSpeechRecognition = () => {
-    if (!recognition) return alert('音声認識未対応です');
-    if (isRecording.value) { recognition.stop(); } else { recognition.start(); isRecording.value = true; }
+    if (isRecording.value) {
+        stopRecording();
+    } else {
+        startRecording();
+    }
 };
 
 onMounted(() => {
@@ -727,7 +813,7 @@ onMounted(() => {
 
 onUnmounted(() => {
     channel.close();
-    if (recognition && isRecording.value) recognition.stop();
+    if (isRecording.value) stopRecording();
 });
 </script>
 

@@ -9,27 +9,50 @@ from flask_cors import CORS
 import time
 import threading
 import subprocess
-import tempfile
-import os
-from pathlib import Path
-from smartcard.System import readers
-from smartcard.util import toHexString
+import queue
 
-app = Flask(__name__)
-CORS(app)  # すべてのオリジンからのアクセスを許可
+# TTSキューと制御用
+tts_queue = queue.Queue()
 
-# NFCカード読み取り状態を保持
-nfc_state = {
-    "status": "idle",  # idle, reading, success, timeout
-    "idm": None,
-    "last_read_time": None
-}
-nfc_lock = threading.Lock()
+def tts_loop():
+    """
+    TTS読み上げ専用スレッド
+    キューからテキストを取り出して順番に再生する
+    """
+    while True:
+        try:
+            item = tts_queue.get()
+            if item is None:
+                break
+            
+            text, done_event = item
+            print(f"[TTS Worker] Processing: {text}")
+            
+            try:
+                # 音声合成
+                wav_path = synthesize_speech(text)
+                print(f"[TTS Worker] Playing audio: {wav_path}")
+                
+                # 再生 (aplayでブロッキング再生)
+                # subprocess.run は完了するまで待機する
+                subprocess.run(['aplay', '-D', 'plughw:3,0', wav_path], check=False)
+                
+                # 一時ファイル削除（synthesize_speech内で管理していない場合）
+                if os.path.exists(wav_path):
+                    os.remove(wav_path)
+                    
+            except Exception as e:
+                print(f"[TTS Worker] Error: {e}")
+            finally:
+                if done_event:
+                    done_event.set()
+                tts_queue.task_done()
+                
+        except Exception as e:
+            print(f"[TTS Worker] Critical Error: {e}")
 
-# OpenJTalk設定
-OPENJTALK_DICT = "/var/lib/mecab/dic/open-jtalk/naist-jdic"
-OPENJTALK_VOICE = "/usr/share/hts-voice/Voice/mei/mei_normal.htsvoice"
-
+# バックグラウンドでTTSスレッドを開始
+threading.Thread(target=tts_loop, daemon=True).start()
 
 def read_card_once(timeout=20):
     """
@@ -287,15 +310,19 @@ def speak():
         return jsonify({"status": "error", "message": "Text is empty"}), 400
     
     try:
-        print(f"[TTS] Synthesizing: {text}")
-        wav_path = synthesize_speech(text)
+        print(f"[TTS] Queuing: {text}")
         
-        # aplayで音声を再生（バックグラウンド、デバイス指定）
-        print(f"[TTS] Playing audio: {wav_path}")
-        subprocess.Popen(['aplay', '-D', 'plughw:3,0', wav_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # 完了待機用のイベント
+        done_event = threading.Event()
         
-        # 即座にレスポンスを返す
-        return jsonify({"status": "ok", "message": "Speech playback started"})
+        # キューに追加
+        tts_queue.put((text, done_event))
+        
+        # 再生完了まで待機（これがないとフロントエンドが話し終わる前に次の動作をしてしまうかも）
+        # ただし、長時間ブロックするのを避けるなら wait しなくてもよい
+        done_event.wait()
+        
+        return jsonify({"status": "ok", "message": "Speech playback finished"})
     
     except Exception as e:
         print(f"[TTS] Error: {e}")
@@ -311,6 +338,6 @@ if __name__ == "__main__":
     print("   GET  /read-nfc     - Get latest NFC reading result")
     print("   POST /speak        - Text-to-speech synthesis and playback")
     
-    app.run(host="0.0.0.0", port=8000, debug=False)
+    app.run(host="0.0.0.0", port=5001, debug=False)
 
 

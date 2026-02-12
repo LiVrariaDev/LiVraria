@@ -4,7 +4,7 @@
 
 // NFCサーバーのベースURL
 // 環境変数から取得、デフォルトは http://localhost:8000
-const NFC_SERVER_URL = import.meta.env.VITE_NFC_API_URL || 'http://localhost:8000';
+const NFC_SERVER_URL = import.meta.env.VITE_NFC_API_URL || 'http://localhost:5001';
 
 /**
  * 音声合成（Raspberry Pi NFC APIサーバー）

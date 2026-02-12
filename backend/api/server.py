@@ -5,6 +5,7 @@ import logging
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from backend.api.auth import get_current_user_id
 import os
 import uvicorn
 import asyncio
@@ -17,7 +18,7 @@ from . import LLM_BACKEND
 from langchain_core.messages import messages_to_dict
 
 # 検索機能
-from backend.api.routers import search
+from backend.api.routers import search, speech
 
 # firebase import
 import firebase_admin
@@ -93,20 +94,7 @@ except Exception as e:
 	logger.error(f"[ERROR] Firebase initialization failed: {e}")
 
 
-oauth2_scheme = HTTPBearer()
 
-def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)) -> str:
-	"""
-	HTTP Headerに含まれたTokenをFirebase Authで認証し
-	認証に成功した場合はUser IDを返す
-	"""
-	try:
-		id_token = credentials.credentials
-		decoded_token = auth.verify_id_token(id_token)
-		return decoded_token["uid"]
-	except Exception as e:
-		logger.error(f"[ERROR] Firebase authentication failed: {e}")
-		raise HTTPException(status_code=401, detail="Invalid authentication token")
 
 class Server:
 	"""
@@ -370,6 +358,7 @@ class Server:
             search.router, 
             dependencies=[Depends(get_current_user_id)]
         )
+		self.app.include_router(speech.router)
 
 
 	async def chat_prompt(self, request: ChatRequest, prompt_file: str, user_id: str) -> ChatResponse:
