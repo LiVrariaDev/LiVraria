@@ -4,6 +4,7 @@
 *firebase-adminsdk*.json
 backend/api/data/
 .vscode/
+*.pem
 
 # Chat history
 chat-history_*.md
