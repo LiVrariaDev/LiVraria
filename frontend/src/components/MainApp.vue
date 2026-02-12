@@ -1,5 +1,5 @@
 <template>
-    <div class="w-screen h-screen font-sans text-gray-800 bg-gray-900">
+    <div class="w-screen h-screen font-sans text-gray-800 bg-[#0B1026] overflow-hidden">
 
         <!-- ===== 診断用 ===== -->
         <img 
@@ -13,91 +13,129 @@
         <div v-if="currentPage === 'home'" class="relative flex flex-col w-full h-full overflow-auto select-none">
             <!-- 背景画像エリア -->
             <div class="absolute inset-0 z-0 bg-cover bg-center transition-all duration-700"
-                 :style="{ backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('/bg.jpg?v=2')` }">
+                 :style="{ backgroundImage: `linear-gradient(rgba(10, 20, 40, 0.6), rgba(10, 20, 40, 0.6)), url('/bg.jpg?v=2')` }">
             </div>
 
             <!-- メインコンテンツエリア -->
-            <!-- 修正: justify-center で垂直方向中央寄せ、pb-64 で下部に大きな余白（会話バー回避） -->
-            <div class="relative z-10 flex-grow flex flex-col items-center justify-center w-full px-8 pb-64">
+            <!-- 修正: pt-[0.5vh] で少し余白を追加 -->
+            <div class="relative z-10 flex-grow flex flex-col items-center w-full px-8 pt-[2vh] pb-[10vh]">
+
+                <!-- タイトル -->
+                <h1 class="text-[5vw] font-black tracking-tighter mb-[2vh] leading-none"
+                    style="-webkit-text-stroke: 0.15vw white; font-family: 'Zen Maru Gothic', sans-serif;">
+                    <span class="bg-gradient-to-br from-pink-300 via-purple-300 to-blue-300 bg-clip-text text-transparent drop-shadow-lg">
+                        LiVraria
+                    </span>
+                </h1>
                 
                 <!-- ステータス表示エリア (ボタンの直上に配置) -->
-                <div class="h-20 mb-8 flex items-center justify-center w-full">
+                <div class="mb-[1vh] flex items-center justify-center w-full min-h-[1vh]">
                     <transition name="fade" mode="out-in">
-                        <div v-if="isRecording" class="flex items-center space-x-4 bg-black/60 px-8 py-3 rounded-full border border-red-500/50 backdrop-blur-md animate-pulse">
-                            <div class="w-4 h-4 bg-red-500 rounded-full animate-ping"></div>
-                            <span class="text-2xl font-bold text-red-100 tracking-widest">LISTENING...</span>
+                        <div v-if="isRecording" class="flex items-center space-x-[1vw] bg-black/60 px-[2vw] py-[1vh] rounded-full border border-red-500/50 backdrop-blur-md animate-pulse">
+                            <div class="w-[2vh] h-[2vh] bg-red-500 rounded-full animate-ping"></div>
+                            <span class="text-[1.5vw] font-bold text-red-100 tracking-widest">LISTENING...</span>
                         </div>
-                        <div v-else-if="isLoading" class="flex items-center space-x-4 bg-black/60 px-8 py-3 rounded-full border border-blue-500/50 backdrop-blur-md">
-                            <div class="w-4 h-4 bg-blue-400 rounded-full animate-bounce"></div>
-                            <span class="text-2xl font-bold text-blue-100 tracking-widest">THINKING...</span>
+                        <div v-else-if="isLoading" class="flex items-center space-x-[1vw] bg-black/60 px-[2vw] py-[1vh] rounded-full border border-blue-500/50 backdrop-blur-md">
+                            <div class="w-[2vh] h-[2vh] bg-blue-400 rounded-full animate-bounce"></div>
+                            <span class="text-[1.5vw] font-bold text-blue-100 tracking-widest">THINKING...</span>
                         </div>
                     </transition>
                 </div>
 
                 <!-- ボタンエリア (2x2 グリッド) -->
-                <div class="grid grid-cols-2 gap-8 w-full max-w-5xl">
-                    <button v-for="button in mainButtons" :key="button.id" 
-                            @click="handleHomeButtonClick(button.action)"
-                            class="group relative overflow-hidden rounded-3xl transition-all duration-300 flex flex-col items-center justify-center h-48 w-full
-                                   bg-transparent border-4 border-white/60 backdrop-blur-sm
-                                   hover:bg-white hover:border-white hover:shadow-[0_0_50px_rgba(255,255,255,0.5)] hover:-translate-y-2">
-                        
-                        <div class="relative z-10 flex flex-col items-center space-y-4">
-                            <!-- アイコン -->
-                            <div class="p-4 rounded-full transition-colors duration-300
-                                        text-white
-                                        group-hover:text-slate-900 group-hover:bg-slate-200/50">
-                                <!-- アイコンサイズ調整 -->
-                                <span v-if="button.icon === 'search'" class="block transform scale-150" v-html="icons.search"></span>
-                                <span v-else-if="button.icon === 'chat'" class="block transform scale-150" v-html="icons.chat"></span>
-                                <span v-else-if="button.icon === 'card'" class="block transform scale-150" v-html="icons.card"></span>
-                                <span v-else class="block transform scale-150" v-html="icons.star"></span>
+                <!-- ボタンエリア (左右分割レイアウト) -->
+                <!-- 全体高さ: 右側のボタン(32vh) * 2 + 隙間(4vh) = 68vh -->
+                <div class="flex gap-x-[2vw] w-[85vw] h-[68vh]">
+                    
+                    <!-- 左: 会話集中モード (デカいボタン) -->
+                    <button @click="handleHomeButtonClick('focus_chat')"
+                            class="group relative overflow-hidden rounded-[2vw] transition-all duration-300 flex flex-col items-center justify-center flex-1 h-full
+                                   bg-transparent border-4 border-white/50 backdrop-blur-sm
+                                   hover:bg-pink-900/20 hover:border-white/80 hover:shadow-[0_0_50px_rgba(244,114,182,0.4)] hover:-translate-y-2">
+                        <div class="relative z-10 flex flex-col items-center space-y-[0.5vh]">
+                            <div class="p-[1.5vw] rounded-full transition-colors duration-300 text-pink-100 group-hover:text-white group-hover:bg-pink-500/20">
+                                <div class="w-[10vw] h-[10vw]">
+                                    <span class="block w-full h-full [&>svg]:w-full [&>svg]:h-full drop-shadow-md" v-html="icons.chat"></span>
+                                </div>
                             </div>
-                            <!-- テキスト -->
-                            <span class="text-4xl font-bold tracking-wide transition-colors duration-300
-                                         text-white
-                                         group-hover:text-slate-900">
-                                {{ button.text }}
+                            <span class="text-[4.5vw] font-bold tracking-wide transition-colors duration-300 text-pink-50 group-hover:text-pink-100 drop-shadow-md">
+                                会話集中モード
                             </span>
                         </div>
                     </button>
+
+                    <!-- 右: 書籍検索 & 会員情報 (縦並び) -->
+                    <div class="flex flex-col gap-y-[4vh] flex-1 h-full">
+                        <!-- 上: 書籍検索 -->
+                         <button @click="handleHomeButtonClick('search')"
+                                class="group relative overflow-hidden rounded-[2vw] transition-all duration-300 flex flex-col items-center justify-center flex-1 w-full
+                                       bg-transparent border-4 border-white/50 backdrop-blur-sm
+                                       hover:bg-cyan-900/20 hover:border-white/80 hover:shadow-[0_0_50px_rgba(34,211,238,0.4)] hover:-translate-y-2">
+                            <div class="relative z-10 flex flex-col items-center space-y-[0.5vh]">
+                                <div class="p-[1vw] rounded-full transition-colors duration-300 text-cyan-100 group-hover:text-white group-hover:bg-cyan-500/20">
+                                    <div class="w-[6vw] h-[6vw]">
+                                        <span class="block w-full h-full [&>svg]:w-full [&>svg]:h-full drop-shadow-md" v-html="icons.search"></span>
+                                    </div>
+                                </div>
+                                <span class="text-[3.5vw] font-bold tracking-wide transition-colors duration-300 text-cyan-50 group-hover:text-cyan-100 drop-shadow-md">
+                                    書籍検索
+                                </span>
+                            </div>
+                        </button>
+
+                        <!-- 下: 会員情報 -->
+                         <button @click="handleHomeButtonClick('member_info')"
+                                class="group relative overflow-hidden rounded-[2vw] transition-all duration-300 flex flex-col items-center justify-center flex-1 w-full
+                                       bg-transparent border-4 border-white/50 backdrop-blur-sm
+                                       hover:bg-indigo-900/20 hover:border-white/80 hover:shadow-[0_0_50px_rgba(129,140,248,0.4)] hover:-translate-y-2">
+                            <div class="relative z-10 flex flex-col items-center space-y-[0.5vh]">
+                                <div class="p-[1vw] rounded-full transition-colors duration-300 text-indigo-100 group-hover:text-white group-hover:bg-indigo-500/20">
+                                    <div class="w-[6vw] h-[6vw]">
+                                        <span class="block w-full h-full [&>svg]:w-full [&>svg]:h-full drop-shadow-md" v-html="icons.card"></span>
+                                    </div>
+                                </div>
+                                <span class="text-[3.5vw] font-bold tracking-wide transition-colors duration-300 text-indigo-50 group-hover:text-indigo-100 drop-shadow-md">
+                                    会員情報
+                                </span>
+                            </div>
+                        </button>
+                    </div>
                 </div>
             </div>
 
             <!-- 下部: 入力とオプションエリア -->
-            <div class="absolute bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-md border-t border-white/10 p-6 flex items-center shadow-2xl z-20 h-24">
-                <div class="flex-grow mx-8 relative flex items-center max-w-4xl">
+            <div class="absolute bottom-0 left-0 right-0 bg-white/70 backdrop-blur-xl px-[1vw] flex items-center justify-between gap-[1vw] z-20 h-[12vh]">
+                <!-- 入力エリア: flex-1 で50%確保 -->
+                <div class="relative flex items-center flex-1">
                     <button @click="toggleSpeechRecognition" 
-                            class="mr-4 p-4 rounded-full transition-all duration-200 focus:outline-none shadow-lg hover:scale-105 active:scale-95 border border-white/10"
-                            :class="isRecording ? 'bg-red-600 text-white hover:bg-red-700 animate-pulse' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'">
-                        <svg v-if="!isRecording" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
-                        <svg v-else class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
+                            class="mr-[1vw] p-[1vh] aspect-square rounded-full transition-all duration-200 focus:outline-none shadow-[0_0_15px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-95 border-2 backdrop-blur-md"
+                            :class="isRecording ? 'bg-pink-600/80 text-white hover:bg-pink-500 shadow-[0_0_20px_rgba(236,72,153,0.6)] animate-pulse border-pink-400/80' : 'bg-[#0B1026]/70 border-indigo-400/40 text-indigo-200 hover:bg-[#0B1026]/80 hover:border-indigo-400 hover:shadow-[0_0_15px_rgba(129,140,248,0.3)]'">
+                        <svg v-if="!isRecording" class="w-[3vh] h-[3vh]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+                        <svg v-else class="w-[3vh] h-[3vh]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
                     </button>
 
                     <input type="text" v-model="userInput" @keydown.enter.prevent="sendHomeMessage" 
                            placeholder="AI司書に話しかける..."
-                           class="w-full bg-gray-800 border border-gray-600 rounded-full py-4 px-6 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all shadow-inner text-lg">
+                           class="w-full bg-[#0B1026]/70 backdrop-blur-md border-2 border-indigo-400/30 rounded-full h-[9vh] px-[2vw] text-indigo-100 placeholder-indigo-300/50 focus:outline-none focus:border-cyan-400 focus:bg-[#0B1026]/80 focus:shadow-[0_0_15px_rgba(34,211,238,0.3)] transition-all shadow-inner text-[1.5vw]">
                 </div>
-                
-                <div class="flex-grow"></div>
 
-                <div class="flex space-x-4 mr-8 items-center">
-                     <button @click="openSecondaryDisplay" class="flex items-center px-6 py-3 bg-teal-600/20 hover:bg-teal-600/40 text-teal-300 font-bold rounded-xl transition-colors duration-200 border border-teal-500/30">
-                        <span class="mr-2 text-xl">📺</span> 動画ウィンドウ
+                <div class="flex space-x-[0.5vw] items-center justify-end flex-1">
+                     <button @click="openSecondaryDisplay" class="flex items-center px-[2.2vw] py-[2vh] bg-[#0B1026]/70 backdrop-blur-md hover:bg-[#0B1026]/80 text-cyan-300 font-bold rounded-[1.2vw] transition-all duration-300 border-2 border-cyan-400/40 hover:border-cyan-400 hover:shadow-[0_0_15px_rgba(34,211,238,0.4)] text-[1.4vw]">
+                        動画ウィンドウ
                      </button>
 
-                     <button @click="toggleSpeech" class="flex items-center px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl transition-colors duration-200 border border-gray-600" :class="{'text-blue-400 border-blue-500/50': isSpeechEnabled}">
-                        <span v-if="isSpeechEnabled">🔊 ON</span>
-                        <span v-else>🔇 OFF</span>
+                     <button @click="toggleSpeech" class="flex items-center px-[2.2vw] py-[2vh] bg-[#0B1026]/70 backdrop-blur-md hover:bg-[#0B1026]/80 text-indigo-200 font-bold rounded-[1.2vw] transition-all duration-300 border-2 border-indigo-400/40 hover:border-indigo-400 hover:shadow-[0_0_15px_rgba(129,140,248,0.4)] text-[1.4vw]" :class="{'text-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.2)] border-cyan-400/50': isSpeechEnabled}">
+                        <span v-if="isSpeechEnabled">読み上げ ON</span>
+                        <span v-else>読み上げ OFF</span>
                      </button>
 
                      <button v-for="button in utilityButtons" :key="button.id"
                              @click="handleHomeButtonClick(button.action)"
-                             class="flex items-center px-6 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl transition-colors duration-200 border border-gray-600">
-                        <span class="mr-2">⚙️</span> {{ button.text }}
+                             class="flex items-center px-[2.2vw] py-[2vh] bg-[#0B1026]/70 backdrop-blur-md hover:bg-[#0B1026]/80 text-indigo-200 font-bold rounded-[1.2vw] transition-all duration-300 border-2 border-indigo-400/40 hover:border-indigo-400 hover:shadow-[0_0_15px_rgba(129,140,248,0.4)] text-[1.4vw]">
+                        {{ button.text }}
                     </button>
-                    <button @click="logout" class="flex items-center px-6 py-3 bg-red-900/30 hover:bg-red-900/50 text-red-400 font-bold rounded-xl transition-colors duration-200 border border-red-800/50">
-                        <span>🚪</span> ログアウト
+                    <button @click="logout" class="flex items-center px-[2.2vw] py-[2vh] bg-[#0B1026]/70 backdrop-blur-md hover:bg-[#0B1026]/80 text-pink-300 font-bold rounded-[1.2vw] transition-all duration-300 border-2 border-pink-400/40 hover:border-pink-400 hover:shadow-[0_0_15px_rgba(244,114,182,0.4)] text-[1.4vw]">
+                        ログアウト
                     </button>
                 </div>
             </div>
@@ -107,7 +145,6 @@
         <div v-if="currentPage === 'search_mode'" class="flex flex-col h-screen bg-slate-50">
             <header class="bg-white/90 backdrop-blur border-b border-slate-200 p-4 px-8 flex justify-between items-center shadow-sm z-20">
                 <div class="flex items-center space-x-3">
-                    <span class="text-2xl">📚</span>
                     <h1 class="text-xl font-bold text-slate-700">蔵書検索</h1>
                 </div>
                 <div class="flex space-x-3">
@@ -136,10 +173,10 @@
                 </div>
                 <div class="flex space-x-3">
                     <button @click="openSecondaryDisplay" class="flex items-center space-x-2 bg-teal-50 hover:bg-teal-100 text-teal-700 font-semibold py-2 px-4 rounded-lg transition-colors border border-teal-200">
-                        <span class="text-lg">📺</span> <span>動画ウィンドウ</span>
+                        <span class="text-lg"></span> <span>動画ウィンドウ</span>
                     </button>
                     <button @click="currentPage = 'home'" class="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">
-                        <span>🏠</span> <span>ホームへ</span>
+                        <span>ホームへ</span>
                     </button>
                 </div>
             </header>
@@ -180,17 +217,18 @@
                         </div>
                         <div class="flex justify-end mt-2">
                              <button @click="toggleSpeech" class="text-sm font-semibold transition-colors duration-200" :class="isSpeechEnabled ? 'text-blue-500' : 'text-gray-400'">
-                                <span v-if="isSpeechEnabled">🔊 読み上げ ON</span>
-                                <span v-else>🔇 読み上げ OFF</span>
+                                <span v-if="isSpeechEnabled">読み上げ ON</span>
+                                <span v-else>読み上げ OFF</span>
                              </button>
                         </div>
                     </div>
                 </div>
 
+                <!-- 右カラム：おすすめ書籍 -->
                 <div class="w-1/2 p-6 flex flex-col bg-slate-50">
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex-1 flex flex-col overflow-hidden">
                         <h2 class="text-lg font-bold text-slate-700 mb-6 flex items-center">
-                            <span class="mr-2 text-2xl">📚</span> AIからのおすすめ書籍
+                            AIからのおすすめ書籍
                         </h2>
                         <div class="flex-1 overflow-y-auto custom-scrollbar pr-2">
                             <div class="grid grid-cols-3 gap-6">
@@ -210,7 +248,7 @@
                     <!-- モーダル化に伴い非表示化（必要なら削除） 
                      <button @click="askAboutBook" :disabled="!selectedBook"
                             class="mt-6 w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-xl hover:from-emerald-600 hover:to-teal-600 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed transition-all transform active:scale-95 flex items-center justify-center">
-                        <span class="mr-2 text-xl">📖</span> この本について詳しく聞く
+                        この本について詳しく聞く
                     </button>
                     -->
                     <p class="mt-4 text-center text-sm text-slate-400">本をクリックして詳細を表示</p>
@@ -402,8 +440,7 @@ const currentSessionId = ref(null);
 const mainButtons = ref([ 
     { id: 1, text: '書籍検索', action: 'search', icon: 'search' }, 
     { id: 2, text: '会話集中モード', action: 'focus_chat', icon: 'chat' }, 
-    { id: 3, text: '会員情報', action: 'member_info', icon: 'card' },  
-    { id: 4, text: 'グッドスナイパー', action: 'good_sniper', icon: 'star' }
+    { id: 3, text: '会員情報', action: 'member_info', icon: 'card' }
 ]);
 const utilityButtons = ref([ { id: 6, text: 'オプション', action: 'options' } ]); 
 const chatHistory = ref([ 
