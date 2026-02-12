@@ -395,12 +395,26 @@ def speak():
         print(f"[TTS] Synthesizing: {text}")
         wav_path = synthesize_speech(text)
         
-        # aplayで音声を再生（バックグラウンド、デバイス指定）
+        # aplayで音声を再生（完了を待つ）
         print(f"[TTS] Playing audio: {wav_path}")
-        subprocess.Popen(['aplay', '-D', 'plughw:3,0', wav_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        result = subprocess.run(
+            ['aplay', '-D', 'plughw:3,0', wav_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True
+        )
         
-        # 即座にレスポンスを返す
-        return jsonify({"status": "ok", "message": "Speech playback started"})
+        # 再生完了後にWAVファイルを削除
+        if os.path.exists(wav_path):
+            os.remove(wav_path)
+            print(f"[TTS] Cleaned up: {wav_path}")
+        
+        if result.returncode == 0:
+            print(f"[TTS] Playback completed successfully")
+            return jsonify({"status": "ok", "message": "Speech playback completed"})
+        else:
+            print(f"[TTS] aplay error: {result.stderr}")
+            return jsonify({"status": "error", "message": f"aplay failed: {result.stderr}"}), 500
     
     except Exception as e:
         print(f"[TTS] Error: {e}")
