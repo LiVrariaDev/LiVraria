@@ -148,7 +148,8 @@ def synthesize_speech(text: str) -> str:
     text = re.sub(r'<[^>]+>', '', text)
 
     # 改行2つ目ほどまで読み上げる (OpenJTalkは改行記号で読み上げを停止する)
-    text = text.split('\n')[2]
+    # text.split('\n')[:2] で最初の2要素を取得し、連結する
+    text = "".join(text.split('\n')[:2])
     
     # 一時ファイルを作成
     txt_fd, txt_path = tempfile.mkstemp(suffix='.txt', text=True)
