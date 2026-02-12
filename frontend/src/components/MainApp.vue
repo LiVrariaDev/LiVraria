@@ -701,25 +701,42 @@ const fetchUserGreeting = () => {
 };
 
 // --- 音声認識の実装 ---
+import { speechRecognition } from '../services/speechRecognition';
+
 const isRecording = ref(false);
-let recognition = null;
-if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognition = new SpeechRecognition();
-    recognition.lang = 'ja-JP'; recognition.interimResults = false; recognition.continuous = false; 
-    recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        if (userInput.value) userInput.value += ' ' + transcript; else userInput.value = transcript;
-    };
-    recognition.onend = () => { isRecording.value = false; };
-    recognition.onerror = (event) => { console.error('音声認識エラー:', event.error); isRecording.value = false; alert('音声認識でエラーが発生しました: ' + event.error); };
-}
-const toggleSpeechRecognition = () => {
-    if (!recognition) return alert('音声認識未対応です');
-    if (isRecording.value) { recognition.stop(); } else { recognition.start(); isRecording.value = true; }
+const sttEngine = ref('');  // 使用中のエンジン名
+
+const toggleSpeechRecognition = async () => {
+    if (isRecording.value) {
+        speechRecognition.stop();
+        isRecording.value = false;
+    } else {
+        await speechRecognition.start();
+        isRecording.value = true;
+    }
 };
 
-onMounted(() => {
+onMounted(async () => {
+    // 音声認識サービスの初期化
+    await speechRecognition.initialize(
+        // 確定結果のコールバック
+        (text) => {
+            if (userInput.value) {
+                userInput.value += ' ' + text;
+            } else {
+                userInput.value = text;
+            }
+            isRecording.value = false;
+        },
+        // 部分結果のコールバック (オプション)
+        (text) => {
+            console.log('[STT] Partial:', text);
+        }
+    );
+    
+    sttEngine.value = speechRecognition.getCurrentEngine();
+    console.log(`[STT] Initialized with: ${sttEngine.value}`);
+    
     // OSコマンドで開く場合は自動オープンしない
     // openSecondaryDisplay(); 
     fetchUserGreeting();
@@ -727,7 +744,9 @@ onMounted(() => {
 
 onUnmounted(() => {
     channel.close();
-    if (recognition && isRecording.value) recognition.stop();
+    if (isRecording.value) {
+        speechRecognition.stop();
+    }
 });
 </script>
 

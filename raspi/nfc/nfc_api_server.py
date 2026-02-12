@@ -6,17 +6,20 @@ Provides HTTP endpoints for NFC card reading and text-to-speech
 
 from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
+from flask_sock import Sock
 import time
 import threading
 import subprocess
 import tempfile
 import os
+import json
 from pathlib import Path
 from smartcard.System import readers
 from smartcard.util import toHexString
 
 app = Flask(__name__)
 CORS(app)  # すべてのオリジンからのアクセスを許可
+sock = Sock(app)  # WebSocketサポート
 
 # NFCカード読み取り状態を保持
 nfc_state = {
@@ -29,6 +32,24 @@ nfc_lock = threading.Lock()
 # OpenJTalk設定
 OPENJTALK_DICT = "/var/lib/mecab/dic/open-jtalk/naist-jdic"
 OPENJTALK_VOICE = "/usr/share/hts-voice/Voice/mei/mei_normal.htsvoice"
+
+# VOSK設定
+VOSK_MODEL_PATH = os.getenv("VOSK_MODEL_PATH", "/opt/vosk-model-ja")
+vosk_model = None
+
+# VOSK初期化
+try:
+    from vosk import Model, KaldiRecognizer
+    if os.path.exists(VOSK_MODEL_PATH):
+        print(f"[VOSK] Loading model from {VOSK_MODEL_PATH}...")
+        vosk_model = Model(VOSK_MODEL_PATH)
+        print(f"✅ [VOSK] Model loaded successfully")
+    else:
+        print(f"⚠️  [VOSK] Model not found: {VOSK_MODEL_PATH}")
+except ImportError:
+    print("⚠️  [VOSK] vosk module not installed")
+except Exception as e:
+    print(f"❌ [VOSK] Failed to load model: {e}")
 
 
 def read_card_once(timeout=20):
@@ -175,8 +196,15 @@ def synthesize_speech(text: str) -> str:
 
 @app.route("/health", methods=["GET"])
 def health():
-    """ヘルスチェック用エンドポイント"""
-    return jsonify({"status": "ok", "service": "nfc-api"})
+    """
+    ヘルスチェック用エンドポイント
+    VOSK利用可否を含む
+    """
+    return jsonify({
+        "status": "ok",
+        "service": "nfc-api",
+        "vosk_available": vosk_model is not None
+    })
 
 
 @app.route("/start-nfc", methods=["POST"])
@@ -260,6 +288,63 @@ def read_nfc():
         return jsonify({"status": "no_card"})
 
 
+@sock.route("/stt/stream")
+def stt_stream(ws):
+    """
+    VOSK音声認識WebSocketエンドポイント
+    
+    受信: 音声データ (バイナリ)
+    送信: {"type": "partial"|"final", "text": "認識結果"}
+    """
+    if not vosk_model:
+        ws.send(json.dumps({
+            "error": "VOSK model not loaded",
+            "fallback": "web_speech_api"
+        }))
+        return
+    
+    # サンプルレート16000Hz
+    recognizer = KaldiRecognizer(vosk_model, 16000)
+    recognizer.SetWords(True)
+    
+    print("[VOSK] WebSocket connected")
+    
+    try:
+        while True:
+            data = ws.receive()
+            
+            if data is None:
+                break
+            
+            # バイナリデータを処理
+            if isinstance(data, bytes):
+                if recognizer.AcceptWaveform(data):
+                    # 確定結果
+                    result = json.loads(recognizer.Result())
+                    text = result.get("text", "")
+                    if text:
+                        ws.send(json.dumps({
+                            "type": "final",
+                            "text": text
+                        }))
+                        print(f"[VOSK] Final: {text}")
+                else:
+                    # 部分結果
+                    partial = json.loads(recognizer.PartialResult())
+                    text = partial.get("partial", "")
+                    if text:
+                        ws.send(json.dumps({
+                            "type": "partial",
+                            "text": text
+                        }))
+                        print(f"[VOSK] Partial: {text}")
+    
+    except Exception as e:
+        print(f"[VOSK] Error: {e}")
+    finally:
+        print("[VOSK] WebSocket disconnected")
+
+
 @app.route("/speak", methods=["POST"])
 def speak():
     """
@@ -303,13 +388,14 @@ def speak():
 
 
 if __name__ == "__main__":
-    print("🚀 NFC API Server starting on http://localhost:8000")
+    print("🚀 NFC API Server starting on http://0.0.0.0:8000")
     print("📡 Endpoints:")
-    print("   GET  /health       - Health check")
-    print("   POST /start-nfc    - Start NFC reading")
-    print("   GET  /check-nfc    - Check NFC reading status")
-    print("   GET  /read-nfc     - Get latest NFC reading result")
-    print("   POST /speak        - Text-to-speech synthesis and playback")
+    print("   GET  /health          - Health check (includes vosk_available)")
+    print("   WS   /stt/stream      - VOSK speech recognition (WebSocket)")
+    print("   POST /start-nfc       - Start NFC reading")
+    print("   GET  /check-nfc       - Check NFC reading status")
+    print("   GET  /read-nfc        - Get latest NFC reading result")
+    print("   POST /speak           - Text-to-speech synthesis and playback")
     
     app.run(host="0.0.0.0", port=8000, debug=False)
 
