@@ -8,6 +8,7 @@ Raspberry Pi上で動作するNFCカード読み取りAPIサーバーです。�
 - タイムアウト制御
 - CORS対応（フロントエンドからのアクセスを許可）
 - systemdによる自動起動
+- **音声合成（OpenJTalk）**: テキストを音声ファイルに変換してブラウザに返す
 
 ## セットアップ
 
@@ -157,6 +158,46 @@ NFC読み取り状態を確認します（ポーリング用）
 }
 ```
 
+### POST /speak
+
+テキストを音声合成してRaspberry Pi側のスピーカーで再生します（OpenJTalk + aplay使用）
+
+**Request Body:**
+```json
+{
+  "text": "合成するテキスト"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "message": "Speech playback started"
+}
+```
+
+**エラーレスポンス:**
+```json
+// textフィールドがない場合
+{
+  "status": "error",
+  "message": "Missing 'text' field"
+}
+
+// テキストが空の場合
+{
+  "status": "error",
+  "message": "Text is empty"
+}
+
+// 音声合成に失敗した場合
+{
+  "status": "error",
+  "message": "エラーメッセージ"
+}
+```
+
 ## 使用例（フロントエンド）
 
 ### パターン1: start-nfc + check-nfc（推奨）
@@ -218,6 +259,37 @@ const startNfc = async () => {
   }, 1000);
 };
 ```
+
+### パターン3: 音声合成（/speak）
+
+```javascript
+// テキストを音声合成してRaspberry Pi側で再生
+const speakText = async (text) => {
+  try {
+    const res = await fetch('http://localhost:8000/speak', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    
+    const result = await res.json();
+    
+    if (result.status === 'ok') {
+      console.log('音声再生開始:', result.message);
+    } else {
+      console.error('TTS Error:', result.message);
+    }
+  } catch (error) {
+    console.error('Failed to speak:', error);
+  }
+};
+
+// 使用例
+await speakText('図書館へようこそ');
+```
+
+> [!NOTE]
+> 音声はRaspberry Pi側のスピーカーから再生されます。ブラウザ側では再生されません。
 
 ## トラブルシューティング
 

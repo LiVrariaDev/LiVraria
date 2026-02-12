@@ -25,6 +25,11 @@ libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm \
 libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
 libffi-dev liblzma-dev git swig libpcsclite-dev pcscd pcsc-tools
 
+echo "=== Install OpenJTalk for TTS ==="
+sudo apt install -y open-jtalk open-jtalk-mecab-naist-jdic \
+hts-voice-nitech-jp-atr503-m001 alsa-utils
+echo "OpenJTalkのインストールが完了しました"
+
 echo "=== Start pcscd service ==="
 sudo systemctl start pcscd
 sudo systemctl enable pcscd

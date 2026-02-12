@@ -337,6 +337,7 @@ import { ref, onMounted, nextTick, onUnmounted } from 'vue';
 import { signOut, getIdToken } from "firebase/auth";
 import { auth } from '../firebaseConfig';
 import { api } from '../services/api'; 
+import { speak } from '../services/nfc';
 import BookSearch from './BookSearch.vue';
 import MemberInfoPage from './MemberInfoPage.vue'; 
 
@@ -348,54 +349,16 @@ const handleImageLoad = () => {
 };
 
 const isSpeechEnabled = ref(true);
-const selectedVoice = ref(null);
-
-const loadVoices = () => {
-    const voices = window.speechSynthesis.getVoices();
-    if (voices.length > 0) {
-        const jaVoices = voices.filter(voice => voice.lang.includes('ja'));
-        if (jaVoices.length > 0) {
-            const priorityNames = ['Google 日本語', 'Microsoft Nanami', 'Kyoko', 'O-Ren', 'Microsoft Haruka'];
-            let bestVoice = null;
-            for (const name of priorityNames) {
-                bestVoice = jaVoices.find(v => v.name.includes(name));
-                if (bestVoice) break;
-            }
-            selectedVoice.value = bestVoice || jaVoices[0];
-        }
-    }
-};
-window.speechSynthesis.onvoiceschanged = loadVoices;
 
 const toggleSpeech = () => {
     isSpeechEnabled.value = !isSpeechEnabled.value;
-    if (!isSpeechEnabled.value) {
-        window.speechSynthesis.cancel();
-    }
 };
 
-const speakText = (text) => {
-    // 修正: 新しい発話リクエストが来たら、現在再生中の音声を即座にキャンセルする
-    window.speechSynthesis.cancel();
+const speakText = async (text) => {
+    if (!isSpeechEnabled.value) return;
+    if (!text) return;
 
-    const finishInteraction = (delay = 0) => {
-        if (delay > 0) {
-            setTimeout(() => sendMessageToSecondary(null, 'idle'), delay);
-        } else {
-            sendMessageToSecondary(null, 'idle');
-        }
-    };
-
-    // 音声OFFまたはAPI非対応の場合でも、一定時間後にidleに戻す
-    if (!isSpeechEnabled.value || !window.speechSynthesis) {
-        const duration = text ? Math.min(text.length * 100 + 1000, 5000) : 2000;
-        finishInteraction(duration);
-        return;
-    }
-
-    if (!selectedVoice.value) loadVoices();
-
-    // 修正: HTMLタグと絵文字を除去
+    // HTMLタグと絵文字を除去
     const plainText = typeof text === 'string' 
         ? text.replace(/<[^>]+>/g, '') // HTMLタグ除去
               .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '') // 絵文字除去
@@ -407,17 +370,18 @@ const speakText = (text) => {
         return;
     }
 
-    const utterance = new SpeechSynthesisUtterance(plainText);
-    if (selectedVoice.value) utterance.voice = selectedVoice.value;
-    utterance.lang = 'ja-JP';
-    utterance.rate = 1.0;
-    
-    // 発話終了時に「待機(idle)」ステートを送信
-    utterance.onend = () => {
-        finishInteraction(0);
-    };
-
-    window.speechSynthesis.speak(utterance);
+    try {
+        // nfc.jsのspeak関数を呼び出し
+        const result = await speak(plainText);
+        
+        if (result.status === 'ok') {
+            console.log('[TTS] 音声再生開始:', result.message);
+        } else {
+            console.error('[TTS] Error:', result.message);
+        }
+    } catch (error) {
+        console.error('[TTS] Failed to speak:', error);
+    }
 };
 
 const icons = {
@@ -465,28 +429,32 @@ const sendMessageToSecondary = (text, state = 'speaking') => {
 };
 
 const handleHomeButtonClick = (action) => {
-    // 修正: ボタンクリック時の発話開始前にもキャンセルを入れる
-    window.speechSynthesis.cancel();
+    console.log('[DEBUG] handleHomeButtonClick called with action:', action);
 
     if (action === 'focus_chat') {
+        console.log('[DEBUG] Switching to chat_mode');
         currentPage.value = 'chat_mode';
     } else if (action === 'search') {
         // 書籍検索モードへ切り替え
         sessionStorage.removeItem('livraria_search_query'); // 通常検索時はクリア
+        console.log('[DEBUG] Switching to search_mode');
         currentPage.value = 'search_mode';
         const msg = "蔵書検索を開始します。";
         speakText(msg);
         sendMessageToSecondary(msg, 'neutral');
     } else if (action === 'member_info') {
+        console.log('[DEBUG] Switching to member_info');
         currentPage.value = 'member_info';
         const msg = "会員情報モードへ切り替えました。";
         speakText(msg);
         sendMessageToSecondary(msg, 'neutral');
     } else {
+        console.log('[DEBUG] Unknown action:', action);
         const msg = `「${action}」機能は準備中です。`;
         speakText(msg);
         sendMessageToSecondary(msg, 'neutral');
     }
+    console.log('[DEBUG] currentPage is now:', currentPage.value);
 };
 
 const updateSuggestedBooks = (books) => {
@@ -503,7 +471,6 @@ const updateSuggestedBooks = (books) => {
 const sendHomeMessage = async () => {
     const user = auth.currentUser;
     if (!user) {
-        window.speechSynthesis.cancel();
         const msg = 'エラー：ログインしてください。';
         speakText(msg);
         sendMessageToSecondary(msg, 'neutral');
@@ -511,9 +478,6 @@ const sendHomeMessage = async () => {
     }
     const message = userInput.value;
     userInput.value = '';
-    
-    // 修正: 送信処理開始時に、現在の発話をキャンセルする
-    window.speechSynthesis.cancel();
     
     isLoading.value = true;
 
@@ -554,9 +518,6 @@ const sendChatMessage = async () => {
 
     const message = userInput.value;
     userInput.value = '';
-    
-    // 修正: チャット送信処理開始時に、現在の発話をキャンセルする
-    window.speechSynthesis.cancel();
     
     chatHistory.value.push({ sender: 'user', text: message });
     scrollToBottom();
@@ -641,9 +602,6 @@ const askAboutBookFromModal = async () => {
     const title = bookDetail.value.title;
     const author = bookDetail.value.authors ? bookDetail.value.authors.join(', ') : '不明';
     const question = `「${title}」（著者: ${author}）の関連本や、似たようなジャンルのおすすめ本を検索して教えてください。`;
-    
-    // 発話をキャンセル
-    window.speechSynthesis.cancel();
     
     chatHistory.value.push({ sender: 'user', text: question });
     scrollToBottom();
@@ -737,17 +695,9 @@ const fetchUserGreeting = () => {
     // homeConversationTextはホーム画面のステータス表示にはもう使われていないが、念のため更新
     isLoading.value = false;
     
-    let attempts = 0;
-    const speakGreeting = () => {
-        if (selectedVoice.value || attempts > 10) {
-            speakText(greeting);
-            sendMessageToSecondary(greeting, 'neutral');
-        } else {
-            attempts++;
-            setTimeout(speakGreeting, 100);
-        }
-    };
-    speakGreeting();
+    // 即座に音声再生
+    speakText(greeting);
+    sendMessageToSecondary(greeting, 'neutral');
 };
 
 // --- 音声認識の実装 ---
@@ -773,14 +723,11 @@ onMounted(() => {
     // OSコマンドで開く場合は自動オープンしない
     // openSecondaryDisplay(); 
     fetchUserGreeting();
-    loadVoices();
-    setTimeout(loadVoices, 500);
 });
 
 onUnmounted(() => {
     channel.close();
     if (recognition && isRecording.value) recognition.stop();
-    window.speechSynthesis.cancel();
 });
 </script>
 
