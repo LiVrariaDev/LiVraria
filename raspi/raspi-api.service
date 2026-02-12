@@ -6,8 +6,8 @@ Requires=pcscd.service
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/home/dryophytes/school/LiVraria/raspi
-ExecStart=/usr/bin/python3 /home/dryophytes/school/LiVraria/raspi/raspi_api_server.py
+WorkingDirectory=/home/livraria/LiVraria/raspi
+ExecStart=/usr/bin/python3 /home/livraria/LiVraria/raspi/raspi_api_server.py
 Restart=always
 RestartSec=10
 
