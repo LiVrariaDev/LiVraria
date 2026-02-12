@@ -443,25 +443,31 @@ const sendMessageToSecondary = (text, state = 'speaking') => {
 };
 
 const handleHomeButtonClick = (action) => {
+    console.log('[DEBUG] handleHomeButtonClick called with action:', action);
 
     if (action === 'focus_chat') {
+        console.log('[DEBUG] Switching to chat_mode');
         currentPage.value = 'chat_mode';
     } else if (action === 'search') {
         // 書籍検索モードへ切り替え
+        console.log('[DEBUG] Switching to search_mode');
         currentPage.value = 'search_mode';
         const msg = "蔵書検索を開始します。";
         speakText(msg);
         sendMessageToSecondary(msg, 'neutral');
     } else if (action === 'member_info') {
+        console.log('[DEBUG] Switching to member_info');
         currentPage.value = 'member_info';
         const msg = "会員情報モードへ切り替えました。";
         speakText(msg);
         sendMessageToSecondary(msg, 'neutral');
     } else {
+        console.log('[DEBUG] Unknown action:', action);
         const msg = `「${action}」機能は準備中です。`;
         speakText(msg);
         sendMessageToSecondary(msg, 'neutral');
     }
+    console.log('[DEBUG] currentPage is now:', currentPage.value);
 };
 
 const updateSuggestedBooks = (books) => {
@@ -683,17 +689,9 @@ const fetchUserGreeting = () => {
     // homeConversationTextはホーム画面のステータス表示にはもう使われていないが、念のため更新
     isLoading.value = false;
     
-    let attempts = 0;
-    const speakGreeting = () => {
-        if (selectedVoice.value || attempts > 10) {
-            speakText(greeting);
-            sendMessageToSecondary(greeting, 'neutral');
-        } else {
-            attempts++;
-            setTimeout(speakGreeting, 100);
-        }
-    };
-    speakGreeting();
+    // 即座に音声再生
+    speakText(greeting);
+    sendMessageToSecondary(greeting, 'neutral');
 };
 
 // --- 音声認識の実装 ---
