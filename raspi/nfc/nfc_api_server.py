@@ -266,9 +266,9 @@ def speak():
         print(f"[TTS] Synthesizing: {text}")
         wav_path = synthesize_speech(text)
         
-        # aplayで音声を再生（バックグラウンド）
+        # aplayで音声を再生（バックグラウンド、デバイス指定）
         print(f"[TTS] Playing audio: {wav_path}")
-        subprocess.Popen(['aplay', wav_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.Popen(['aplay', '-D', 'plughw:3,0', wav_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
         # 即座にレスポンスを返す
         return jsonify({"status": "ok", "message": "Speech playback started"})
