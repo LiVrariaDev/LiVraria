@@ -366,44 +366,16 @@ const handleImageLoad = () => {
 };
 
 const isSpeechEnabled = ref(true);
-const selectedVoice = ref(null);
-
-const loadVoices = () => {
-    const voices = window.speechSynthesis.getVoices();
-    if (voices.length > 0) {
-        const jaVoices = voices.filter(voice => voice.lang.includes('ja'));
-        if (jaVoices.length > 0) {
-            const priorityNames = ['Google 日本語', 'Microsoft Nanami', 'Kyoko', 'O-Ren', 'Microsoft Haruka'];
-            let bestVoice = null;
-            for (const name of priorityNames) {
-                bestVoice = jaVoices.find(v => v.name.includes(name));
-                if (bestVoice) break;
-            }
-            selectedVoice.value = bestVoice || jaVoices[0];
-        }
-    }
-};
-window.speechSynthesis.onvoiceschanged = loadVoices;
 
 const toggleSpeech = () => {
     isSpeechEnabled.value = !isSpeechEnabled.value;
-    if (!isSpeechEnabled.value) {
-        window.speechSynthesis.cancel();
-    }
 };
 
-const speakText = (text) => {
+const speakText = async (text) => {
     if (!isSpeechEnabled.value) return;
-    if (!window.speechSynthesis) return;
-    
-    // 修正: 新しい発話リクエストが来たら、現在再生中の音声を即座にキャンセルする
-    window.speechSynthesis.cancel();
-
     if (!text) return;
 
-    if (!selectedVoice.value) loadVoices();
-
-    // 修正: HTMLタグと絵文字を除去
+    // HTMLタグと絵文字を除去
     const plainText = typeof text === 'string' 
         ? text.replace(/<[^>]+>/g, '') // HTMLタグ除去
               .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '') // 絵文字除去
@@ -411,17 +383,24 @@ const speakText = (text) => {
 
     if (!plainText.trim()) return;
 
-    const utterance = new SpeechSynthesisUtterance(plainText);
-    if (selectedVoice.value) utterance.voice = selectedVoice.value;
-    utterance.lang = 'ja-JP';
-    utterance.rate = 1.0;
-    
-    // 発話終了時に「待機(idle)」ステートを送信
-    utterance.onend = () => {
-        sendMessageToSecondary(null, 'idle');
-    };
+    try {
+        // Raspberry Pi側の/speakエンドポイントを呼び出し
+        const response = await fetch('http://localhost:8000/speak', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: plainText })
+        });
 
-    window.speechSynthesis.speak(utterance);
+        const result = await response.json();
+        
+        if (result.status === 'ok') {
+            console.log('[TTS] 音声再生開始:', result.message);
+        } else {
+            console.error('[TTS] Error:', result.message);
+        }
+    } catch (error) {
+        console.error('[TTS] Failed to speak:', error);
+    }
 };
 
 const icons = {
@@ -469,8 +448,6 @@ const sendMessageToSecondary = (text, state = 'speaking') => {
 };
 
 const handleHomeButtonClick = (action) => {
-    // 修正: ボタンクリック時の発話開始前にもキャンセルを入れる
-    window.speechSynthesis.cancel();
 
     if (action === 'focus_chat') {
         currentPage.value = 'chat_mode';
@@ -506,7 +483,6 @@ const updateSuggestedBooks = (books) => {
 const sendHomeMessage = async () => {
     const user = auth.currentUser;
     if (!user) {
-        window.speechSynthesis.cancel();
         const msg = 'エラー：ログインしてください。';
         speakText(msg);
         sendMessageToSecondary(msg, 'neutral');
@@ -514,9 +490,6 @@ const sendHomeMessage = async () => {
     }
     const message = userInput.value;
     userInput.value = '';
-    
-    // 修正: 送信処理開始時に、現在の発話をキャンセルする
-    window.speechSynthesis.cancel();
     
     isLoading.value = true;
 
@@ -557,9 +530,6 @@ const sendChatMessage = async () => {
 
     const message = userInput.value;
     userInput.value = '';
-    
-    // 修正: チャット送信処理開始時に、現在の発話をキャンセルする
-    window.speechSynthesis.cancel();
     
     chatHistory.value.push({ sender: 'user', text: message });
     scrollToBottom();
@@ -644,9 +614,6 @@ const askAboutBookFromModal = async () => {
     const title = bookDetail.value.title;
     const author = bookDetail.value.authors ? bookDetail.value.authors.join(', ') : '不明';
     const question = `「${title}」（著者: ${author}）の関連本や、似たようなジャンルのおすすめ本を検索して教えてください。`;
-    
-    // 発話をキャンセル
-    window.speechSynthesis.cancel();
     
     chatHistory.value.push({ sender: 'user', text: question });
     scrollToBottom();
@@ -757,14 +724,11 @@ onMounted(() => {
     // OSコマンドで開く場合は自動オープンしない
     // openSecondaryDisplay(); 
     fetchUserGreeting();
-    loadVoices();
-    setTimeout(loadVoices, 500);
 });
 
 onUnmounted(() => {
     channel.close();
     if (recognition && isRecording.value) recognition.stop();
-    window.speechSynthesis.cancel();
 });
 </script>
 
