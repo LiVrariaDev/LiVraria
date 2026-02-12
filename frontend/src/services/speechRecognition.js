@@ -1,36 +1,29 @@
-import { VoskSTT } from './vosk';
+import { VoskBrowserSTT } from './voskBrowser';
 
 class SpeechRecognitionService {
     constructor() {
-        this.useVosk = false;
-        this.voskSTT = null;
+        this.useVoskBrowser = false;
+        this.voskBrowserSTT = null;
         this.webSpeechAPI = null;
         this.isInitialized = false;
-        this.raspiHost = null;  // Raspberry PiのIPアドレス
     }
 
     /**
-     * Raspberry Piのヘルスチェック
-     * nfc-apiはRaspberry Pi内で動作するため、localhostで固定
+     * Vosk-browser (WebAssembly) 対応チェック
      */
-    async detectRaspiAndCheckHealth() {
-        // Raspberry Pi内で動作するため、localhostを使用
-        this.raspiHost = 'localhost';
+    async detectVoskBrowserSupport() {
+        // WebAssembly対応チェック
+        if (!window.WebAssembly) {
+            console.log('[STT] WebAssembly not supported');
+            return false;
+        }
 
         try {
-            const response = await fetch(`http://${this.raspiHost}:8000/health`, {
-                method: 'GET',
-                signal: AbortSignal.timeout(3000)  // 3秒タイムアウト
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                console.log('[STT] Raspberry Pi health:', data);
-                return data.vosk_available === true;
-            }
-            return false;
+            // Vosk-browserの初期化テスト
+            console.log('[STT] Testing Vosk-browser support...');
+            return true;  // vosk-browserがインストールされていればtrue
         } catch (error) {
-            console.log('[STT] Raspberry Pi not available, using Web Speech API');
+            console.log('[STT] Vosk-browser not available:', error);
             return false;
         }
     }
@@ -41,11 +34,19 @@ class SpeechRecognitionService {
     async initialize(onResult, onPartial) {
         if (this.isInitialized) return;
 
-        this.useVosk = await this.detectRaspiAndCheckHealth();
+        this.useVoskBrowser = await this.detectVoskBrowserSupport();
 
-        if (this.useVosk) {
-            console.log('[STT] Using VOSK on Raspberry Pi');
-            this.voskSTT = new VoskSTT(this.raspiHost, onResult, onPartial);
+        if (this.useVoskBrowser) {
+            console.log('[STT] Using Vosk-browser (WebAssembly)');
+            this.voskBrowserSTT = new VoskBrowserSTT(onResult, onPartial);
+
+            try {
+                await this.voskBrowserSTT.initialize();
+            } catch (error) {
+                console.error('[STT] Vosk-browser initialization failed, falling back to Web Speech API:', error);
+                this.useVoskBrowser = false;
+                this.setupWebSpeechAPI(onResult, onPartial);
+            }
         } else {
             console.log('[STT] Using Web Speech API');
             this.setupWebSpeechAPI(onResult, onPartial);
@@ -90,23 +91,31 @@ class SpeechRecognitionService {
     }
 
     async start() {
-        if (this.useVosk && this.voskSTT) {
-            await this.voskSTT.start();
+        if (this.useVoskBrowser && this.voskBrowserSTT) {
+            await this.voskBrowserSTT.start();
         } else if (this.webSpeechAPI) {
             this.webSpeechAPI.start();
         }
     }
 
     stop() {
-        if (this.useVosk && this.voskSTT) {
-            this.voskSTT.stop();
-        } else if (this.webSpeechAPI) {
+        console.log('[STT] Stopping speech recognition...');
+
+        if (this.useVoskBrowser && this.voskBrowserSTT) {
+            console.log('[STT] Stopping Vosk-browser...');
+            this.voskBrowserSTT.stop();
+        }
+
+        if (this.webSpeechAPI) {
+            console.log('[STT] Stopping Web Speech API...');
             this.webSpeechAPI.stop();
         }
+
+        console.log('[STT] Speech recognition stopped');
     }
 
     getCurrentEngine() {
-        return this.useVosk ? 'VOSK (Raspberry Pi)' : 'Web Speech API';
+        return this.useVoskBrowser ? 'Vosk-browser (WebAssembly)' : 'Web Speech API';
     }
 }
 

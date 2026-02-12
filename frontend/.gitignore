@@ -33,3 +33,6 @@ coverage
 *.sw?
 
 *.tsbuildinfo
+
+# VOSK models (large files, download during setup)
+public/models/
