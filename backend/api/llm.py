@@ -21,6 +21,12 @@ from backend.search.rakuten_books import rakuten_search_books
 # Logger
 logger = logging.getLogger("uvicorn.error")
 
+# LangChainのデバッグログを有効化（環境変数で制御）
+if os.getenv("LANGCHAIN_DEBUG", "false").lower() == "true":
+	import langchain
+	langchain.debug = True
+	logger.info("[DEBUG] LangChain debug mode enabled")
+
 
 # State Definition
 
@@ -496,6 +502,15 @@ def llm_chat(
 				"search_results": {},
 				"recommended_books": []
 			})
+			
+			# デバッグ: 結果の詳細をログ出力
+			logger.info(f"[DEBUG] LangGraph result keys: {list(result.keys())}")
+			logger.info(f"[DEBUG] Messages count in result: {len(result.get('messages', []))}")
+			if result.get('messages'):
+				for idx, msg in enumerate(result['messages']):
+					msg_type = type(msg).__name__
+					msg_content = getattr(msg, 'content', 'N/A')
+					logger.info(f"[DEBUG] Message {idx}: type={msg_type}, content_type={type(msg_content).__name__}, content={msg_content[:100] if isinstance(msg_content, str) else msg_content}")
 			
 			# 最後のAIメッセージを取得
 			ai_messages = [msg for msg in result["messages"] if isinstance(msg, AIMessage)]
