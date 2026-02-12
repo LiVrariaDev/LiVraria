@@ -140,53 +140,71 @@ def synthesize_speech(text: str) -> str:
     """
     import wave
     import struct
+    import re
+    
+    # HTMLタグ（<br>など）を改行に変換
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    # その他のHTMLタグを除去
+    text = re.sub(r'<[^>]+>', '', text)
     
     # 一時ファイルを作成
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as txt_file:
-        txt_file.write(text)
-        txt_path = txt_file.name
-    
-    temp_wav_path = tempfile.mktemp(suffix='.wav')
-    final_wav_path = tempfile.mktemp(suffix='.wav')
-    
+    txt_fd, txt_path = tempfile.mkstemp(suffix='.txt', text=True)
     try:
-        # OpenJTalkコマンドを実行
-        cmd = [
-            'open_jtalk',
-            '-x', OPENJTALK_DICT,
-            '-m', OPENJTALK_VOICE,
-            '-ow', temp_wav_path,
-            txt_path
-        ]
+        # ファイルディスクリプタに書き込み
+        with os.fdopen(txt_fd, 'w', encoding='utf-8') as txt_file:
+            txt_file.write(text)
+            txt_file.flush()  # 明示的にフラッシュ
         
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        temp_wav_path = tempfile.mktemp(suffix='.wav')
+        final_wav_path = tempfile.mktemp(suffix='.wav')
         
-        if result.returncode != 0:
-            raise RuntimeError(f"OpenJTalk failed: {result.stderr}")
-        
-        if not os.path.exists(temp_wav_path):
-            raise RuntimeError("WAV file was not generated")
-        
-        # 先頭に無音を追加（0.2秒）
-        with wave.open(temp_wav_path, 'rb') as wav_in:
-            params = wav_in.getparams()
-            frames = wav_in.readframes(wav_in.getnframes())
+        try:
+            # OpenJTalkコマンドを実行
+            cmd = [
+                'open_jtalk',
+                '-x', OPENJTALK_DICT,
+                '-m', OPENJTALK_VOICE,
+                '-ow', temp_wav_path,
+                txt_path
+            ]
             
-            # 無音データを生成（0で埋める）
-            silence_duration = 0.2  # 秒
-            silence_frames = int(params.framerate * silence_duration)
-            silence_data = struct.pack('h' * silence_frames * params.nchannels, 
-                                       *([0] * silence_frames * params.nchannels))
+            print(f"[DEBUG] Running OpenJTalk with text file: {txt_path}")
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             
-            # 無音 + 元の音声データを結合
-            with wave.open(final_wav_path, 'wb') as wav_out:
-                wav_out.setparams(params)
-                wav_out.writeframes(silence_data + frames)
+            if result.returncode != 0:
+                raise RuntimeError(f"OpenJTalk failed: {result.stderr}")
+            
+            if not os.path.exists(temp_wav_path):
+                raise RuntimeError("WAV file was not generated")
+            
+            # 先頭に無音を追加（0.2秒）
+            with wave.open(temp_wav_path, 'rb') as wav_in:
+                params = wav_in.getparams()
+                frames = wav_in.readframes(wav_in.getnframes())
+                
+                # 無音データを生成（0で埋める）
+                silence_duration = 0.2  # 秒
+                silence_frames = int(params.framerate * silence_duration)
+                silence_data = struct.pack('h' * silence_frames * params.nchannels, 
+                                           *([0] * silence_frames * params.nchannels))
+                
+                # 無音 + 元の音声データを結合
+                with wave.open(final_wav_path, 'wb') as wav_out:
+                    wav_out.setparams(params)
+                    wav_out.writeframes(silence_data + frames)
+            
+            # 一時ファイルを削除
+            os.remove(temp_wav_path)
+            
+            return final_wav_path
         
-        # 一時ファイルを削除
-        os.remove(temp_wav_path)
-        
-        return final_wav_path
+        except Exception as e:
+            # エラー時は一時ファイルをクリーンアップ
+            if os.path.exists(temp_wav_path):
+                os.remove(temp_wav_path)
+            if os.path.exists(final_wav_path):
+                os.remove(final_wav_path)
+            raise e
     
     finally:
         # テキストファイルを削除
