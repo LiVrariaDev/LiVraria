@@ -28,7 +28,7 @@ nfc_lock = threading.Lock()
 
 # OpenJTalk設定
 OPENJTALK_DICT = "/var/lib/mecab/dic/open-jtalk/naist-jdic"
-OPENJTALK_VOICE = "/usr/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice"
+OPENJTALK_VOICE = "/usr/share/hts-voice/Voice/mei/mei_normal.htsvoice"
 
 
 def read_card_once(timeout=20):
