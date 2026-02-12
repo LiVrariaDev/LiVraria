@@ -15,7 +15,7 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
 # User-defined
-from backend import PROMPTS_DIR, LLM_MAX_RETRIES
+from backend import PROMPTS_DIR, LLM_MAX_RETRIES, LLM_HISTORY_LIMIT
 from backend.search.rakuten_books import rakuten_search_books
 
 # Logger
@@ -485,6 +485,14 @@ def llm_chat(
 		current_message = HumanMessage(content=message)
 		messages = history + [current_message]
 		logger.info(f"[DEBUG] With history, messages count: {len(messages)}")
+		
+		# 履歴が長すぎる場合は最新のメッセージのみを保持（Gemini 2.5 Flashの空レスポンス対策）
+		if len(messages) > LLM_HISTORY_LIMIT:
+			# 最初のメッセージ（システムプロンプト含む）と最新のN件を保持
+			first_message = messages[0]
+			recent_messages = messages[-(LLM_HISTORY_LIMIT - 1):]
+			messages = [first_message] + recent_messages
+			logger.info(f"[INFO] History truncated to {len(messages)} messages (limit: {LLM_HISTORY_LIMIT})")
 	
 	logger.info(f"[DEBUG] Final messages for LangGraph: {len(messages)} messages")
 	

@@ -28,6 +28,7 @@ SESSION_TIMEOUT = 1800  # 30分（秒単位）
 
 # LLM settings
 LLM_MAX_RETRIES = 3  # LLMが空のレスポンスを返した場合の最大リトライ回数
+LLM_HISTORY_LIMIT = 100  # 会話履歴の最大メッセージ数（システムプロンプト除く）
 
 
 # Database settings
