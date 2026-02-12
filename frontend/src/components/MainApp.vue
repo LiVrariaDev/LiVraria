@@ -337,7 +337,7 @@ import { ref, onMounted, nextTick, onUnmounted } from 'vue';
 import { signOut, getIdToken } from "firebase/auth";
 import { auth } from '../firebaseConfig';
 import { api } from '../services/api'; 
-import { speak } from '../services/nfc';
+import { textToSpeech } from '../services/textToSpeech';
 import BookSearch from './BookSearch.vue';
 import MemberInfoPage from './MemberInfoPage.vue'; 
 
@@ -352,33 +352,17 @@ const isSpeechEnabled = ref(true);
 
 const toggleSpeech = () => {
     isSpeechEnabled.value = !isSpeechEnabled.value;
+    if (!isSpeechEnabled.value) {
+        textToSpeech.cancel();
+    }
 };
 
 const speakText = async (text) => {
     if (!isSpeechEnabled.value) return;
     if (!text) return;
 
-    // HTMLタグと絵文字を除去
-    const plainText = typeof text === 'string' 
-        ? text.replace(/<[^>]+>/g, '') // HTMLタグ除去
-              .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '') // 絵文字除去
-        : '';
-
-    // テキストが無い場合（表情のみの場合など）も、2秒後にidleに戻す
-    if (!plainText.trim()) {
-        finishInteraction(2000);
-        return;
-    }
-
     try {
-        // nfc.jsのspeak関数を呼び出し
-        const result = await speak(plainText);
-        
-        if (result.status === 'ok') {
-            console.log('[TTS] 音声再生開始:', result.message);
-        } else {
-            console.error('[TTS] Error:', result.message);
-        }
+        await textToSpeech.speak(text);
     } catch (error) {
         console.error('[TTS] Failed to speak:', error);
     }
@@ -736,6 +720,10 @@ onMounted(async () => {
     
     sttEngine.value = speechRecognition.getCurrentEngine();
     console.log(`[STT] Initialized with: ${sttEngine.value}`);
+    
+    // TTSサービスの初期化
+    await textToSpeech.initialize();
+    console.log(`[TTS] Initialized with: ${textToSpeech.getCurrentEngine()}`);
     
     // OSコマンドで開く場合は自動オープンしない
     // openSecondaryDisplay(); 
