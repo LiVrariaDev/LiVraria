@@ -355,6 +355,7 @@ import { ref, onMounted, nextTick, onUnmounted } from 'vue';
 import { signOut, getIdToken } from "firebase/auth";
 import { auth } from '../firebaseConfig';
 import { api } from '../services/api'; 
+import { speak } from '../services/nfc';
 import BookSearch from './BookSearch.vue';
 import MemberInfoPage from './MemberInfoPage.vue'; 
 
@@ -384,14 +385,8 @@ const speakText = async (text) => {
     if (!plainText.trim()) return;
 
     try {
-        // Raspberry Pi側の/speakエンドポイントを呼び出し
-        const response = await fetch('http://localhost:8000/speak', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: plainText })
-        });
-
-        const result = await response.json();
+        // nfc.jsのspeak関数を呼び出し
+        const result = await speak(plainText);
         
         if (result.status === 'ok') {
             console.log('[TTS] 音声再生開始:', result.message);

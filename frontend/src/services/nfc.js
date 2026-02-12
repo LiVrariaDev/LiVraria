@@ -2,11 +2,27 @@
  * NFC API Server (Mock/Raspi) と通信するためのユーティリティ
  */
 
-// NFCサーバーのベースURL (ローカル開発用)
-// 本番環境（Raspi上）では 'http://localhost:8000' かもしれないが、
-// Viteプロキシ経由ではない（Raspi上の別プロセス）ため、ここでは直接指定するか、設定可能にする必要がある
-// 一旦ハードコード（モック用に合わせて）
-const NFC_SERVER_URL = 'http://localhost:8000';
+// NFCサーバーのベースURL
+// 環境変数から取得、デフォルトは http://localhost:8000
+const NFC_SERVER_URL = import.meta.env.VITE_NFC_API_URL || 'http://localhost:8000';
+
+/**
+ * 音声合成（Raspberry Pi NFC APIサーバー）
+ * @param {string} text - 合成するテキスト
+ * @returns {Promise<Object>} - { status: 'ok', message: '...' }
+ */
+export const speak = async (text) => {
+    const response = await fetch(`${NFC_SERVER_URL}/speak`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ text })
+    });
+
+    if (!response.ok) throw new Error('Failed to speak');
+    return response.json();
+};
 
 /**
  * NFCカードの読み取りを開始し、検出されたらコールバックを実行する
