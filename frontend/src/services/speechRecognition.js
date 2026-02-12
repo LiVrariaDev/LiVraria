@@ -9,26 +9,6 @@ class SpeechRecognitionService {
     }
 
     /**
-     * Vosk-browser (WebAssembly) 対応チェック
-     */
-    async detectVoskBrowserSupport() {
-        // WebAssembly対応チェック
-        if (!window.WebAssembly) {
-            console.log('[STT] WebAssembly not supported');
-            return false;
-        }
-
-        try {
-            // Vosk-browserの初期化テスト
-            console.log('[STT] Testing Vosk-browser support...');
-            return true;  // vosk-browserがインストールされていればtrue
-        } catch (error) {
-            console.log('[STT] Vosk-browser not available:', error);
-            return false;
-        }
-    }
-
-    /**
      * 初期化
      */
     async initialize(onResult, onPartial) {
@@ -37,33 +17,77 @@ class SpeechRecognitionService {
             this.voskBrowserSTT.onResult = onResult;
             this.voskBrowserSTT.onPartial = onPartial;
         }
-        if (this.webSpeechAPI) {
-            // Web Speech APIのコールバック更新ロジックが必要ならここに追加
-            // 現状の実装では再設定機能がないため、webSpeechAPIの再生成が必要かもしれないが、
-            // 今回はVosk-browser優先
-        }
 
         if (this.isInitialized) return;
 
-        this.useVoskBrowser = await this.detectVoskBrowserSupport();
+        // エンジン選択ロジック
+        // 1. APIサーバー(Raspi)が稼働しているか確認
+        // 2. 稼働している場合 -> Web Speech APIが使えない可能性が高い(Raspi Chromium)ため、Vosk-browserを優先
+        // 3. 稼働していない場合 -> PC環境とみなし、Web Speech APIを優先
 
+        const isApiAvailable = await this.checkApiHealth();
+        const isWebSpeechSupported = ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
+
+        console.log(`[STT] API Server: ${isApiAvailable ? 'Available' : 'Unavailable'}`);
+        console.log(`[STT] Web Speech API: ${isWebSpeechSupported ? 'Supported' : 'Not Supported'}`);
+
+        if (isApiAvailable) {
+            console.log('[STT] Raspberry Pi environment detected (API Available). Using Vosk-browser.');
+            this.useVoskBrowser = true;
+        } else if (isWebSpeechSupported) {
+            console.log('[STT] PC environment detected. Using Web Speech API.');
+            this.useVoskBrowser = false;
+        } else {
+            console.warn('[STT] Web Speech API not supported. Fallback to Vosk-browser.');
+            this.useVoskBrowser = true;
+        }
+
+        // Vosk-browserを使用する場合の初期化
         if (this.useVoskBrowser) {
-            console.log('[STT] Using Vosk-browser (WebAssembly)');
+            console.log('[STT] Initializing Vosk-browser (WebAssembly)...');
             this.voskBrowserSTT = new VoskBrowserSTT(onResult, onPartial);
 
             try {
                 await this.voskBrowserSTT.initialize();
+                console.log('[STT] Vosk-browser initialized successfully');
             } catch (error) {
-                console.error('[STT] Vosk-browser initialization failed, falling back to Web Speech API:', error);
-                this.useVoskBrowser = false;
-                this.setupWebSpeechAPI(onResult, onPartial);
+                console.error('[STT] Vosk-browser initialization failed:', error);
+
+                // Vosk初期化失敗時のフォールバック
+                if (isWebSpeechSupported) {
+                    console.log('[STT] Falling back to Web Speech API');
+                    this.useVoskBrowser = false;
+                    this.setupWebSpeechAPI(onResult, onPartial);
+                }
             }
-        } else {
-            console.log('[STT] Using Web Speech API');
+        }
+
+        // Web Speech APIを使用する場合
+        if (!this.useVoskBrowser) {
             this.setupWebSpeechAPI(onResult, onPartial);
         }
 
         this.isInitialized = true;
+    }
+
+    /**
+     * APIサーバーの稼働確認
+     */
+    async checkApiHealth() {
+        try {
+            // タイムアウトを短めに設定
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 1000);
+
+            const response = await fetch('http://localhost:8000/health', {
+                method: 'GET',
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            return response.ok;
+        } catch (error) {
+            return false;
+        }
     }
 
     setupWebSpeechAPI(onResult, onPartial) {
