@@ -48,13 +48,13 @@ class SpeechRecognitionService {
             this.voskSTT = new VoskSTT(this.raspiHost, onResult, onPartial);
         } else {
             console.log('[STT] Using Web Speech API');
-            this.setupWebSpeechAPI(onResult);
+            this.setupWebSpeechAPI(onResult, onPartial);
         }
 
         this.isInitialized = true;
     }
 
-    setupWebSpeechAPI(onResult) {
+    setupWebSpeechAPI(onResult, onPartial) {
         if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
             console.error('[STT] Web Speech API not supported');
             return;
@@ -63,12 +63,21 @@ class SpeechRecognitionService {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         this.webSpeechAPI = new SpeechRecognition();
         this.webSpeechAPI.lang = 'ja-JP';
-        this.webSpeechAPI.interimResults = false;
+        this.webSpeechAPI.interimResults = true;  // リアルタイム入力を有効化
         this.webSpeechAPI.continuous = false;
 
         this.webSpeechAPI.onresult = (event) => {
-            const transcript = event.results[0][0].transcript;
-            onResult(transcript);
+            // 最新の結果を取得
+            const result = event.results[event.results.length - 1];
+            const transcript = result[0].transcript;
+
+            if (result.isFinal) {
+                // 確定結果
+                onResult(transcript);
+            } else if (onPartial) {
+                // 部分結果（リアルタイム）
+                onPartial(transcript);
+            }
         };
 
         this.webSpeechAPI.onend = () => {
