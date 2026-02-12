@@ -211,6 +211,10 @@
                                 送信
                             </button>
                         </div>
+                        <!-- 音声認識の部分結果表示 -->
+                        <div v-if="partialText" class="mt-2 text-sm text-gray-500 italic">
+                            認識中: {{ partialText }}
+                        </div>
                         <div class="flex justify-end mt-2">
                              <button @click="toggleSpeech" class="text-sm font-semibold transition-colors duration-200" :class="isSpeechEnabled ? 'text-blue-500' : 'text-gray-400'">
                                 <span v-if="isSpeechEnabled">読み上げ ON</span>
@@ -349,6 +353,7 @@ const handleImageLoad = () => {
 };
 
 const isSpeechEnabled = ref(true);
+const isSpeaking = ref(false);  // AI発話中フラグ
 
 const toggleSpeech = () => {
     isSpeechEnabled.value = !isSpeechEnabled.value;
@@ -361,10 +366,31 @@ const speakText = async (text) => {
     if (!isSpeechEnabled.value) return;
     if (!text) return;
 
+    // 音声認識を一時停止（AI音声を拾わないようにする）
+    const wasRecording = isRecording.value;
+    if (wasRecording) {
+        speechRecognition.stop();
+        isRecording.value = false;
+    }
+
+    isSpeaking.value = true;
+
     try {
         await textToSpeech.speak(text);
+        
+        // TTS完了を待つ（推定時間: 文字数 * 0.1秒 + 1秒のバッファ）
+        const estimatedDuration = (text.length * 0.1 + 1) * 1000;
+        await new Promise(resolve => setTimeout(resolve, estimatedDuration));
     } catch (error) {
         console.error('[TTS] Failed to speak:', error);
+    } finally {
+        isSpeaking.value = false;
+        
+        // 音声認識を再開（元々録音中だった場合のみ）
+        if (wasRecording) {
+            await speechRecognition.start();
+            isRecording.value = true;
+        }
     }
 };
 
@@ -378,6 +404,7 @@ const icons = {
 
 const currentPage = ref('home');
 const userInput = ref('');
+const partialText = ref('');  // 音声認識の部分結果
 const isLoading = ref(false);
 const secondaryWindow = ref(null);
 const currentSessionId = ref(null); 
@@ -691,6 +718,12 @@ const isRecording = ref(false);
 const sttEngine = ref('');  // 使用中のエンジン名
 
 const toggleSpeechRecognition = async () => {
+    // AI発話中は音声認識を開始しない
+    if (isSpeaking.value && !isRecording.value) {
+        console.warn('[STT] AI が話している間は音声認識できません');
+        return;
+    }
+
     if (isRecording.value) {
         speechRecognition.stop();
         isRecording.value = false;
@@ -710,10 +743,12 @@ onMounted(async () => {
             } else {
                 userInput.value = text;
             }
+            partialText.value = '';  // 確定時に部分結果をクリア
             isRecording.value = false;
         },
         // 部分結果のコールバック (オプション)
         (text) => {
+            partialText.value = text;  // 部分結果をUI表示
             console.log('[STT] Partial:', text);
         }
     );

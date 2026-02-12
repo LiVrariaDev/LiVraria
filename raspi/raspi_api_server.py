@@ -336,6 +336,8 @@ def stt_stream(ws):
             
             # バイナリデータを処理
             if isinstance(data, bytes):
+                print(f"[VOSK] Received {len(data)} bytes")  # デバッグ用
+                
                 if recognizer.AcceptWaveform(data):
                     # 確定結果
                     result = json.loads(recognizer.Result())
@@ -350,12 +352,12 @@ def stt_stream(ws):
                     # 部分結果
                     partial = json.loads(recognizer.PartialResult())
                     text = partial.get("partial", "")
+                    print(f"[VOSK] Partial (raw): '{text}'")  # デバッグ用（空文字でも出力）
                     if text:
                         ws.send(json.dumps({
                             "type": "partial",
                             "text": text
                         }))
-                        print(f"[VOSK] Partial: {text}")
     
     except Exception as e:
         print(f"[VOSK] Error: {e}")

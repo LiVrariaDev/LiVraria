@@ -71,6 +71,48 @@ source .venv/bin/activate
 pip install -r requirements.txt
 echo "依存関係のインストールが完了しました"
 
+echo "=== VOSK日本語モデルのセットアップ ==="
+VOSK_MODEL_DIR="/opt/vosk-model-ja"
+VOSK_MODEL_ZIP="vosk-model-small-ja-0.22.zip"
+VOSK_MODEL_URL="https://alphacephei.com/vosk/models/${VOSK_MODEL_ZIP}"
+
+if [ -d "$VOSK_MODEL_DIR" ]; then
+    echo "VOSKモデルは既にインストールされています: $VOSK_MODEL_DIR"
+else
+    echo "VOSKモデルをダウンロードしています..."
+    
+    # 一時ディレクトリにダウンロード
+    cd /tmp
+    wget -q --show-progress "$VOSK_MODEL_URL"
+    
+    if [ $? -eq 0 ]; then
+        echo "VOSKモデルを展開しています..."
+        unzip -q "$VOSK_MODEL_ZIP"
+        
+        # 展開されたディレクトリ名を取得
+        EXTRACTED_DIR=$(unzip -l "$VOSK_MODEL_ZIP" | grep -m1 "/$" | awk '{print $4}' | sed 's/\/$//')
+        
+        # /optに移動（sudo必要）
+        echo "VOSKモデルを /opt に配置しています..."
+        sudo mv "$EXTRACTED_DIR" "$VOSK_MODEL_DIR"
+        
+        # クリーンアップ
+        rm "$VOSK_MODEL_ZIP"
+        
+        echo "✅ VOSKモデルのインストールが完了しました: $VOSK_MODEL_DIR"
+    else
+        echo "⚠️  VOSKモデルのダウンロードに失敗しました"
+        echo "手動でインストールしてください:"
+        echo "  wget $VOSK_MODEL_URL"
+        echo "  unzip $VOSK_MODEL_ZIP"
+        echo "  sudo mv vosk-model-small-ja-0.22 $VOSK_MODEL_DIR"
+    fi
+    
+    # 元のディレクトリに戻る
+    cd - > /dev/null
+fi
+
+
 echo "=== Systemd service ==="
 if [ "$1" == "--systemd" ]; then
     echo "systemdサービスをセットアップします..."
