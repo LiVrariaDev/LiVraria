@@ -64,7 +64,11 @@ def tts_loop():
                     cmd.extend(['-D', AUDIO_DEVICE])
                 cmd.append(wav_path)
                 
-                subprocess.run(cmd, check=False)
+                result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+                if result.returncode != 0:
+                    print(f"[TTS Worker] aplay failed with code {result.returncode}: {result.stderr}")
+                else:
+                    print(f"[TTS Worker] aplay finished successfully.")
                 
                 # 一時ファイル削除（synthesize_speech内で管理していない場合）
                 if os.path.exists(wav_path):
