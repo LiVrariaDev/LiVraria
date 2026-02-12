@@ -14,8 +14,8 @@ if [ "$EUID" -eq 0 ]; then
     exit 1
 fi
 
-echo "=== NFC API Server Setup ==="
-echo "このスクリプトはRaspberry Pi上でNFC APIサーバーをセットアップします"
+echo "=== Raspberry Pi API Server Setup ==="
+echo "このスクリプトはRaspberry Pi上でAPI Server (NFC, TTS, VOSK)をセットアップします"
 echo ""
 
 echo "=== Update & library install ==="
@@ -74,14 +74,14 @@ echo "依存関係のインストールが完了しました"
 echo "=== Systemd service ==="
 if [ "$1" == "--systemd" ]; then
     echo "systemdサービスをセットアップします..."
-    sudo cp nfc-api.service /etc/systemd/system/
+    sudo cp raspi-api.service /etc/systemd/system/
     sudo systemctl daemon-reload
-    sudo systemctl enable nfc-api.service
-    sudo systemctl start nfc-api.service
+    sudo systemctl enable raspi-api.service
+    sudo systemctl start raspi-api.service
     echo "systemdサービスを起動しました"
     echo ""
     echo "サービスの状態を確認:"
-    sudo systemctl status nfc-api.service --no-pager
+    sudo systemctl status raspi-api.service --no-pager
 else
     echo "systemdサービスのセットアップをスキップしました"
     echo "自動起動を有効にする場合は --systemd オプションを付けて実行してください"
@@ -93,7 +93,7 @@ echo ""
 echo "次のステップ:"
 echo "1. NFCカードリーダーがUSB接続されていることを確認"
 echo "2. カードリーダーの確認: pcsc_scan"
-echo "3. APIサーバーの手動起動テスト: python nfc_api_server.py"
+echo "3. APIサーバーの手動起動テスト: python raspi_api_server.py"
 echo "4. ヘルスチェック: curl http://localhost:8000/health"
 echo ""
 if [ "$1" != "--systemd" ]; then

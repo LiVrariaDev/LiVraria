@@ -337,7 +337,7 @@ import { ref, onMounted, nextTick, onUnmounted } from 'vue';
 import { signOut, getIdToken } from "firebase/auth";
 import { auth } from '../firebaseConfig';
 import { api } from '../services/api'; 
-import { speak } from '../services/nfc';
+import { textToSpeech } from '../services/textToSpeech';
 import BookSearch from './BookSearch.vue';
 import MemberInfoPage from './MemberInfoPage.vue'; 
 
@@ -352,33 +352,17 @@ const isSpeechEnabled = ref(true);
 
 const toggleSpeech = () => {
     isSpeechEnabled.value = !isSpeechEnabled.value;
+    if (!isSpeechEnabled.value) {
+        textToSpeech.cancel();
+    }
 };
 
 const speakText = async (text) => {
     if (!isSpeechEnabled.value) return;
     if (!text) return;
 
-    // HTMLタグと絵文字を除去
-    const plainText = typeof text === 'string' 
-        ? text.replace(/<[^>]+>/g, '') // HTMLタグ除去
-              .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '') // 絵文字除去
-        : '';
-
-    // テキストが無い場合（表情のみの場合など）も、2秒後にidleに戻す
-    if (!plainText.trim()) {
-        finishInteraction(2000);
-        return;
-    }
-
     try {
-        // nfc.jsのspeak関数を呼び出し
-        const result = await speak(plainText);
-        
-        if (result.status === 'ok') {
-            console.log('[TTS] 音声再生開始:', result.message);
-        } else {
-            console.error('[TTS] Error:', result.message);
-        }
+        await textToSpeech.speak(text);
     } catch (error) {
         console.error('[TTS] Failed to speak:', error);
     }
@@ -701,25 +685,46 @@ const fetchUserGreeting = () => {
 };
 
 // --- 音声認識の実装 ---
+import { speechRecognition } from '../services/speechRecognition';
+
 const isRecording = ref(false);
-let recognition = null;
-if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognition = new SpeechRecognition();
-    recognition.lang = 'ja-JP'; recognition.interimResults = false; recognition.continuous = false; 
-    recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        if (userInput.value) userInput.value += ' ' + transcript; else userInput.value = transcript;
-    };
-    recognition.onend = () => { isRecording.value = false; };
-    recognition.onerror = (event) => { console.error('音声認識エラー:', event.error); isRecording.value = false; alert('音声認識でエラーが発生しました: ' + event.error); };
-}
-const toggleSpeechRecognition = () => {
-    if (!recognition) return alert('音声認識未対応です');
-    if (isRecording.value) { recognition.stop(); } else { recognition.start(); isRecording.value = true; }
+const sttEngine = ref('');  // 使用中のエンジン名
+
+const toggleSpeechRecognition = async () => {
+    if (isRecording.value) {
+        speechRecognition.stop();
+        isRecording.value = false;
+    } else {
+        await speechRecognition.start();
+        isRecording.value = true;
+    }
 };
 
-onMounted(() => {
+onMounted(async () => {
+    // 音声認識サービスの初期化
+    await speechRecognition.initialize(
+        // 確定結果のコールバック
+        (text) => {
+            if (userInput.value) {
+                userInput.value += ' ' + text;
+            } else {
+                userInput.value = text;
+            }
+            isRecording.value = false;
+        },
+        // 部分結果のコールバック (オプション)
+        (text) => {
+            console.log('[STT] Partial:', text);
+        }
+    );
+    
+    sttEngine.value = speechRecognition.getCurrentEngine();
+    console.log(`[STT] Initialized with: ${sttEngine.value}`);
+    
+    // TTSサービスの初期化
+    await textToSpeech.initialize();
+    console.log(`[TTS] Initialized with: ${textToSpeech.getCurrentEngine()}`);
+    
     // OSコマンドで開く場合は自動オープンしない
     // openSecondaryDisplay(); 
     fetchUserGreeting();
@@ -727,7 +732,9 @@ onMounted(() => {
 
 onUnmounted(() => {
     channel.close();
-    if (recognition && isRecording.value) recognition.stop();
+    if (isRecording.value) {
+        speechRecognition.stop();
+    }
 });
 </script>
 

@@ -19,6 +19,12 @@ pyDes==2.0.1  # DES encryption
 # ============================================================================
 flask==3.1.2  # Web framework
 flask-cors==6.0.2  # CORS support
+flask-sock==0.7.0  # WebSocket support
+
+# ============================================================================
+# Speech Recognition (VOSK)
+# ============================================================================
+vosk==0.3.45  # Offline speech recognition engine
 
 # ============================================================================
 # System Requirements (install via apt)
