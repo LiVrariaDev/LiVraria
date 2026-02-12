@@ -96,20 +96,26 @@ export class VoskSTT {
     }
 
     stop() {
+        console.log('[VOSK] Stopping...');
+
         if (this.mediaRecorder) {
             this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
             this.mediaRecorder.processor.disconnect();
             this.mediaRecorder.source.disconnect();
+            console.log('[VOSK] Audio capture stopped');
         }
 
         if (this.audioContext) {
             this.audioContext.close();
+            console.log('[VOSK] AudioContext closed');
         }
 
         if (this.ws) {
             this.ws.close();
+            console.log('[VOSK] WebSocket closed');
         }
 
         this.isRecording = false;
+        console.log('[VOSK] Stopped successfully');
     }
 }
