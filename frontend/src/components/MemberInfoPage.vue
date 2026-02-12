@@ -8,8 +8,8 @@
         </div>
         <h1 class="text-xl font-bold text-slate-700">会員情報</h1>
       </div>
-      <button @click="goBack" class="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">
-        <span>🔙</span> <span>戻る</span>
+      <button @click="goBack" class="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">
+        <span>戻る</span>
       </button>
     </header>
 
@@ -24,7 +24,7 @@
             : 'text-slate-600 border-transparent hover:text-slate-700'
         ]"
       >
-        <span class="mr-2">💳</span>カード登録・編集
+        カード登録・編集
       </button>
       <button
         @click="currentTab = 'profile'"
@@ -35,7 +35,7 @@
             : 'text-slate-600 border-transparent hover:text-slate-700'
         ]"
       >
-        <span class="mr-2">👤</span>基本情報変更
+        基本情報変更
       </button>
     </div>
 

@@ -127,7 +127,7 @@
 
           <!-- 方法2: 手動入力 -->
           <div class="bg-slate-50 border-2 border-slate-200 rounded-xl p-6">
-            <h3 class="text-lg font-bold text-slate-700 mb-4">✏️ 新しいNFCカードIDを入力</h3>
+            <h3 class="text-lg font-bold text-slate-700 mb-4">新しいNFCカードIDを入力</h3>
             <input
               type="text"
               v-model="newCardId"

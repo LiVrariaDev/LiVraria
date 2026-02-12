@@ -1,10 +1,10 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'; // computed を追加
+import { ref, onMounted, computed, nextTick, watch } from 'vue';
 import { getAuth } from 'firebase/auth';
 import { api } from '../services/api';
 
 // 既存の変数...
-const query = ref('');
+const query = ref(''); // 初期値は空にする（onMountedで設定）
 const semanticSearch = ref(false);
 const books = ref([]);
 const loading = ref(false);
@@ -54,6 +54,17 @@ const isSelected = (lib) => {
 
 // ユーザーの居住地を取得してリストを準備
 onMounted(async () => {
+  console.log("BookSearch component mounted.");
+  
+  // SessionStorageから初期クエリを取得
+  const initialQ = sessionStorage.getItem('livraria_search_query');
+  
+  if (initialQ) {
+      query.value = initialQ;
+      // 読み込んだら消す（リロード時などに残らないように）
+      sessionStorage.removeItem('livraria_search_query');
+  }
+
   try {
     const auth = getAuth();
     // ... (認証待ちのロジックはそのまま) ...
@@ -64,6 +75,15 @@ onMounted(async () => {
             unsubscribe();
         });
     });
+
+    // 認証完了後に検索を実行 (初期クエリがある場合のみ)
+    // 自動検索は行わない（ユーザー要望）
+    /*
+    if (query.value) {
+        console.log("BookSearch executing initial search for:", query.value);
+        searchBooks(); // awaitしない（並列実行）
+    }
+    */
 
     const user = auth.currentUser;
     if (user) {
@@ -290,7 +310,7 @@ const checkAvailability = async (book) => {
             {{ loading ? '検索中...' : '検索' }}
             </button>
         </div>
-
+ 
         <div class="flex items-center justify-between bg-blue-50 p-3 rounded text-sm text-blue-800">
             <div>
                 <span class="font-bold">検索対象の図書館:</span>

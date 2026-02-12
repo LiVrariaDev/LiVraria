@@ -129,11 +129,7 @@
                         <span v-else>読み上げ OFF</span>
                      </button>
 
-                     <button v-for="button in utilityButtons" :key="button.id"
-                             @click="handleHomeButtonClick(button.action)"
-                             class="flex items-center px-[2.2vw] py-[2vh] bg-[#0B1026]/70 backdrop-blur-md hover:bg-[#0B1026]/80 text-indigo-200 font-bold rounded-[1.2vw] transition-all duration-300 border-2 border-indigo-400/40 hover:border-indigo-400 hover:shadow-[0_0_15px_rgba(129,140,248,0.4)] text-[1.4vw]">
-                        {{ button.text }}
-                    </button>
+
                     <button @click="logout" class="flex items-center px-[2.2vw] py-[2vh] bg-[#0B1026]/70 backdrop-blur-md hover:bg-[#0B1026]/80 text-pink-300 font-bold rounded-[1.2vw] transition-all duration-300 border-2 border-pink-400/40 hover:border-pink-400 hover:shadow-[0_0_15px_rgba(244,114,182,0.4)] text-[1.4vw]">
                         ログアウト
                     </button>
@@ -148,8 +144,8 @@
                     <h1 class="text-xl font-bold text-slate-700">蔵書検索</h1>
                 </div>
                 <div class="flex space-x-3">
-                    <button @click="currentPage = 'home'" class="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">
-                        <span>🏠</span> <span>ホームへ</span>
+                    <button @click="currentPage = 'home'" class="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">
+                        <span>ホームへ</span>
                     </button>
                 </div>
             </header>
@@ -172,10 +168,10 @@
                     <h1 class="text-xl font-bold text-slate-700">会話集中モード</h1>
                 </div>
                 <div class="flex space-x-3">
-                    <button @click="openSecondaryDisplay" class="flex items-center space-x-2 bg-teal-50 hover:bg-teal-100 text-teal-700 font-semibold py-2 px-4 rounded-lg transition-colors border border-teal-200">
-                        <span class="text-lg"></span> <span>動画ウィンドウ</span>
+                    <button @click="openSecondaryDisplay" class="flex items-center bg-teal-50 hover:bg-teal-100 text-teal-700 font-semibold py-2 px-4 rounded-lg transition-colors border border-teal-200">
+                         <span>動画ウィンドウ</span>
                     </button>
-                    <button @click="currentPage = 'home'" class="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">
+                    <button @click="currentPage = 'home'" class="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">
                         <span>ホームへ</span>
                     </button>
                 </div>
@@ -256,24 +252,7 @@
             </div>
         </div>
 
-        <!-- ===== 蔵書検索モード表示 ===== -->
-        <div v-if="currentPage === 'search_mode'" class="flex flex-col h-screen bg-slate-50">
-            <header class="bg-white/90 backdrop-blur border-b border-slate-200 p-4 px-8 flex justify-between items-center shadow-sm z-20">
-                <div class="flex items-center space-x-3">
-                    <span class="text-2xl">📚</span>
-                    <h1 class="text-xl font-bold text-slate-700">蔵書検索</h1>
-                </div>
-                <div class="flex space-x-3">
-                    <button @click="currentPage = 'home'" class="flex items-center space-x-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">
-                        <span>🏠</span> <span>ホームへ</span>
-                    </button>
-                </div>
-            </header>
-            
-            <div class="flex-1 overflow-auto">
-                <BookSearch />
-            </div>
-        </div>
+
 
         <!-- ===== 書籍詳細モーダル ===== -->
         <Teleport to="body">
@@ -325,8 +304,11 @@
                                 <button @click="closeBookDetail" class="px-6 py-3 rounded-xl border border-slate-300 text-slate-600 font-bold hover:bg-slate-50 transition-colors">
                                     閉じる
                                 </button>
+                                <button @click="searchThisBook" class="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold shadow-lg hover:shadow-xl hover:from-emerald-600 hover:to-teal-600 transition-all flex items-center">
+                                    書籍検索で探す
+                                </button>
                                 <button @click="askAboutBookFromModal" class="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center">
-                                    <span class="mr-2 text-xl">🔍</span> 関連本を探す
+                                    関連本を探す
                                 </button>
                             </div>
                         </div>
@@ -382,7 +364,11 @@ const speakText = async (text) => {
               .replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '') // 絵文字除去
         : '';
 
-    if (!plainText.trim()) return;
+    // テキストが無い場合（表情のみの場合など）も、2秒後にidleに戻す
+    if (!plainText.trim()) {
+        finishInteraction(2000);
+        return;
+    }
 
     try {
         // nfc.jsのspeak関数を呼び出し
@@ -416,7 +402,7 @@ const mainButtons = ref([
     { id: 2, text: '会話集中モード', action: 'focus_chat', icon: 'chat' }, 
     { id: 3, text: '会員情報', action: 'member_info', icon: 'card' }
 ]);
-const utilityButtons = ref([ { id: 6, text: 'オプション', action: 'options' } ]); 
+ 
 const chatHistory = ref([ 
     { sender: 'ai', text: 'こんにちは！AI司書です。本日はどのようなご用件でしょうか？' }
 ]);
@@ -450,6 +436,7 @@ const handleHomeButtonClick = (action) => {
         currentPage.value = 'chat_mode';
     } else if (action === 'search') {
         // 書籍検索モードへ切り替え
+        sessionStorage.removeItem('livraria_search_query'); // 通常検索時はクリア
         console.log('[DEBUG] Switching to search_mode');
         currentPage.value = 'search_mode';
         const msg = "蔵書検索を開始します。";
@@ -660,6 +647,25 @@ const askAboutBook = async () => {
     openBookDetail(selectedBook.value);
 };
 
+const searchThisBook = () => {
+    if (!bookDetail.value) return;
+    
+    // タイトルをセット (SessionStorageを使用)
+    const title = bookDetail.value.title;
+    sessionStorage.setItem('livraria_search_query', title);
+    
+    // モーダルを閉じる
+    closeBookDetail();
+    
+    // 検索モードへ遷移
+    currentPage.value = 'search_mode';
+    
+    // 一言添える
+    const msg = `「${bookDetail.value.title}」を検索します。`;
+    speakText(msg);
+    sendMessageToSecondary(msg, 'neutral');
+};
+
 const scrollToBottom = async () => {
     await nextTick();
     if(chatHistoryEl.value) chatHistoryEl.value.scrollTop = chatHistoryEl.value.scrollHeight;
@@ -684,7 +690,7 @@ const fetchUserGreeting = () => {
     
     // 修正: ユーザー名を特定せず、誰にでも通じる司書らしい挨拶に変更
     // API通信も行わないため、即座に表示・発話が可能
-    const greeting = `いらっしゃいませ。<br>今日はどんな本をお探しですか？`;
+    const greeting = `いらっしゃいませ。今日はどんな本をお探しですか？`;
     
     // homeConversationTextはホーム画面のステータス表示にはもう使われていないが、念のため更新
     isLoading.value = false;
