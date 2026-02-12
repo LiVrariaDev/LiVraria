@@ -160,7 +160,7 @@ NFC読み取り状態を確認します（ポーリング用）
 
 ### POST /speak
 
-テキストを音声合成してWAVファイルを返します（OpenJTalk使用）
+テキストを音声合成してRaspberry Pi側のスピーカーで再生します（OpenJTalk + aplay使用）
 
 **Request Body:**
 ```json
@@ -170,8 +170,12 @@ NFC読み取り状態を確認します（ポーリング用）
 ```
 
 **Response:**
-- Content-Type: `audio/wav`
-- 音声ファイル（WAV形式）
+```json
+{
+  "status": "ok",
+  "message": "Speech playback started"
+}
+```
 
 **エラーレスポンス:**
 ```json
@@ -259,7 +263,7 @@ const startNfc = async () => {
 ### パターン3: 音声合成（/speak）
 
 ```javascript
-// テキストを音声合成して再生
+// テキストを音声合成してRaspberry Pi側で再生
 const speakText = async (text) => {
   try {
     const res = await fetch('http://localhost:8000/speak', {
@@ -268,16 +272,13 @@ const speakText = async (text) => {
       body: JSON.stringify({ text })
     });
     
-    if (!res.ok) {
-      const error = await res.json();
-      console.error('TTS Error:', error.message);
-      return;
-    }
+    const result = await res.json();
     
-    // WAVファイルを取得して再生
-    const blob = await res.blob();
-    const audio = new Audio(URL.createObjectURL(blob));
-    await audio.play();
+    if (result.status === 'ok') {
+      console.log('音声再生開始:', result.message);
+    } else {
+      console.error('TTS Error:', result.message);
+    }
   } catch (error) {
     console.error('Failed to speak:', error);
   }
@@ -286,6 +287,9 @@ const speakText = async (text) => {
 // 使用例
 await speakText('図書館へようこそ');
 ```
+
+> [!NOTE]
+> 音声はRaspberry Pi側のスピーカーから再生されます。ブラウザ側では再生されません。
 
 ## トラブルシューティング
 

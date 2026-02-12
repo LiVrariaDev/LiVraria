@@ -239,7 +239,7 @@ def read_nfc():
 @app.route("/speak", methods=["POST"])
 def speak():
     """
-    テキストを音声合成してWAVファイルを返す
+    テキストを音声合成してaplayで再生する
     
     Request Body:
         {
@@ -247,7 +247,10 @@ def speak():
         }
     
     Response:
-        audio/wav ファイル
+        {
+            "status": "ok",
+            "message": "Speech playback started"
+        }
     """
     data = request.get_json()
     
@@ -263,25 +266,16 @@ def speak():
         print(f"[TTS] Synthesizing: {text}")
         wav_path = synthesize_speech(text)
         
-        # ファイルを送信（送信後に自動削除）
-        return send_file(
-            wav_path,
-            mimetype='audio/wav',
-            as_attachment=False,
-            download_name='speech.wav'
-        )
+        # aplayで音声を再生（バックグラウンド）
+        print(f"[TTS] Playing audio: {wav_path}")
+        subprocess.Popen(['aplay', wav_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        # 即座にレスポンスを返す
+        return jsonify({"status": "ok", "message": "Speech playback started"})
     
     except Exception as e:
         print(f"[TTS] Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
-    
-    finally:
-        # ファイルを削除（send_file後に実行される）
-        if 'wav_path' in locals() and os.path.exists(wav_path):
-            try:
-                os.remove(wav_path)
-            except:
-                pass
 
 
 if __name__ == "__main__":
@@ -291,7 +285,8 @@ if __name__ == "__main__":
     print("   POST /start-nfc    - Start NFC reading")
     print("   GET  /check-nfc    - Check NFC reading status")
     print("   GET  /read-nfc     - Get latest NFC reading result")
-    print("   POST /speak        - Text-to-speech synthesis")
+    print("   POST /speak        - Text-to-speech synthesis and playback")
     
     app.run(host="0.0.0.0", port=8000, debug=False)
+
 
