@@ -507,6 +507,10 @@ class DataStore:
 		
 		for user_id, user in list(self.users.items()):
 			# lastloginがタイムアウトを超えている場合
+			# 既にlogoutステータスのユーザーはスキップ（無限ループ防止）
+			if user.status == UserStatus.logout:
+				continue
+			
 			if user.lastlogin < timeout_threshold:
 				# そのユーザーのアクティブセッションをすべてclose
 				for session_id, conv in list(self.conversations.items()):
