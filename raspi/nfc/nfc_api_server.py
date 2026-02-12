@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """
 NFC API Server for Raspberry Pi
-Provides HTTP endpoints for NFC card reading
+Provides HTTP endpoints for NFC card reading and text-to-speech
 """
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 import time
 import threading
+import subprocess
+import tempfile
+import os
+from pathlib import Path
 from smartcard.System import readers
 from smartcard.util import toHexString
 
@@ -21,6 +25,10 @@ nfc_state = {
     "last_read_time": None
 }
 nfc_lock = threading.Lock()
+
+# OpenJTalk設定
+OPENJTALK_DICT = "/var/lib/mecab/dic/open-jtalk/naist-jdic"
+OPENJTALK_VOICE = "/usr/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice"
 
 
 def read_card_once(timeout=20):
@@ -93,6 +101,52 @@ def background_read_nfc(timeout):
             nfc_state["last_read_time"] = time.time()
         else:
             nfc_state["status"] = "timeout"
+
+
+def synthesize_speech(text: str) -> str:
+    """
+    OpenJTalkを使用してテキストを音声ファイルに変換
+    
+    Args:
+        text: 合成するテキスト
+    
+    Returns:
+        str: 生成されたWAVファイルのパス
+    
+    Raises:
+        RuntimeError: 音声合成に失敗した場合
+    """
+    # 一時ファイルを作成
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as txt_file:
+        txt_file.write(text)
+        txt_path = txt_file.name
+    
+    wav_path = tempfile.mktemp(suffix='.wav')
+    
+    try:
+        # OpenJTalkコマンドを実行
+        cmd = [
+            'open_jtalk',
+            '-x', OPENJTALK_DICT,
+            '-m', OPENJTALK_VOICE,
+            '-ow', wav_path,
+            txt_path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        
+        if result.returncode != 0:
+            raise RuntimeError(f"OpenJTalk failed: {result.stderr}")
+        
+        if not os.path.exists(wav_path):
+            raise RuntimeError("WAV file was not generated")
+        
+        return wav_path
+    
+    finally:
+        # テキストファイルを削除
+        if os.path.exists(txt_path):
+            os.remove(txt_path)
 
 
 @app.route("/health", methods=["GET"])
@@ -182,6 +236,54 @@ def read_nfc():
         return jsonify({"status": "no_card"})
 
 
+@app.route("/speak", methods=["POST"])
+def speak():
+    """
+    テキストを音声合成してWAVファイルを返す
+    
+    Request Body:
+        {
+            "text": "合成するテキスト"
+        }
+    
+    Response:
+        audio/wav ファイル
+    """
+    data = request.get_json()
+    
+    if not data or "text" not in data:
+        return jsonify({"status": "error", "message": "Missing 'text' field"}), 400
+    
+    text = data["text"]
+    
+    if not text.strip():
+        return jsonify({"status": "error", "message": "Text is empty"}), 400
+    
+    try:
+        print(f"[TTS] Synthesizing: {text}")
+        wav_path = synthesize_speech(text)
+        
+        # ファイルを送信（送信後に自動削除）
+        return send_file(
+            wav_path,
+            mimetype='audio/wav',
+            as_attachment=False,
+            download_name='speech.wav'
+        )
+    
+    except Exception as e:
+        print(f"[TTS] Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+    
+    finally:
+        # ファイルを削除（send_file後に実行される）
+        if 'wav_path' in locals() and os.path.exists(wav_path):
+            try:
+                os.remove(wav_path)
+            except:
+                pass
+
+
 if __name__ == "__main__":
     print("🚀 NFC API Server starting on http://localhost:8000")
     print("📡 Endpoints:")
@@ -189,5 +291,7 @@ if __name__ == "__main__":
     print("   POST /start-nfc    - Start NFC reading")
     print("   GET  /check-nfc    - Check NFC reading status")
     print("   GET  /read-nfc     - Get latest NFC reading result")
+    print("   POST /speak        - Text-to-speech synthesis")
     
     app.run(host="0.0.0.0", port=8000, debug=False)
+
