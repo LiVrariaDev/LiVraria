@@ -43,6 +43,7 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from './firebaseConfig';
+import api from './services/api';
 
 // コンポーネント
 import MainApp from './components/MainApp.vue';
@@ -97,9 +98,23 @@ const startCountdown = () => {
 };
 
 // ログアウト実行
-const performLogout = () => {
+const performLogout = async () => {
   clearInterval(countdownInterval);
   showLogoutModal.value = false;
+  
+  try {
+    // バックエンドAPIを呼び出し
+    if (user.value) {
+      const token = await user.value.getIdToken();
+      await api.logoutUser(user.value.uid, token);
+      console.log('[App] Backend logout successful (auto-logout)');
+    }
+  } catch (error) {
+    console.error('[App] Backend logout failed (auto-logout):', error);
+    // バックエンドエラーでもFirebase認証はログアウトする
+  }
+  
+  // Firebase認証からログアウト
   signOut(auth).catch(error => console.error('Auto logout failed', error));
   // タイマーのクリアは watch(user) 側で行われます
 };
