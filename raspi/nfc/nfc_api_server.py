@@ -17,12 +17,9 @@ from smartcard.util import toHexString
 
 app = Flask(__name__)
 CORS(app) # Enable CORS for all routes
-
-# OpenJTalk Settings (Standard paths for Raspberry Pi OS)
-OPENJTALK_DICT = '/var/lib/mecab/dic/open-jtalk/naist-jdic'
-OPENJTALK_VOICE = '/usr/share/hts-voice/mei/mei_normal.htsvoice'
-# If you use standard voice:
-# OPENJTALK_VOICE = '/usr/share/hts-voice/nitech-jp-atr503-m001/nitech_jp_atr503_m001.htsvoice'
+# OpenJTalk設定
+OPENJTALK_DICT = "/var/lib/mecab/dic/open-jtalk/naist-jdic"
+OPENJTALK_VOICE = "/usr/share/hts-voice/Voice/mei/mei_normal.htsvoice"
 
 # Audio Device (Use 'aplay -l' to find your device. e.g. 'plughw:3,0' for USB, 'default' for standard)
 AUDIO_DEVICE = 'plughw:3,0' 
@@ -55,10 +52,10 @@ def tts_loop():
             
             try:
                 # Check if dictionary and voice exist
-                if not os.path.exists(OPENJTALK_DICT):
-                    raise FileNotFoundError(f"OpenJTalk Dictionary not found: {OPENJTALK_DICT}")
-                if not os.path.exists(OPENJTALK_VOICE):
-                    raise FileNotFoundError(f"OpenJTalk Voice not found: {OPENJTALK_VOICE}")
+                if not OPENJTALK_DICT or not os.path.exists(OPENJTALK_DICT):
+                    raise FileNotFoundError(f"OpenJTalk Dictionary not found. Checked standard paths.")
+                if not OPENJTALK_VOICE or not os.path.exists(OPENJTALK_VOICE):
+                    raise FileNotFoundError(f"OpenJTalk Voice not found. Checked standard paths.")
 
                 # 音声合成
                 wav_path = synthesize_speech(text)
