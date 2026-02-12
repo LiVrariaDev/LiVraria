@@ -32,6 +32,17 @@ class SpeechRecognitionService {
      * 初期化
      */
     async initialize(onResult, onPartial) {
+        // コールバックは常に更新（HMRや再マウント対応）
+        if (this.voskBrowserSTT) {
+            this.voskBrowserSTT.onResult = onResult;
+            this.voskBrowserSTT.onPartial = onPartial;
+        }
+        if (this.webSpeechAPI) {
+            // Web Speech APIのコールバック更新ロジックが必要ならここに追加
+            // 現状の実装では再設定機能がないため、webSpeechAPIの再生成が必要かもしれないが、
+            // 今回はVosk-browser優先
+        }
+
         if (this.isInitialized) return;
 
         this.useVoskBrowser = await this.detectVoskBrowserSupport();

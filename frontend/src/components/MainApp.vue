@@ -725,7 +725,19 @@ const toggleSpeechRecognition = async () => {
     }
 
     if (isRecording.value) {
-        speechRecognition.stop();
+        await speechRecognition.stop();
+        
+        // 停止時に部分結果が残っていれば入力欄に反映
+        if (partialText.value && partialText.value.trim().length > 0) {
+            console.log('[STT] Committing partial result on stop:', partialText.value);
+            if (userInput.value) {
+                userInput.value += ' ' + partialText.value;
+            } else {
+                userInput.value = partialText.value;
+            }
+            partialText.value = '';
+        }
+        
         isRecording.value = false;
     } else {
         await speechRecognition.start();
@@ -738,18 +750,19 @@ onMounted(async () => {
     await speechRecognition.initialize(
         // 確定結果のコールバック
         (text) => {
+            console.log('[STT] Final Result received:', text);
             if (userInput.value) {
                 userInput.value += ' ' + text;
             } else {
                 userInput.value = text;
             }
+            console.log('[STT] Updated userInput:', userInput.value);
             partialText.value = '';  // 確定時に部分結果をクリア
-            isRecording.value = false;
         },
         // 部分結果のコールバック (オプション)
         (text) => {
             partialText.value = text;  // 部分結果をUI表示
-            console.log('[STT] Partial:', text);
+            // console.log('[STT] Partial:', text);
         }
     );
     

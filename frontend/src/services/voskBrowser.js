@@ -118,15 +118,27 @@ export class VoskBrowserSTT {
     /**
      * 音声認識を停止
      */
-    stop() {
+    async stop() {
         console.log('[VOSK-Browser] Stopping...');
+
+        // 停止前に少し待機して、未処理の音声バッファが処理されるのを待つ
+        // WebAssemblyの処理遅延を考慮 (かなり遅れているようなので3秒待つ)
+        await new Promise(resolve => setTimeout(resolve, 3000));
 
         // リソース解放
         if (this.mediaRecorder) {
             try {
-                this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                this.mediaRecorder.processor.disconnect();
-                this.mediaRecorder.source.disconnect();
+                // トラックを停止（これがマイクのOFFに直結）
+                if (this.mediaRecorder.stream) {
+                    this.mediaRecorder.stream.getTracks().forEach(track => {
+                        track.stop();
+                        console.log('[VOSK-Browser] Track stopped:', track.label);
+                    });
+                }
+
+                if (this.mediaRecorder.processor) this.mediaRecorder.processor.disconnect();
+                if (this.mediaRecorder.source) this.mediaRecorder.source.disconnect();
+
                 this.mediaRecorder = null;
                 console.log('[VOSK-Browser] Audio capture stopped');
             } catch (error) {
@@ -136,7 +148,9 @@ export class VoskBrowserSTT {
 
         if (this.audioContext) {
             try {
-                this.audioContext.close();
+                if (this.audioContext.state !== 'closed') {
+                    await this.audioContext.close();
+                }
                 this.audioContext = null;
                 console.log('[VOSK-Browser] AudioContext closed');
             } catch (error) {
@@ -147,8 +161,8 @@ export class VoskBrowserSTT {
         if (this.recognizer) {
             try {
                 // Recognizerの解放
-                // イベントリスナーは自動的に解除されるため、明示的なremoveは不要
-                // free()メソッドがない場合はnull代入のみでGCに任せる
+                this.recognizer.remove("result");
+                this.recognizer.remove("partialresult");
                 // this.recognizer.free(); 
                 this.recognizer = null;
             } catch (error) {

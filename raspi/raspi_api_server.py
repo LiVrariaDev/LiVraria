@@ -146,6 +146,9 @@ def synthesize_speech(text: str) -> str:
     text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
     # その他のHTMLタグを除去
     text = re.sub(r'<[^>]+>', '', text)
+
+    # 改行2つ目ほどまで読み上げる (OpenJTalkは改行記号で読み上げを停止する)
+    text = text.split('\n')[2]
     
     # 一時ファイルを作成
     txt_fd, txt_path = tempfile.mkstemp(suffix='.txt', text=True)
@@ -306,63 +309,9 @@ def read_nfc():
         return jsonify({"status": "no_card"})
 
 
-@sock.route("/stt/stream")
-def stt_stream(ws):
-    """
-    VOSK音声認識WebSocketエンドポイント
-    
-    受信: 音声データ (バイナリ)
-    送信: {"type": "partial"|"final", "text": "認識結果"}
-    """
-    if not vosk_model:
-        ws.send(json.dumps({
-            "error": "VOSK model not loaded",
-            "fallback": "web_speech_api"
-        }))
-        return
-    
-    # サンプルレート16000Hz
-    recognizer = KaldiRecognizer(vosk_model, 16000)
-    recognizer.SetWords(True)
-    
-    print("[VOSK] WebSocket connected")
-    
-    try:
-        while True:
-            data = ws.receive()
-            
-            if data is None:
-                break
-            
-            # バイナリデータを処理
-            if isinstance(data, bytes):
-                print(f"[VOSK] Received {len(data)} bytes")  # デバッグ用
-                
-                if recognizer.AcceptWaveform(data):
-                    # 確定結果
-                    result = json.loads(recognizer.Result())
-                    text = result.get("text", "")
-                    if text:
-                        ws.send(json.dumps({
-                            "type": "final",
-                            "text": text
-                        }))
-                        print(f"[VOSK] Final: {text}")
-                else:
-                    # 部分結果
-                    partial = json.loads(recognizer.PartialResult())
-                    text = partial.get("partial", "")
-                    print(f"[VOSK] Partial (raw): '{text}'")  # デバッグ用（空文字でも出力）
-                    if text:
-                        ws.send(json.dumps({
-                            "type": "partial",
-                            "text": text
-                        }))
-    
-    except Exception as e:
-        print(f"[VOSK] Error: {e}")
-    finally:
-        print("[VOSK] WebSocket disconnected")
+# @sock.route("/stt/stream") was removed.
+# WebSocket speech recognition is now handled client-side by vosk-browser.
+
 
 
 @app.route("/speak", methods=["POST"])
