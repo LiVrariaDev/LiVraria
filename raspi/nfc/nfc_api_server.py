@@ -9,7 +9,16 @@ from flask_cors import CORS
 import time
 import threading
 import subprocess
+import os
+import tempfile
 import queue
+
+# OpenJTalk Settings (Adjust paths for your environment)
+OPENJTALK_DICT = '/var/lib/mecab/dic/open-jtalk/naist-jdic'
+OPENJTALK_VOICE = '/usr/share/hts-voice/mei/mei_normal.htsvoice'
+# Audio Device (Use 'aplay -l' to find your device. e.g. 'plughw:3,0' for USB, 'default' for standard)
+AUDIO_DEVICE = 'plughw:3,0' 
+# AUDIO_DEVICE = 'default' 
 
 # TTSキューと制御用
 tts_queue = queue.Queue()
@@ -34,8 +43,12 @@ def tts_loop():
                 print(f"[TTS Worker] Playing audio: {wav_path}")
                 
                 # 再生 (aplayでブロッキング再生)
-                # subprocess.run は完了するまで待機する
-                subprocess.run(['aplay', '-D', 'plughw:3,0', wav_path], check=False)
+                cmd = ['aplay']
+                if AUDIO_DEVICE != 'default':
+                    cmd.extend(['-D', AUDIO_DEVICE])
+                cmd.append(wav_path)
+                
+                subprocess.run(cmd, check=False)
                 
                 # 一時ファイル削除（synthesize_speech内で管理していない場合）
                 if os.path.exists(wav_path):
