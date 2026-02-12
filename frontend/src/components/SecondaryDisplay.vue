@@ -1,11 +1,15 @@
 <template>
   <div class="relative w-screen h-screen overflow-hidden bg-black text-white font-sans">
     
+    <!-- 背景画像 (ユーザー指定: 16:9 PNG) -->
+    <img src="/bg.jpg" class="absolute inset-0 w-full h-full object-cover z-0" alt="Background" onerror="this.style.display='none'" />
+    
     <!-- Video A (Buffer 1) -->
+
     <video 
       ref="videoA"
       class="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
-      :class="{ 'opacity-100 z-10': activeVideo === 'A', 'opacity-0 z-0': activeVideo !== 'A' }"
+      :class="{ 'opacity-100 z-20': activeVideo === 'A', 'opacity-0 z-0': activeVideo !== 'A' }"
       :src="srcA"
       :loop="activeVideo === 'A' && isLooping"
       muted playsinline
@@ -17,13 +21,15 @@
     <video 
       ref="videoB"
       class="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
-      :class="{ 'opacity-100 z-10': activeVideo === 'B', 'opacity-0 z-0': activeVideo !== 'B' }"
+      :class="{ 'opacity-100 z-20': activeVideo === 'B', 'opacity-0 z-0': activeVideo !== 'B' }"
       :src="srcB"
       :loop="activeVideo === 'B' && isLooping"
       muted playsinline
       @ended="handleVideoEnded('B')"
       @error="handleVideoError"
     ></video>
+
+    <!-- Video B (Buffer 2) -->
 
     <!-- 字幕レイヤー -->
     <div class="absolute inset-0 z-20 flex flex-col items-center justify-end pb-8 pointer-events-none">
@@ -53,26 +59,26 @@ import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 // --- 動画ファイルの定義 ---
 const VIDEOS = {
   // 通常 (Neutral)
-  idle_loop: '/videos/idle_loop.mp4',
-  neutral_talking: '/videos/neutral_talking.mp4', // 今回は未使用
+  idle_loop: '/webm/idle_loop.webm',
+  neutral_talking: '/webm/neutral_talking.webm', // 今回は未使用
 
   // 思考 (Thinking)
-  thinking_start: '/videos/thinking_start.mp4',
-  thinking_talking: '/videos/thinking_talking.mp4', // 今回は未使用
-  thinking_loop: '/videos/thinking_loop.mp4',
-  thinking_return: '/videos/thinking_return.mp4',
+  thinking_start: '/webm/thinking_start.webm',
+  thinking_talking: '/webm/thinking_talking.webm', // 今回は未使用
+  thinking_loop: '/webm/thinking_loop.webm',
+  thinking_return: '/webm/thinking_return.webm',
 
   // 笑顔 (Happy)
-  happy_start: '/videos/happy_start.mp4',
-  happy_talking: '/videos/happy_talking.mp4', // 今回は未使用
-  happy_loop: '/videos/happy_loop.mp4',
-  happy_return: '/videos/happy_return.mp4',
+  happy_start: '/webm/happy_start.webm',
+  happy_talking: '/webm/happy_talking.webm', // 今回は未使用
+  happy_loop: '/webm/happy_loop.webm',
+  happy_return: '/webm/happy_return.webm',
 
   // 困り顔 (Sorry)
-  sorry_start: '/videos/sorry_start.mp4',
-  sorry_talking: '/videos/sorry_talking.mp4', // 今回は未使用
-  sorry_loop: '/videos/sorry_loop.mp4',
-  sorry_return: '/videos/sorry_return.mp4',
+  sorry_start: '/webm/sorry_start.webm',
+  sorry_talking: '/webm/sorry_talking.webm', // 今回は未使用
+  sorry_loop: '/webm/sorry_loop.webm',
+  sorry_return: '/webm/sorry_return.webm',
 };
 
 // --- ステート管理 ---
@@ -94,6 +100,9 @@ const channel = new BroadcastChannel('livraria_channel');
 const processTextLines = async (text) => {
     if (!text) return;
     
+    // 絵文字を除去
+    const plainText = text.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
+
     // 既存の表示をクリア（あるいは継続させるか？今回は新規発話でクリアする方針）
     visibleLines.value = [];
     
@@ -101,9 +110,10 @@ const processTextLines = async (text) => {
     // ただし、分割しすぎると読みづらいので、ある程度の長さでまとめるのが理想だが、
     // まずは単純に句点と改行で分割し、読点はそのままにするか、長い場合は分割する。
     // ここでは簡易的に「。, !, ?, \n」で分割し、「、」は分割しない方針で。
-    const rawLines = text.split(/([。！？\n]+)/).reduce((acc, curr, i, arr) => {
+    const rawLines = plainText.split(/([。！？\n]+)/).reduce((acc, curr, i, arr) => {
         if (i % 2 === 0) { // 文言
-            if (curr.trim()) acc.push(curr);
+            const trimmed = curr.trim();
+            if (trimmed) acc.push(trimmed);
         } else { // 区切り文字
              if (acc.length > 0) acc[acc.length - 1] += curr;
         }
