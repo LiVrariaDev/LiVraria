@@ -12,15 +12,31 @@ import subprocess
 import os
 import tempfile
 import queue
+from smartcard.System import readers
+from smartcard.util import toHexString
+
+app = Flask(__name__)
+CORS(app) # Enable CORS for all routes
 
 # OpenJTalk Settings (Adjust paths for your environment)
-OPENJTALK_DICT = '/var/lib/mecab/dic/open-jtalk/naist-jdic'
-OPENJTALK_VOICE = '/usr/share/hts-voice/mei/mei_normal.htsvoice'
+# OPENJTALK_DICT = '/var/lib/mecab/dic/open-jtalk/naist-jdic'
+# OPENJTALK_VOICE = '/usr/share/hts-voice/mei/mei_normal.htsvoice'
+OPENJTALK_DICT = '/usr/share/open_jtalk/dic'
+OPENJTALK_VOICE = '/usr/share/hts-voice/mei_normal/mei_normal.htsvoice'
+
 # Audio Device (Use 'aplay -l' to find your device. e.g. 'plughw:3,0' for USB, 'default' for standard)
 AUDIO_DEVICE = 'plughw:3,0' 
 # AUDIO_DEVICE = 'default' 
 
-# TTSキューと制御用
+# Global State
+nfc_state = {
+    "status": "idle", # idle, reading, success, timeout
+    "idm": None,
+    "last_read_time": 0
+}
+nfc_lock = threading.Lock()
+
+# TTS Queue
 tts_queue = queue.Queue()
 
 def tts_loop():
@@ -67,6 +83,7 @@ def tts_loop():
 # バックグラウンドでTTSスレッドを開始
 threading.Thread(target=tts_loop, daemon=True).start()
 
+
 def read_card_once(timeout=20):
     """
     NFCカードを1回読み取る（タイムアウト付き）
@@ -90,17 +107,17 @@ def read_card_once(timeout=20):
                 time.sleep(0.5)
                 continue
             
-            print(f"[DEBUG] カードリーダー検出: {reader_list[0]}")
+            # print(f"[DEBUG] カードリーダー検出: {reader_list[0]}")
             reader = reader_list[0]
             connection = reader.createConnection()
             
-            print("[DEBUG] 接続試行中...")
+            # print("[DEBUG] 接続試行中...")
             connection.connect()
             
-            print("[DEBUG] APDUコマンド送信中...")
+            # print("[DEBUG] APDUコマンド送信中...")
             response, sw1, sw2 = connection.transmit(GET_IDM_APDU)
             
-            print(f"[DEBUG] レスポンス: sw1={hex(sw1)}, sw2={hex(sw2)}, response={response}")
+            # print(f"[DEBUG] レスポンス: sw1={hex(sw1)}, sw2={hex(sw2)}, response={response}")
             
             if sw1 == 0x90 and sw2 == 0x00:
                 idm_hex = toHexString(response).replace(" ", "")
@@ -111,7 +128,7 @@ def read_card_once(timeout=20):
             connection.disconnect()
         except Exception as e:
             # カードが置かれていない場合は例外が発生するため無視
-            print(f"[DEBUG] 例外発生: {type(e).__name__}: {e}")
+            # print(f"[DEBUG] 例外発生: {type(e).__name__}: {e}")
             pass
         
         time.sleep(0.5)
@@ -343,7 +360,7 @@ def speak():
 
 
 if __name__ == "__main__":
-    print("🚀 NFC API Server starting on http://localhost:8000")
+    print("🚀 NFC API Server starting on http://0.0.0.0:5001")
     print("📡 Endpoints:")
     print("   GET  /health       - Health check")
     print("   POST /start-nfc    - Start NFC reading")
@@ -352,5 +369,3 @@ if __name__ == "__main__":
     print("   POST /speak        - Text-to-speech synthesis and playback")
     
     app.run(host="0.0.0.0", port=5001, debug=False)
-
-
