@@ -472,6 +472,23 @@ def llm_chat(
 	if history is None:
 		history = []
 	
+	# 空のメッセージを除外（Gemini APIエラー対策）
+	def is_valid_message(msg: BaseMessage) -> bool:
+		"""メッセージが有効かどうかをチェック"""
+		if not hasattr(msg, 'content'):
+			return False
+		content = msg.content
+		# contentが文字列の場合、空でないかチェック
+		if isinstance(content, str):
+			return bool(content.strip())
+		# contentがリストの場合、空でないかチェック
+		if isinstance(content, list):
+			return len(content) > 0
+		return True
+	
+	# 履歴から空のメッセージを除外
+	history = [msg for msg in history if is_valid_message(msg)]
+	
 	# メッセージリストを構築
 	if not history:
 		# 履歴がない場合: システムプロンプトを最初のメッセージに含める
