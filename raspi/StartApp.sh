@@ -36,6 +36,7 @@ chromium \
   --user-data-dir="/tmp/chrome_main_profile" \
   --touch-events=enabled \
   --disable-touch-drag-drop \
+  --unsafely-treat-insecure-origin-as-secure="$SERVER_URL" \
   --overscroll-history-navigation=0 &
 
 echo "Main display launched. Waiting for login and secondary window..."
