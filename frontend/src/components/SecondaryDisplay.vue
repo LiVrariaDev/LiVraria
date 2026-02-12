@@ -144,30 +144,58 @@ const processTextLines = async (text) => {
     }
 };
 
+// --- ログイン状態管理 ---
+const isLoggedIn = ref(false);
+
 // --- 通信受信 ---
 channel.onmessage = (event) => {
   const { type, text, state } = event.data;
-  if (type !== 'chat') return;
   
-  console.log(`[Secondary] Received state: ${state}, Text: ${text}, CurrentEmotion: ${currentEmotion.value}`);
-
-  if (state === 'thinking') {
+  // ログイン通知
+  if (type === 'login') {
+    isLoggedIn.value = true;
+    console.log('[Secondary] User logged in');
+    // 既に idle_loop が再生されているので、特に何もしない
+    return;
+  }
+  
+  // ログアウト通知
+  if (type === 'logout') {
+    isLoggedIn.value = false;
+    console.log('[Secondary] User logged out');
+    // 字幕をクリア
     visibleLines.value = [];
-    startThinkingSequence();
-  } 
-  else if (state === 'idle') {
+    // idle_loop に戻る
     returnToIdle();
-  } 
-  else {
-    if (text) processTextLines(text);
-    // 修正: none が来たら強制的に neutral にする (二重防御)
-    let safeState = state;
-    if (!safeState || safeState === 'none') {
-        console.warn(`[Secondary] Invalid state '${safeState}' detected. Forcing to 'neutral'.`);
-        safeState = 'neutral';
+    return;
+  }
+  
+  // チャット通知（ログイン中のみ処理）
+  if (type === 'chat') {
+    if (!isLoggedIn.value) {
+      console.warn('[Secondary] Ignoring chat while logged out');
+      return;
     }
-    playEmotionAction(safeState);
+    
+    console.log(`[Secondary] Received state: ${state}, Text: ${text}, CurrentEmotion: ${currentEmotion.value}`);
 
+    if (state === 'thinking') {
+      visibleLines.value = [];
+      startThinkingSequence();
+    } 
+    else if (state === 'idle') {
+      returnToIdle();
+    } 
+    else {
+      if (text) processTextLines(text);
+      // 修正: none が来たら強制的に neutral にする (二重防御)
+      let safeState = state;
+      if (!safeState || safeState === 'none') {
+          console.warn(`[Secondary] Invalid state '${safeState}' detected. Forcing to 'neutral'.`);
+          safeState = 'neutral';
+      }
+      playEmotionAction(safeState);
+    }
   }
 };
 

@@ -698,6 +698,9 @@ const scrollToBottom = async () => {
 };
 
 const logout = async () => {
+    // 2ndディスプレイにログアウト通知
+    channel.postMessage({ type: 'logout' });
+    
     const user = auth.currentUser;
     if (user) {
         try {
@@ -757,6 +760,16 @@ onMounted(() => {
     // OSコマンドで開く場合は自動オープンしない
     // openSecondaryDisplay(); 
     fetchUserGreeting();
+    
+    // 2ndディスプレイにログイン通知
+    const user = auth.currentUser;
+    if (user) {
+        channel.postMessage({ 
+            type: 'login',
+            userId: user.uid 
+        });
+    }
+    
     loadVoices();
     setTimeout(loadVoices, 500);
 });

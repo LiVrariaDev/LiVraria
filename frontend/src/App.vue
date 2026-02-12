@@ -152,23 +152,29 @@ watch(user, (newUser) => {
 });
 
 onMounted(() => {
-  const urlParams = new URLSearchParams(window.location.search);
-  isSecondaryView.value = urlParams.get('view') === 'secondary';
-
+  // URLパラメータをチェック
+  const params = new URLSearchParams(window.location.search);
+  isSecondaryView.value = params.get('view') === 'secondary';
+  
+  // SecondaryView の場合は認証チェックをスキップ（表示専用のため）
   if (isSecondaryView.value) {
-    document.title = "Secondary Display";
-  } else {
-    document.title = "LiVraria Main";
+    isAuthReady.value = true;
+    return;
   }
 
-  if (!isSecondaryView.value) {
-    unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      user.value = currentUser;
-      isAuthReady.value = true;
-    });
-  } else {
+  // 通常の認証チェック
+  unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    if (firebaseUser) {
+      user.value = firebaseUser;
+      resetTimer(); // ログイン時にタイマー開始
+    } else {
+      user.value = null;
+      // ログアウト時はタイマーをクリア
+      if (idleTimer) clearTimeout(idleTimer);
+      if (countdownInterval) clearInterval(countdownInterval);
+    }
     isAuthReady.value = true;
-  }
+  });
 });
 
 onUnmounted(() => {
