@@ -15,7 +15,7 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
 # User-defined
-from backend import PROMPTS_DIR
+from backend import PROMPTS_DIR, LLM_MAX_RETRIES
 from backend.search.rakuten_books import rakuten_search_books
 
 # Logger
@@ -482,43 +482,59 @@ def llm_chat(
 	
 	logger.info(f"[DEBUG] Final messages for LangGraph: {len(messages)} messages")
 	
-	# ワークフロー実行
+	# ワークフロー実行（リトライロジック付き）
+	retry_count = 0
+	response_text = ""
+	
 	try:
-		# 初期ステートに search_results は空で渡すが、
-		# 実際のデータ管理はツール内のクロージャ変数が担うため、
-		# StateGraph上の search_results は実質ダミーまたはログ用となる
-		result = app.invoke({
-			"messages": messages,
-			"search_results": {},
-			"recommended_books": []
-		})
-		
-		# 最後のAIメッセージを取得
-		ai_messages = [msg for msg in result["messages"] if isinstance(msg, AIMessage)]
-		if ai_messages:
-			last_message = ai_messages[-1]
-			# contentが文字列でない場合の処理
-			if isinstance(last_message.content, str):
-				response_text = last_message.content
-			elif isinstance(last_message.content, list):
-				# contentがリストの場合、テキスト部分を抽出
-				text_parts = []
-				for part in last_message.content:
-					if isinstance(part, dict) and 'text' in part:
-						text_parts.append(part['text'])
-					elif isinstance(part, str):
-						text_parts.append(part)
-				response_text = ''.join(text_parts) if text_parts else str(last_message.content)
-			else:
-				response_text = str(last_message.content)
+		while retry_count < LLM_MAX_RETRIES:
+			# 初期ステートに search_results は空で渡すが、
+			# 実際のデータ管理はツール内のクロージャ変数が担うため、
+			# StateGraph上の search_results は実質ダミーまたはログ用となる
+			result = app.invoke({
+				"messages": messages,
+				"search_results": {},
+				"recommended_books": []
+			})
 			
-			# 空の応答の場合のフォールバック
-			if not response_text.strip():
-				logger.warning("[WARNING] Empty response from LLM")
-				response_text = "申し訳ございません。応答を生成できませんでした（空の応答）。"
-		else:
-			response_text = "申し訳ございません。応答を生成できませんでした。"
-			logger.error("No AI message found in result: %s", result)
+			# 最後のAIメッセージを取得
+			ai_messages = [msg for msg in result["messages"] if isinstance(msg, AIMessage)]
+			if ai_messages:
+				last_message = ai_messages[-1]
+				# contentが文字列でない場合の処理
+				if isinstance(last_message.content, str):
+					response_text = last_message.content
+				elif isinstance(last_message.content, list):
+					# contentがリストの場合、テキスト部分を抽出
+					text_parts = []
+					for part in last_message.content:
+						if isinstance(part, dict) and 'text' in part:
+							text_parts.append(part['text'])
+						elif isinstance(part, str):
+							text_parts.append(part)
+					response_text = ''.join(text_parts) if text_parts else str(last_message.content)
+				else:
+					response_text = str(last_message.content)
+				
+				# 空の応答でなければ成功
+				if response_text.strip():
+					if retry_count > 0:
+						logger.info(f"[INFO] Retry succeeded after {retry_count} attempts")
+					break
+				else:
+					retry_count += 1
+					if retry_count < LLM_MAX_RETRIES:
+						logger.warning(f"[WARNING] Empty response from LLM (attempt {retry_count}/{LLM_MAX_RETRIES}), retrying...")
+					else:
+						logger.error(f"[ERROR] Empty response from LLM after {LLM_MAX_RETRIES} attempts")
+						response_text = "申し訳ございません。応答を生成できませんでした。"
+			else:
+				retry_count += 1
+				if retry_count < LLM_MAX_RETRIES:
+					logger.warning(f"[WARNING] No AI message found (attempt {retry_count}/{LLM_MAX_RETRIES}), retrying...")
+				else:
+					response_text = "申し訳ございません。応答を生成できませんでした。"
+					logger.error("No AI message found in result after retries: %s", result)
 		
 		# ツール呼び出しから表情を取得（なければ neutral）  
 		current_expression = "neutral"

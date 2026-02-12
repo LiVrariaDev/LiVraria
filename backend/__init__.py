@@ -26,6 +26,10 @@ BACKEND_PORT = 8000
 # Session settings
 SESSION_TIMEOUT = 1800  # 30分（秒単位）
 
+# LLM settings
+LLM_MAX_RETRIES = 3  # LLMが空のレスポンスを返した場合の最大リトライ回数
+
+
 # Database settings
 MONGODB_DB = "livraria_dev"
 
