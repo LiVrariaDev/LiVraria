@@ -1,19 +1,20 @@
 [Unit]
-Description=NFC API Server for LiVraria
+Description=Raspberry Pi API Server (NFC, TTS, VOSK)
 After=network.target pcscd.service
 Requires=pcscd.service
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/home/livraria/LiVraria/raspi/nfc
-ExecStart=/home/livraria/LiVraria/raspi/nfc/.venv/bin/python nfc_api_server.py
+WorkingDirectory=/home/dryophytes/school/LiVraria/raspi
+ExecStart=/usr/bin/python3 /home/dryophytes/school/LiVraria/raspi/raspi_api_server.py
 Restart=always
 RestartSec=10
 
 StandardOutput=journal
 StandardError=journal
 Environment="PYTHONUNBUFFERED=1"
+Environment="VOSK_MODEL_PATH=/opt/vosk-model-ja"
 
 [Install]
 WantedBy=multi-user.target
