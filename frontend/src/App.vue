@@ -43,7 +43,7 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from './firebaseConfig';
-import api from './services/api';
+import { api } from './services/api';
 
 // コンポーネント
 import MainApp from './components/MainApp.vue';
