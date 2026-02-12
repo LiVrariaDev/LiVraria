@@ -2,7 +2,7 @@
   <div class="relative w-screen h-screen overflow-hidden bg-black text-white font-sans">
     
     <!-- 背景画像 (ユーザー指定: 16:9 PNG) -->
-    <img src="/secondary_bg.png" class="absolute inset-0 w-full h-full object-cover z-0" alt="Background" onerror="this.style.display='none'" />
+    <img src="/bg.jpg" class="absolute inset-0 w-full h-full object-cover z-0" alt="Background" onerror="this.style.display='none'" />
     
     <!-- Video A (Buffer 1) -->
 
@@ -59,26 +59,26 @@ import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 // --- 動画ファイルの定義 ---
 const VIDEOS = {
   // 通常 (Neutral)
-  idle_loop: '/videos/idle_loop.mp4',
-  neutral_talking: '/videos/neutral_talking.mp4', // 今回は未使用
+  idle_loop: '/webm/idle_loop.webm',
+  neutral_talking: '/webm/neutral_talking.webm', // 今回は未使用
 
   // 思考 (Thinking)
-  thinking_start: '/videos/thinking_start.mp4',
-  thinking_talking: '/videos/thinking_talking.mp4', // 今回は未使用
-  thinking_loop: '/videos/thinking_loop.mp4',
-  thinking_return: '/videos/thinking_return.mp4',
+  thinking_start: '/webm/thinking_start.webm',
+  thinking_talking: '/webm/thinking_talking.webm', // 今回は未使用
+  thinking_loop: '/webm/thinking_loop.webm',
+  thinking_return: '/webm/thinking_return.webm',
 
   // 笑顔 (Happy)
-  happy_start: '/videos/happy_start.mp4',
-  happy_talking: '/videos/happy_talking.mp4', // 今回は未使用
-  happy_loop: '/videos/happy_loop.mp4',
-  happy_return: '/videos/happy_return.mp4',
+  happy_start: '/webm/happy_start.webm',
+  happy_talking: '/webm/happy_talking.webm', // 今回は未使用
+  happy_loop: '/webm/happy_loop.webm',
+  happy_return: '/webm/happy_return.webm',
 
   // 困り顔 (Sorry)
-  sorry_start: '/videos/sorry_start.mp4',
-  sorry_talking: '/videos/sorry_talking.mp4', // 今回は未使用
-  sorry_loop: '/videos/sorry_loop.mp4',
-  sorry_return: '/videos/sorry_return.mp4',
+  sorry_start: '/webm/sorry_start.webm',
+  sorry_talking: '/webm/sorry_talking.webm', // 今回は未使用
+  sorry_loop: '/webm/sorry_loop.webm',
+  sorry_return: '/webm/sorry_return.webm',
 };
 
 // --- ステート管理 ---
