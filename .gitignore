@@ -5,6 +5,9 @@
 backend/api/data/
 .vscode/
 *.pem
+frontend/public/models
+docs/*.mmd
+docs/*.svg
 
 # Chat history
 chat-history_*.md
