@@ -437,7 +437,15 @@ const openSecondaryDisplay = () => {
 };
 
 const sendMessageToSecondary = (text, state = 'speaking') => {
-    channel.postMessage({ type: 'chat', text, state });
+    try {
+        channel.postMessage({ type: 'chat', text, state });
+    } catch (e) {
+        // コンポーネントがアンマウントされた後に呼ばれる可能性があるため、
+        // チャンネルが閉じている場合のエラー(InvalidStateError)は無視する
+        if (e.name !== 'InvalidStateError') {
+            console.error('Failed to send message to secondary:', e);
+        }
+    }
 };
 
 const handleHomeButtonClick = (action) => {

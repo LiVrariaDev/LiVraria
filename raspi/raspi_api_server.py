@@ -28,6 +28,7 @@ nfc_state = {
     "last_read_time": None
 }
 nfc_lock = threading.Lock()
+tts_lock = threading.Lock()
 
 # OpenJTalk設定
 OPENJTALK_DICT = "/var/lib/mecab/dic/open-jtalk/naist-jdic"
@@ -346,13 +347,19 @@ def speak():
         wav_path = synthesize_speech(text)
         
         # aplayで音声を再生（完了を待つ）
-        print(f"[TTS] Playing audio: {wav_path}")
-        result = subprocess.run(
-            ['aplay', '-D', 'plughw:3,0', wav_path],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True
-        )
+        audio_device = os.getenv("AUDIO_DEVICE", "plughw:3,0")
+        print(f"[TTS] Playing audio: {wav_path} using device: {audio_device}")
+        
+        cmd = ['aplay', '-D', audio_device, wav_path]
+        
+        # 音声再生を排他制御
+        with tts_lock:
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True
+            )
         
         # 再生完了後にWAVファイルを削除
         if os.path.exists(wav_path):
@@ -364,6 +371,8 @@ def speak():
             return jsonify({"status": "ok", "message": "Speech playback completed"})
         else:
             print(f"[TTS] aplay error: {result.stderr}")
+            # エラーメッセージにbusyが含まれていれば、クライアント側でリトライしやすくする等の考慮も可能だが
+            # ここではそのまま500を返す
             return jsonify({"status": "error", "message": f"aplay failed: {result.stderr}"}), 500
     
     except Exception as e:
