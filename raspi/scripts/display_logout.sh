@@ -12,17 +12,21 @@ MAX_WAIT=20 # 20秒待機
 COUNTER=0
 
 while [ $COUNTER -lt $MAX_WAIT ]; do
-    # ウィンドウの存在確認
-    SEC_ID=$(wmctrl -l | grep "Secondary Display" | awk '{print $1}')
-    
-    if [ -z "$SEC_ID" ]; then
-        echo "Secondary Display is closed." >> /tmp/display_control.log
+    # 1. "Secondary Display" というタイトルのウィンドウIDを取得
+    # Chromeの場合、複数のIDが返ることがあるので head -n 1 で絞る
+    WID=$(xdotool search --name "Secondary Display" | head -n 1)
+
+    if [ -z "$WID" ]; then
+        echo "Secondary Display is closed (Window not found)." >> /tmp/display_control.log
         exit 0
     fi
 
-    # ウィンドウがあれば閉じる要求を送る
-    wmctrl -c "Secondary Display"
-    echo "Sent close request... ($COUNTER)" >> /tmp/display_control.log
+    echo "Target window found: $WID. Sending close signal... ($COUNTER)" >> /tmp/display_control.log
+    
+    # ウィンドウを最前面に持ってくる
+    xdotool windowactivate --sync "$WID"
+    # Alt+F4 (ウィンドウを閉じる) を送信
+    xdotool key --window "$WID" Alt+F4
     
     sleep 0.5
     COUNTER=$((COUNTER + 1))

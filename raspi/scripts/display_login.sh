@@ -15,8 +15,6 @@ fi
 # デフォルト値 (もし.envにない場合)
 PRIMARY_WIDTH=${PRIMARY_WIDTH:-1920}
 
-PRIMARY_WIDTH=${PRIMARY_WIDTH:-1920}
-
 # 環境変数の設定 (サービスから実行される場合などに必要)
 export DISPLAY=:0
 # ユーザーに合わせて変更 (pi -> dryophytes)
