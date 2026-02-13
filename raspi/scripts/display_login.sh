@@ -15,7 +15,15 @@ fi
 # デフォルト値 (もし.envにない場合)
 PRIMARY_WIDTH=${PRIMARY_WIDTH:-1920}
 
+PRIMARY_WIDTH=${PRIMARY_WIDTH:-1920}
+
+# 環境変数の設定 (サービスから実行される場合などに必要)
+export DISPLAY=:0
+# 必要であれば XAUTHORITY も設定（通常は pi ユーザーのものを利用）
+export XAUTHORITY=/home/pi/.Xauthority
+
 echo "[$(date)] Display Login Script Started" >> /tmp/display_control.log
+echo "User: $(whoami), Display: $DISPLAY" >> /tmp/display_control.log
 
 # "Secondary Display" というタイトルのウィンドウを検索して移動・フルスクリーン化
 # StartApp.sh のロジックを参考

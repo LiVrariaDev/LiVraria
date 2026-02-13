@@ -1,6 +1,11 @@
 #!/bin/bash
 
+# 環境変数の設定
+export DISPLAY=:0
+export XAUTHORITY=/home/pi/.Xauthority
+
 echo "[$(date)] Display Logout Script Started" >> /tmp/display_control.log
+echo "User: $(whoami), Display: $DISPLAY" >> /tmp/display_control.log
 
 # "Secondary Display" というウィンドウを閉じる
 # wmctrl -c <WINDOW_TITLE> : Close the window cleanly
