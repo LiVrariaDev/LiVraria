@@ -371,6 +371,43 @@ def speak():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+# Display Control Endpoints
+DISPLAY_LOGIN_SCRIPT = os.path.join(os.path.dirname(__file__), "scripts", "display_login.sh")
+DISPLAY_LOGOUT_SCRIPT = os.path.join(os.path.dirname(__file__), "scripts", "display_logout.sh")
+
+@app.route("/display/login", methods=["POST"])
+def display_login():
+    """
+    ディスプレイ制御用ログインスクリプトを実行
+    """
+    try:
+        if not os.path.exists(DISPLAY_LOGIN_SCRIPT):
+             return jsonify({"status": "error", "message": "Script not found"}), 500
+        
+        print(f"[Display] Executing login script: {DISPLAY_LOGIN_SCRIPT}")
+        subprocess.Popen([DISPLAY_LOGIN_SCRIPT], shell=False) # 非同期で実行（結果を待たない）
+        return jsonify({"status": "ok", "message": "Display login script triggers"})
+    except Exception as e:
+        print(f"[Display] Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route("/display/logout", methods=["POST"])
+def display_logout():
+    """
+    ディスプレイ制御用ログアウトスクリプトを実行
+    """
+    try:
+        if not os.path.exists(DISPLAY_LOGOUT_SCRIPT):
+             return jsonify({"status": "error", "message": "Script not found"}), 500
+
+        print(f"[Display] Executing logout script: {DISPLAY_LOGOUT_SCRIPT}")
+        subprocess.Popen([DISPLAY_LOGOUT_SCRIPT], shell=False) # 非同期で実行（結果を待たない）
+        return jsonify({"status": "ok", "message": "Display logout script triggered"})
+    except Exception as e:
+        print(f"[Display] Error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 if __name__ == "__main__":
     print("🚀 NFC API Server starting on http://0.0.0.0:8000")
     print("📡 Endpoints:")
@@ -380,6 +417,8 @@ if __name__ == "__main__":
     print("   GET  /check-nfc       - Check NFC reading status")
     print("   GET  /read-nfc        - Get latest NFC reading result")
     print("   POST /speak           - Text-to-speech synthesis and playback")
+    print("   POST /display/login   - Trigger display login script")
+    print("   POST /display/logout  - Trigger display logout script")
     
     app.run(host="0.0.0.0", port=8000, debug=False)
 
