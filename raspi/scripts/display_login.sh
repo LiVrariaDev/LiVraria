@@ -19,11 +19,13 @@ PRIMARY_WIDTH=${PRIMARY_WIDTH:-1920}
 
 # 環境変数の設定 (サービスから実行される場合などに必要)
 export DISPLAY=:0
-# 必要であれば XAUTHORITY も設定（通常は pi ユーザーのものを利用）
-export XAUTHORITY=/home/pi/.Xauthority
+# ユーザーに合わせて変更 (pi -> dryophytes)
+export XAUTHORITY=/home/livraria/.Xauthority
 
 echo "[$(date)] Display Login Script Started" >> /tmp/display_control.log
-echo "User: $(whoami), Display: $DISPLAY" >> /tmp/display_control.log
+echo "User: $(whoami), Display: $DISPLAY, XAUTHORITY: $XAUTHORITY" >> /tmp/display_control.log
+echo "Visible windows:" >> /tmp/display_control.log
+wmctrl -l >> /tmp/display_control.log
 
 # "Secondary Display" というタイトルのウィンドウを検索して移動・フルスクリーン化
 # StartApp.sh のロジックを参考
