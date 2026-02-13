@@ -344,6 +344,7 @@ import { api } from '../services/api';
 import { textToSpeech } from '../services/textToSpeech';
 import BookSearch from './BookSearch.vue';
 import MemberInfoPage from './MemberInfoPage.vue'; 
+import { notifyDisplayLogout } from '../services/nfc'; 
 
 const handleImageError = () => {
     alert("【画像読み込みエラー】\n publicフォルダに 'bg.jpg' が見つかりません。");
@@ -692,7 +693,12 @@ const logout = async () => {
             console.error("Backend logout failed:", e);
         }
   }
-    signOut(auth).catch(error => console.error('Logout failed', error));
+    signOut(auth)
+        .then(() => {
+            console.log('Logout successful');
+            notifyDisplayLogout();
+        })
+        .catch(error => console.error('Logout failed', error));
 };
 
 const fetchUserGreeting = () => {

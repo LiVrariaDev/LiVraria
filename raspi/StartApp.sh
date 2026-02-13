@@ -52,32 +52,4 @@ else
     echo "Warning: Main display window not found."
 fi
 
-# 3. Secondaryウィンドウが開くまで待機（busy wait）
-MAX_WAIT=300  # 最大5分待機
-COUNTER=0
-
-while [ $COUNTER -lt $MAX_WAIT ]; do
-    # "Secondary Display" というタイトルのウィンドウを検索
-    SEC_ID=$(wmctrl -l | grep "Secondary Display" | awk '{print $1}')
-    
-    if [ -n "$SEC_ID" ]; then
-        echo "Secondary display detected: $SEC_ID"
-        
-        # 4. Secondaryを右ディスプレイに移動してフルスクリーン化
-        sleep 0.5  # ウィンドウが完全に表示されるまで少し待つ
-        wmctrl -i -r "$SEC_ID" -e 0,$PRIMARY_WIDTH,0,-1,-1
-        wmctrl -i -r "$SEC_ID" -b add,fullscreen
-        
-        echo "Secondary display moved to right screen and set to fullscreen."
-        break
-    fi
-    
-    sleep 1
-    COUNTER=$((COUNTER + 1))
-done
-
-if [ $COUNTER -eq $MAX_WAIT ]; then
-    echo "Warning: Secondary display not detected within timeout."
-fi
-
 echo "Livraria system is running."

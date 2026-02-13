@@ -98,3 +98,34 @@ const pollNfcStatus = (onSuccess) => {
         setTimeout(checkStatus, pollInterval);
     });
 };
+
+/**
+ * ディスプレイ制御：ログイン通知
+ * @returns {Promise<void>}
+ */
+export const notifyDisplayLogin = async () => {
+    try {
+        await fetch(`${NFC_SERVER_URL}/display/login`, {
+            method: 'POST',
+        });
+        console.log("Display login notified");
+    } catch (e) {
+        console.error("Failed to notify display login", e);
+    }
+};
+
+/**
+ * ディスプレイ制御：ログアウト通知
+ * @returns {Promise<void>}
+ */
+export const notifyDisplayLogout = async () => {
+    try {
+        await fetch(`${NFC_SERVER_URL}/display/logout`, {
+            method: 'POST',
+        });
+        console.log("Display logout notified");
+    } catch (e) {
+        console.error("Failed to notify display logout", e);
+    }
+};
+

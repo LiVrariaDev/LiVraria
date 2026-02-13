@@ -151,7 +151,7 @@ const profile = reactive({
 
 const isReadingNfc = ref(false);
 
-import { readNfcCard } from '../services/nfc';
+import { readNfcCard, notifyDisplayLogin } from '../services/nfc';
 import { signInWithCustomToken } from "firebase/auth";
 
 const startNfcLogin = async () => {
@@ -171,6 +171,9 @@ const startNfcLogin = async () => {
       // 2. FirebaseにCustom Tokenでログイン
       await signInWithCustomToken(auth, result.custom_token);
       console.log('NFCログイン完了');
+      
+      // ディスプレイ制御：ログイン通知
+      notifyDisplayLogin();
     });
   } catch (error) {
     console.error('NFCログインエラー:', error);
@@ -244,6 +247,7 @@ const signUp = async () => {
 
     await api.createUser(userData, token);
     console.log('ユーザー登録完了');
+    notifyDisplayLogin();
 
   } catch (error) {
     console.error('Registration error:', error);
@@ -263,6 +267,7 @@ const signIn = async () => {
   try {
     await signInWithEmailAndPassword(auth, email.value, password.value);
     console.log('ログイン完了');
+    notifyDisplayLogin();
   } catch (error) {
     errorMessage.value = getFirebaseErrorMessage(error.code);
   } finally {
