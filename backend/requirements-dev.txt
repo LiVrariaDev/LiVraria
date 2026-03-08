@@ -8,14 +8,14 @@
 # Development Tools
 # ============================================================================
 # Debug & Logging
-rich==14.3.1  # Beautiful terminal output
-rich-toolkit==0.17.1  # Rich extensions
+rich==14.3.3  # Beautiful terminal output
+rich-toolkit==0.19.7  # Rich extensions
 
 # CLI Tools
-typer==0.21.1  # CLI application framework
+typer==0.24.1  # CLI application framework
 
 # FastAPI Development Tools
-fastapi-cli==0.0.20  # FastAPI CLI
+fastapi-cli==0.0.24  # FastAPI CLI
 
 # ============================================================================
 # Testing & Quality Assurance
