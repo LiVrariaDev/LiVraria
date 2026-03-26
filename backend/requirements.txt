@@ -18,7 +18,7 @@ google-genai==1.60.0  # Gemini API
 
 # LangChain
 langchain-core==1.2.11  # LangChain core components
-langgraph==1.0.7  # LangGraph for stateful workflows
+langgraph==1.0.10rc1  # LangGraph for stateful workflows
 langchain-google-genai==4.2.0  # LangChain Gemini integration
 langchain-ollama==1.0.1  # LangChain Ollama integration
 
