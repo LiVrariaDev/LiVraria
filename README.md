@@ -3,7 +3,7 @@
 図書のAI推薦システム - Firebase認証、NFC認証、AI会話機能を備えた次世代図書館システム
 
 [![CI](https://github.com/LiVrariaDev/LiVraria/actions/workflows/ci.yaml/badge.svg)](https://github.com/LiVrariaDev/LiVraria/actions/workflows/ci.yaml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: EUPL v1.2](https://img.shields.io/badge/License-EUPL_v1.2-blue.svg)](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12)
 
 > [!IMPORTANT]
 > 本プロジェクトは開発段階であり、まだ完全ではありません。
