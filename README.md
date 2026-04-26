@@ -330,12 +330,14 @@ cd raspi/nfc
 
 ## ライセンス
 
-このプロジェクトは**MIT License**の下で公開されています。詳細は[LICENSE](LICENSE)を参照してください。
+このプロジェクトは**EUPL v1.2**の下で公開されています。詳細は[LICENSE](LICENSE)を参照してください。
 
 ```
-MIT License
 Copyright (c) 2025 LiVrariaDev
+Licensed under the EUPL, Version 1.2 or – as soon they will be approved by the European Commission - subsequent versions of the EUPL (the "Licence").
 ```
+
+備考: 本プロジェクトは`nfcpy`(EUPL v1.1)を使用しているため、そのライセンス規定に基づき、全体をEUPL v1.2として公開しています。
 
 ### 改造版を作成する場合
 
