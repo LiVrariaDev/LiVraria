@@ -6,6 +6,9 @@ backend/api/data/
 .vscode/
 *.pem
 
+# vosk model
+frontend/public/models/
+
 # Chat history
 chat-history_*.md
 
