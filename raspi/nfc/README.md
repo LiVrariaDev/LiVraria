@@ -1,259 +1,49 @@
-# NFC API Server for Raspberry Pi
+# NFC API サーバー
 
-Raspberry Pi上で動作するNFCカード読み取りAPIサーバーです。フロントエンドからのHTTPリクエストに応答してNFCカードのIDmを返却します。
-
-## 機能
-
-- NFCカード読み取り（ポーリング方式）
-- タイムアウト制御
-- CORS対応（フロントエンドからのアクセスを許可）
-- systemdによる自動起動
+`nfc_api_server.py` は Flask で動く Raspberry Pi 向けのローカル NFC 読み取り API である。PC/SC 経由でカードリーダーに接続し、FeliCa IDm を取得する。
 
 ## セットアップ
 
-### 1. システム依存関係のインストール
+Raspberry Pi 上で `raspi/nfc/` に移動して実行する。
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y pcscd pcsc-tools libpcsclite-dev python3-pip
-sudo systemctl start pcscd
-sudo systemctl enable pcscd
+./setup.sh
 ```
 
-### 2. Python依存関係のインストール
+スクリプトは `sudo` で直接実行しない。`pcscd`、`pcsc-tools`、`libpcsclite-dev` などをインストールし、pyenv で Python 3.11.13 を用意して `.venv` に `requirements.txt` をインストールする。
 
-```bash
-cd /home/pi/LiVraria/raspi
-pip3 install -r requirements.txt
-```
-
-### 3. NFCカードリーダーの確認
+カードリーダーを確認してから手動起動する。
 
 ```bash
 pcsc_scan
-```
-
-カードリーダーが認識されていることを確認してください。
-
-### 4. APIサーバーの起動（手動テスト）
-
-```bash
-cd /home/pi/LiVraria/raspi/nfc
-python3 nfc_api_server.py
-```
-
-ブラウザまたはcurlで動作確認:
-
-```bash
-# ヘルスチェック
+source .venv/bin/activate
+python nfc_api_server.py
 curl http://localhost:8000/health
-
-# NFC読み取り開始
-curl -X POST http://localhost:8000/start-nfc \
-  -H "Content-Type: application/json" \
-  -d '{"timeout": 20}'
-
-# 読み取り状態確認（別ターミナルで）
-curl http://localhost:8000/check-nfc
 ```
 
-### 5. systemdサービスの設定（自動起動）
+## エンドポイント
+
+| メソッド | パス | 用途 |
+| --- | --- | --- |
+| `GET` | `/health` | ヘルスチェック |
+| `POST` | `/start-nfc` | 非同期の NFC 読み取りを開始する。本文の `timeout` は秒数で、既定は 20。 |
+| `GET` | `/check-nfc` | 読み取り状態を返す。`idle`、`reading`、`success`、`timeout` を使用する。 |
+| `GET` | `/read-nfc` | 直近の読み取り結果を返す。 |
+
+`/check-nfc` の成功時は `idm` を返す。成功した結果は約 5 秒後にリセットされる。
+
+## systemd
+
+自動起動を設定するには次を実行する。
 
 ```bash
-# サービスファイルをコピー
-sudo cp /home/pi/LiVraria/raspi/nfc/nfc-api.service /etc/systemd/system/
-
-# サービスファイルのパスを環境に合わせて編集
-sudo nano /etc/systemd/system/nfc-api.service
-
-# サービスを有効化
-sudo systemctl daemon-reload
-sudo systemctl enable nfc-api
-sudo systemctl start nfc-api
-
-# ステータス確認
-sudo systemctl status nfc-api
-
-# ログ確認
-sudo journalctl -u nfc-api -f
+./setup.sh --systemd
 ```
 
-## APIエンドポイント
+`nfc-api.service` には固定のユーザーとパスが記述されているため、有効化する前に実機の配置先・実行ユーザー・仮想環境パスと一致するか確認する。
 
-### GET /health
+## 制約と確認待ち
 
-ヘルスチェック用エンドポイント
-
-**Response:**
-```json
-{
-  "status": "ok",
-  "service": "nfc-api"
-}
-```
-
-### POST /start-nfc
-
-NFC読み取りを開始します（バックグラウンドで実行）
-
-**Request Body:**
-```json
-{
-  "timeout": 20  // タイムアウト時間（秒）、デフォルト20秒
-}
-```
-
-**Response:**
-```json
-{
-  "status": "started",
-  "message": "NFC reading started"
-}
-```
-
-### GET /check-nfc
-
-NFC読み取り状態を確認します（ポーリング用）
-
-**Response:**
-```json
-// 読み取り中
-{
-  "status": "reading"
-}
-
-// 読み取り成功
-{
-  "status": "success",
-  "idm": "01234567890ABCDEF"
-}
-
-// タイムアウト
-{
-  "status": "timeout"
-}
-
-// アイドル状態
-{
-  "status": "idle"
-}
-```
-
-### GET /read-nfc
-
-最新のNFC読み取り結果を返します（シンプルなポーリング用）
-
-**Response:**
-```json
-// カード検出
-{
-  "status": "ok",
-  "idm": "01234567890ABCDEF"
-}
-
-// カード未検出
-{
-  "status": "no_card"
-}
-```
-
-## 使用例（フロントエンド）
-
-### パターン1: start-nfc + check-nfc（推奨）
-
-```javascript
-// NFC読み取り開始
-const startNfc = async () => {
-  nfcLoading.value = true;
-  
-  // 読み取り開始
-  await fetch('http://localhost:8000/start-nfc', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ timeout: 20 })
-  });
-  
-  // ポーリングで状態確認
-  const interval = setInterval(async () => {
-    const res = await fetch('http://localhost:8000/check-nfc');
-    const data = await res.json();
-    
-    if (data.status === 'success') {
-      clearInterval(interval);
-      nfcLoading.value = false;
-      // 認証処理
-      await authenticateWithNfc(data.idm);
-    } else if (data.status === 'timeout') {
-      clearInterval(interval);
-      nfcLoading.value = false;
-      alert('タイムアウト');
-    }
-  }, 1000); // 1秒ごとにポーリング
-};
-```
-
-### パターン2: read-nfc（シンプル）
-
-```javascript
-// ボタンクリック時に読み取り開始
-const startNfc = async () => {
-  nfcLoading.value = true;
-  const startTime = Date.now();
-  const timeout = 20000; // 20秒
-  
-  const interval = setInterval(async () => {
-    const res = await fetch('http://localhost:8000/read-nfc');
-    const data = await res.json();
-    
-    if (data.status === 'ok') {
-      clearInterval(interval);
-      nfcLoading.value = false;
-      // 認証処理
-      await authenticateWithNfc(data.idm);
-    } else if (Date.now() - startTime > timeout) {
-      clearInterval(interval);
-      nfcLoading.value = false;
-      alert('タイムアウト');
-    }
-  }, 1000);
-};
-```
-
-## トラブルシューティング
-
-### カードリーダーが認識されない
-
-```bash
-# pcscdサービスの状態確認
-sudo systemctl status pcscd
-
-# カードリーダーの確認
-pcsc_scan
-```
-
-### サービスが起動しない
-
-```bash
-# ログ確認
-sudo journalctl -u nfc-api -n 50
-
-# 手動起動でエラー確認
-cd /home/pi/LiVraria/raspi/nfc
-python3 nfc_api_server.py
-```
-
-### ポート8000が使用中
-
-```bash
-# ポート使用状況確認
-sudo lsof -i :8000
-
-# プロセスを終了
-sudo kill <PID>
-```
-
-## 注意事項
-
-- このAPIサーバーはRaspberry Piのローカル環境でのみ動作します
-- 外部からのアクセスは想定していません（localhost:8000のみ）
-- NFCカードリーダーがUSB接続されている必要があります
+- API は `0.0.0.0:8000` で待ち受け、CORS はすべてのオリジンを許可する実装である。公開ネットワークへ直接公開する用途は確認していない。
+- FastAPI バックエンドの既定ポートも 8000 である。同一ホストに両方を置く場合のポート・プロキシ設定は未確認である。
+- 実証済みなのは `raspi/2nddisp` ブランチであり、現在の `main` での動作確認は未実施である。

@@ -2,7 +2,7 @@
   "name": "livraria",
   "version": "0.0.0",
   "private": true,
-  "license": "MIT",
+  "license": "EUPL-1.2",
   "type": "module",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
