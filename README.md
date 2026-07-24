@@ -43,4 +43,4 @@ pnpm run start
 
 ## ライセンス
 
-本プロジェクトは [EUPL v1.2](LICENSE) の下で公開されています。依存ライブラリに関する情報は [NOTICE](NOTICE) を参照してください。
+本プロジェクトは [MIT License](LICENSE) の下で公開されています。依存ライブラリに関する情報は [NOTICE](NOTICE) を参照してください。

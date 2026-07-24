@@ -1,18 +1,12 @@
 # ============================================================================
 # Raspberry Pi - NFC Functionality
 # ============================================================================
-# This file defines dependencies for using NFC card readers (RC-S300, etc.)
-# on Raspberry Pi.
+# This file defines dependencies for using PC/SC NFC card readers on Raspberry Pi.
 
 # ============================================================================
 # NFC Card Reader
 # ============================================================================
 pyscard==2.3.1  # smartcard module (PC/SC communication)
-nfcpy==1.0.4  # NFC communication library
-ndeflib==0.3.3  # NFC data format
-libusb1==3.3.1  # USB communication
-pyserial==3.5  # Serial communication
-pyDes==2.0.1  # DES encryption
 
 # ============================================================================
 # Flask API Server
