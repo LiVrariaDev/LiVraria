@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pprint
 
-RAKUTEN_BOOKTOTAL_ENDPOINT = "https://app.rakuten.co.jp/services/api/BooksTotal/Search/20170404"
-RAKUTEN_BOOK_ENDPOINT = "https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404"
+RAKUTEN_BOOKTOTAL_ENDPOINT = "https://openapi.rakuten.co.jp/services/api/BooksTotal/Search/20170404"
+RAKUTEN_BOOK_ENDPOINT = "https://openapi.rakuten.co.jp/services/api/BooksBook/Search/20170404"
 
 RAKUTEN_BOOK_GENRE_FLATLIST = Path(PROJECT_ROOT, "backend", "search", "rakuten_books_genre", "rakuten_genres_flat.json")
 RAKUTEN_BOOK_GENRE_TREELIST = Path(PROJECT_ROOT, "backend", "search", "rakuten_books_genre", "rakuten_genres_hierarchy.json")
@@ -24,7 +24,9 @@ def genreid_to_genre(genre_id: str) -> str:
         return ""
 
 def rakuten_search_books(keywords: list[str], count: int = 10, genre_id: str = "001", orflag: int = 0) -> list[dict]:
-    headers = {}
+    headers = {
+        "accessKey": os.getenv("RAKUTEN_ACCESS_KEY"),
+    }
 
     params = {
         "applicationId": os.getenv("RAKUTEN_APP_ID"),
@@ -38,6 +40,7 @@ def rakuten_search_books(keywords: list[str], count: int = 10, genre_id: str = "
     }
 
     response = requests.get(RAKUTEN_BOOKTOTAL_ENDPOINT, headers=headers, params=params)
+    response.raise_for_status()
     json_data = response.json().get("Items", [])
     
     book_list = []
@@ -72,7 +75,9 @@ def rakuten_search_books(keywords: list[str], count: int = 10, genre_id: str = "
     return book_list
 
 def rakuten_search_info(isbn: str) -> dict:
-    headers = {}
+    headers = {
+        "accessKey": os.getenv("RAKUTEN_ACCESS_KEY")
+    }
     params = {
         "applicationId": os.getenv("RAKUTEN_APP_ID"),
         "format": "json",
@@ -83,6 +88,7 @@ def rakuten_search_info(isbn: str) -> dict:
     }
 
     response = requests.get(RAKUTEN_BOOK_ENDPOINT, headers=headers, params=params)
+    response.raise_for_status()
     items = response.json().get("Items", [])
     
     if not items:
@@ -107,10 +113,6 @@ def rakuten_search_info(isbn: str) -> dict:
 
     return info_data
 
-if __name__ == "__main__":
-    books = rakuten_search_books(["Rust", "プログラミング"])
-    pprint.pprint(books)
-
 def rakuten_search_books_random(keywords: list[str], count: int = 30) -> list[dict]:
     """
     【蔵書検索用】
@@ -118,16 +120,14 @@ def rakuten_search_books_random(keywords: list[str], count: int = 30) -> list[di
     - 結果をシャッフルして返す
     - Vueで表示しやすい形式（mediumImageUrlなど）に整形済み
     """
-    # 環境変数チェック
-    app_id = os.getenv("RAKUTEN_APP_ID")
-    if not app_id:
-        return []
 
-    headers = {}
+    headers = {
+        "accessKey": os.getenv("RAKUTEN_ACCESS_KEY")
+    }
     keyword_str = " ".join(keywords)
     
     params = {
-        "applicationId": app_id,
+        "applicationId": os.getenv("RAKUTEN_APP_ID"),
         "title": keyword_str,    # タイトルや著者名
         "format": "json",
         "formatVersion": "2",
@@ -169,4 +169,7 @@ def rakuten_search_books_random(keywords: list[str], count: int = 30) -> list[di
     except Exception as e:
         print(f"[ERROR] Rakuten random search failed: {e}")
         return []
-    
+
+if __name__ == "__main__":
+    books = rakuten_search_books(["Rust", "プログラミング"])
+    pprint.pprint(books)
