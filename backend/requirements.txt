@@ -25,7 +25,7 @@ langchain-ollama==1.0.1  # LangChain Ollama integration
 # ============================================================================
 # HTTP Communication
 # ============================================================================
-requests==2.32.5  # External API calls (Rakuten, CiNii, etc.)
+requests==2.33.0  # External API calls (Rakuten, CiNii, etc.)
 
 # ============================================================================
 # Utilities
