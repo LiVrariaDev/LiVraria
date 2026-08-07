@@ -110,6 +110,9 @@ def get_llm(backend: str = None, temperature: float = 0.3, max_tokens: int = 512
 			"model": "gemini-2.5-flash",
 			"temperature": temperature,
 			"max_tokens": max_tokens,
+			# 2.5 Flash の動的思考が出力枠を使い切り、最終テキストが
+			# 空になることを防ぐ。雑談・書籍推薦では思考を必要としない。
+			"thinking_budget": 0,
 			"google_api_key": os.getenv("GEMINI_API_KEY")
 		}
 		if system_prompt:
