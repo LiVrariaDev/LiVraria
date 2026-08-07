@@ -517,10 +517,11 @@ def llm_chat(
 	
 	# メッセージリストを構築
 	if not history:
-		# システム指示とユーザー発話を分離する。ツール利用時の役割を正しく伝える。
-		current_message = HumanMessage(content=message)
-		messages = [SystemMessage(content=system_prompt), current_message]
-		logger.info(f"[DEBUG] No history, created system and user messages")
+		# Gemini への既存の入力形式を維持する。
+		first_message = f"{system_prompt}\n\n---\n\nユーザー: {message}"
+		current_message = HumanMessage(content=first_message)
+		messages = [current_message]
+		logger.info(f"[DEBUG] No history, created first message with system prompt")
 	else:
 		# 履歴がある場合: システムプロンプトは最初の会話で既に送信済みなので、通常のメッセージのみ
 		current_message = HumanMessage(content=message)
@@ -583,18 +584,24 @@ def llm_chat(
 						logger.warning(f"[WARNING] Empty response from LLM (attempt {retry_count}/{LLM_MAX_RETRIES}), retrying...")
 					else:
 						logger.error(f"[ERROR] Empty response from LLM after {LLM_MAX_RETRIES} attempts")
-						response_text = "申し訳ございません。応答を生成できませんでした。"
+						response_text = (
+							"LLMから空の応答が返されました"
+							f"（{LLM_MAX_RETRIES}回試行）。"
+						)
 			else:
 				retry_count += 1
 				if retry_count < LLM_MAX_RETRIES:
 					logger.warning(f"[WARNING] No AI message found (attempt {retry_count}/{LLM_MAX_RETRIES}), retrying...")
 				else:
-					response_text = "申し訳ございません。応答を生成できませんでした。"
+					response_text = (
+						"LLM応答にAIMessageが含まれていません"
+						f"（{LLM_MAX_RETRIES}回試行）。"
+					)
 					logger.error("No AI message found in result after retries: %s", result)
 		
-		# 今回のターンのツール呼び出しから表情を取得（なければ neutral）
+		# ツール呼び出しから表情を取得（なければ neutral）
 		current_expression = "neutral"
-		for msg in result["messages"][len(messages):]:
+		for msg in result["messages"]:
 			if hasattr(msg, "tool_calls") and msg.tool_calls:
 				for tool_call in msg.tool_calls:
 					if tool_call["name"] == "update_expression":
@@ -605,15 +612,9 @@ def llm_chat(
 			current_expression = "neutral"
 			logger.info("[DEBUG] No expression change detected, defaulting to neutral.")
 
-		# LangGraph が生成した AIMessage / ToolMessage をそのまま保存する。
-		# Gemini のツール文脈（thought signature を含む）を次ターンへ保持するため。
-		turn_messages = list(result["messages"][len(messages):])
-		if turn_messages and isinstance(turn_messages[-1], AIMessage):
-			turn_messages[-1] = AIMessage(content=response_text)
-		else:
-			turn_messages.append(AIMessage(content=response_text))
-		base_history = history if history else [messages[0]]
-		updated_history = base_history + [current_message] + turn_messages
+		# 正式なツール呼び出しはこのターン内で完結させ、表示用テキストだけを履歴に保存する。
+		ai_message = AIMessage(content=response_text)
+		updated_history = history + [current_message, ai_message]
 		
 		# 推薦された書籍を取得 (クロージャ変数から)
 		recommended_books = list(recommended_books_state)
@@ -621,11 +622,13 @@ def llm_chat(
 		return response_text, updated_history, recommended_books, current_expression
 		
 	except Exception as e:
-		import traceback
-		traceback.print_exc()
-		
-		error_message = "申し訳ございません。応答を生成できませんでした。"
-		logger.error(f"Error in llm_chat: {e}")
+		# logger.exception は traceback を含めてサーバーログへ出力する。
+		logger.exception("Error in llm_chat")
+		detail = re.sub(r"\s+", " ", str(e)).strip()[:500]
+		error_message = (
+			f"LLM処理中に例外が発生しました: {type(e).__name__}"
+			f"{': ' + detail if detail else ''}"
+		)
 		
 		# エラー時も履歴オブジェクトを返す
 		ai_message = AIMessage(content=error_message)
@@ -634,7 +637,7 @@ def llm_chat(
 		else:
 			updated_history = history + [AIMessage(content=error_message)]
 			
-		# errorログは別で保存する → クライアント側に返すと脆弱
+		# 開発中の原因特定のため、例外の型とメッセージをクライアントにも返す。
 		return error_message, updated_history, [], "neutral"
 
 
