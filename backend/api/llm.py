@@ -300,7 +300,15 @@ def create_agent_workflow(llm, tools):
 		if not messages:
 			logger.error("[ERROR] agent_node: Empty messages list!")
 			raise ValueError("Messages list is empty in agent_node")
-		response = llm_with_tools.invoke(messages)
+
+		# 表情ツールは UI の状態更新だけを担う。これを実行した直後にもツールを
+		# 必須にすると、Gemini が空の tool call を繰り返して発話を返さないことがある。
+		# この場合のみツールなしで最終発話を生成する。
+		if isinstance(messages[-1], ToolMessage) and messages[-1].name == "update_expression":
+			logger.info("[DEBUG] Generating final response after update_expression without tools")
+			response = llm.invoke(messages)
+		else:
+			response = llm_with_tools.invoke(messages)
 		return {"messages": [response]}
 
 	def force_tool_node(state: AgentState):
@@ -579,6 +587,12 @@ def llm_chat(
 						logger.info(f"[INFO] Retry succeeded after {retry_count} attempts")
 					break
 				else:
+					logger.error(
+						"[ERROR] Empty final AI message: content=%r, tool_calls=%r, response_metadata=%r",
+						last_message.content,
+						getattr(last_message, "tool_calls", None),
+						getattr(last_message, "response_metadata", None),
+					)
 					retry_count += 1
 					if retry_count < LLM_MAX_RETRIES:
 						logger.warning(f"[WARNING] Empty response from LLM (attempt {retry_count}/{LLM_MAX_RETRIES}), retrying...")
