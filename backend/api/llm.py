@@ -64,6 +64,42 @@ def contains_internal_response(text: str) -> bool:
 	"""モデル内部のツール／思考形式がテキストに混入したか判定する。"""
 	return bool(_INTERNAL_RESPONSE_PATTERN.search(text))
 
+
+def select_expression(
+	response_text: str,
+	messages: Sequence[BaseMessage],
+	recommended_books: Sequence[dict],
+) -> str:
+	"""処理結果から暫定的な表情を決定する。"""
+	# TODO: 最終回答を軽量モデルで分類し、会話内容に応じた表情を選択する。
+	# Candidate: gemini-2.5-flash-lite
+	error_markers = (
+		"LLM処理中に例外が発生しました",
+		"LLMから空の応答が返されました",
+		"LLM応答にAIMessageが含まれていません",
+		"応答の生成中にエラーが発生しました",
+	)
+	if any(marker in response_text for marker in error_markers):
+		return "sorry"
+
+	search_messages = [
+		message
+		for message in messages
+		if isinstance(message, ToolMessage) and message.name == "search_books"
+	]
+	if any(
+		"見つかりませんでした" in str(message.content)
+		or "エラーが発生しました" in str(message.content)
+		for message in search_messages
+	):
+		return "sorry"
+
+	if recommended_books:
+		return "happy"
+	if search_messages:
+		return "thinking"
+	return "neutral"
+
 # LangChainのデバッグログを有効化（環境変数で制御）
 if os.getenv("LANGCHAIN_DEBUG", "false").lower() == "true":
 	import langchain
@@ -186,21 +222,6 @@ def search_books(keywords: list[str], count: int = 30) -> str:
 
 
 @tool
-def update_expression(expression_type: str) -> str:
-    """
-    表情の更新
-
-	司書アバターの表情（感情）を更新します。
-    Args:
-        expression_type: 'neutral'（通常）', happy'（良い本が見つかった時）, 'thinking'（検索中）, 'sorry'（見つからない時）
-    Returns:
-		表情の変更の有無のメッセージ
-	"""
-    # このツール自体はメッセージを返すだけで、
-    # 実際のState更新はLangGraphのノード内、またはToolNodeの結果を反映して行います。
-    return f"表情を{expression_type}に変更しました。"
-
-@tool
 def recommend_books(selections: list[dict]) -> str:
 	"""
 	検索結果から推薦する本を選択
@@ -295,10 +316,6 @@ def create_agent_workflow(llm, tools):
 	
 	# ツールをLLMにバインド
 	llm_with_tools = llm.bind_tools(tools)
-	tools_without_expression = [
-		tool for tool in tools if tool.name != "update_expression"
-	]
-	llm_without_expression = llm.bind_tools(tools_without_expression)
 	
 	def agent_node(state: AgentState):
 		"""エージェントノード: LLMで応答を生成"""
@@ -308,17 +325,7 @@ def create_agent_workflow(llm, tools):
 			logger.error("[ERROR] agent_node: Empty messages list!")
 			raise ValueError("Messages list is empty in agent_node")
 
-		# 同一ターンで表情ツールを繰り返さないよう、実行後は update_expression
-		# だけを除外する。書籍検索と推薦のツールは引き続き利用可能にする。
-		expression_updated = any(
-			isinstance(message, ToolMessage) and message.name == "update_expression"
-			for message in messages
-		)
-		if expression_updated:
-			logger.info("[DEBUG] Continuing without update_expression tool")
-			response = llm_without_expression.invoke(messages)
-		else:
-			response = llm_with_tools.invoke(messages)
+		response = llm_with_tools.invoke(messages)
 		return {"messages": [response]}
 
 	def force_tool_node(state: AgentState):
@@ -460,19 +467,6 @@ def llm_chat(
 			return f"検索中にエラーが発生しました: {str(e)}"
 
 	@tool
-	def update_expression(expression_type: str) -> str:
-		"""
-		表情の更新
-	
-		司書アバターの表情（感情）を更新します。
-		Args:
-			expression_type: 'neutral'（通常）', happy'（良い本が見つかった時）, 'thinking'（検索中）, 'sorry'（見つからない時）
-		Returns:
-			表情の変更の有無のメッセージ
-		"""
-		return f"表情を{expression_type}に変更しました。"
-
-	@tool
 	def recommend_books(selections: list[dict]) -> str:
 		"""
 		検索結果から推薦する本を選択
@@ -524,7 +518,7 @@ def llm_chat(
 	llm = get_llm(backend=model, temperature=temperature, max_tokens=max_tokens)
 	
 	# ツール定義
-	tools = [search_books, recommend_books, update_expression]
+	tools = [search_books, recommend_books]
 	
 	# ワークフロー作成
 	app = create_agent_workflow(llm, tools)
@@ -623,25 +617,18 @@ def llm_chat(
 					)
 					logger.error("No AI message found in result after retries: %s", result)
 		
-		# ツール呼び出しから表情を取得（なければ neutral）
-		current_expression = "neutral"
-		for msg in result["messages"]:
-			if hasattr(msg, "tool_calls") and msg.tool_calls:
-				for tool_call in msg.tool_calls:
-					if tool_call["name"] == "update_expression":
-						current_expression = tool_call["args"]["expression_type"]
-						logger.info(f"[DEBUG] AI decided to change expression to: {current_expression}")
-						
-		if current_expression == "none":
-			current_expression = "neutral"
-			logger.info("[DEBUG] No expression change detected, defaulting to neutral.")
-
 		# 正式なツール呼び出しはこのターン内で完結させ、表示用テキストだけを履歴に保存する。
 		ai_message = AIMessage(content=response_text)
 		updated_history = history + [current_message, ai_message]
 		
 		# 推薦された書籍を取得 (クロージャ変数から)
 		recommended_books = list(recommended_books_state)
+		current_expression = select_expression(
+			response_text,
+			result["messages"],
+			recommended_books,
+		)
+		logger.info(f"[DEBUG] Selected expression from processing result: {current_expression}")
 		
 		return response_text, updated_history, recommended_books, current_expression
 		
@@ -662,7 +649,7 @@ def llm_chat(
 			updated_history = history + [AIMessage(content=error_message)]
 			
 		# 開発中の原因特定のため、例外の型とメッセージをクライアントにも返す。
-		return error_message, updated_history, [], "neutral"
+		return error_message, updated_history, [], "sorry"
 
 
 def llm_summary(
