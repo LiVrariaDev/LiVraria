@@ -295,6 +295,10 @@ def create_agent_workflow(llm, tools):
 	
 	# ツールをLLMにバインド
 	llm_with_tools = llm.bind_tools(tools)
+	tools_without_expression = [
+		tool for tool in tools if tool.name != "update_expression"
+	]
+	llm_without_expression = llm.bind_tools(tools_without_expression)
 	
 	def agent_node(state: AgentState):
 		"""エージェントノード: LLMで応答を生成"""
@@ -304,12 +308,15 @@ def create_agent_workflow(llm, tools):
 			logger.error("[ERROR] agent_node: Empty messages list!")
 			raise ValueError("Messages list is empty in agent_node")
 
-		# 表情ツールは UI の状態更新だけを担う。これを実行した直後にもツールを
-		# 必須にすると、Gemini が空の tool call を繰り返して発話を返さないことがある。
-		# この場合のみツールなしで最終発話を生成する。
-		if isinstance(messages[-1], ToolMessage) and messages[-1].name == "update_expression":
-			logger.info("[DEBUG] Generating final response after update_expression without tools")
-			response = llm.invoke(messages)
+		# 同一ターンで表情ツールを繰り返さないよう、実行後は update_expression
+		# だけを除外する。書籍検索と推薦のツールは引き続き利用可能にする。
+		expression_updated = any(
+			isinstance(message, ToolMessage) and message.name == "update_expression"
+			for message in messages
+		)
+		if expression_updated:
+			logger.info("[DEBUG] Continuing without update_expression tool")
+			response = llm_without_expression.invoke(messages)
 		else:
 			response = llm_with_tools.invoke(messages)
 		return {"messages": [response]}
