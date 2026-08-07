@@ -9,6 +9,40 @@
 const NFC_SERVER_URL = 'http://localhost:8000';
 
 /**
+ * Raspberry Pi 側の OpenJTalk 読み上げが利用可能か確認する。
+ * @returns {Promise<boolean>}
+ */
+export const isRaspiTtsAvailable = async () => {
+    try {
+        const response = await fetch(`${NFC_SERVER_URL}/health`);
+        if (!response.ok) return false;
+
+        const data = await response.json();
+        return data.tts_available === true;
+    } catch (error) {
+        console.warn('Raspberry Pi TTS health check failed:', error);
+        return false;
+    }
+};
+
+/**
+ * Raspberry Pi 側で OpenJTalk の読み上げを開始する。
+ * @param {string} text
+ * @returns {Promise<void>}
+ */
+export const speakOnRaspi = async (text) => {
+    const response = await fetch(`${NFC_SERVER_URL}/speak`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+    });
+
+    if (!response.ok) {
+        throw new Error('Raspberry Pi TTS request failed');
+    }
+};
+
+/**
  * NFCカードの読み取りを開始し、検出されたらコールバックを実行する
  * @param {Function} onSuccess - 成功時のコールバック (idm) => void
  * @param {Object} options - オプション { timeout: number }

@@ -8,6 +8,10 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import time
 import threading
+import os
+import shutil
+import subprocess
+import tempfile
 from smartcard.System import readers
 from smartcard.util import toHexString
 
@@ -21,6 +25,90 @@ nfc_state = {
     "last_read_time": None
 }
 nfc_lock = threading.Lock()
+
+# 音声合成は端末上で実行し、ブラウザの SpeechSynthesis に依存しない。
+OPENJTALK_DICT = os.getenv("OPENJTALK_DICT", "/var/lib/mecab/dic/open-jtalk/naist-jdic")
+OPENJTALK_VOICE = os.getenv(
+    "OPENJTALK_VOICE", "/usr/share/hts-voice/Voice/mei/mei_normal.htsvoice"
+)
+ALSA_DEVICE = os.getenv("ALSA_DEVICE", "plughw:3,0")
+
+
+def is_tts_available():
+    """OpenJTalk と再生に必要なファイル・コマンドが利用可能か返す。"""
+    return (
+        shutil.which("open_jtalk") is not None
+        and shutil.which("aplay") is not None
+        and os.path.isdir(OPENJTALK_DICT)
+        and os.path.isfile(OPENJTALK_VOICE)
+    )
+
+
+def remove_file_after_playback(process, path):
+    """aplay の終了後に生成した一時 WAV ファイルを削除する。"""
+    try:
+        process.wait()
+    finally:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+
+
+def synthesize_and_play(text):
+    """OpenJTalk で合成し、指定した ALSA デバイスで非同期再生する。"""
+    text_file = None
+    wav_fd = None
+    wav_path = None
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False, encoding="utf-8"
+        ) as text_file:
+            text_file.write(text)
+
+        wav_fd, wav_path = tempfile.mkstemp(suffix=".wav")
+        os.close(wav_fd)
+        wav_fd = None
+
+        result = subprocess.run(
+            [
+                "open_jtalk",
+                "-x", OPENJTALK_DICT,
+                "-m", OPENJTALK_VOICE,
+                "-ow", wav_path,
+                text_file.name,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or "OpenJTalk failed")
+
+        process = subprocess.Popen(
+            ["aplay", "-D", ALSA_DEVICE, wav_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        cleanup_thread = threading.Thread(
+            target=remove_file_after_playback, args=(process, wav_path), daemon=True
+        )
+        cleanup_thread.start()
+        wav_path = None
+    finally:
+        if text_file is not None:
+            try:
+                os.remove(text_file.name)
+            except FileNotFoundError:
+                pass
+        if wav_fd is not None:
+            os.close(wav_fd)
+        if wav_path is not None:
+            try:
+                os.remove(wav_path)
+            except FileNotFoundError:
+                pass
 
 
 def read_card_once(timeout=20):
@@ -98,7 +186,30 @@ def background_read_nfc(timeout):
 @app.route("/health", methods=["GET"])
 def health():
     """ヘルスチェック用エンドポイント"""
-    return jsonify({"status": "ok", "service": "nfc-api"})
+    return jsonify({
+        "status": "ok",
+        "service": "nfc-api",
+        "tts_available": is_tts_available(),
+    })
+
+
+@app.route("/speak", methods=["POST"])
+def speak():
+    """テキストを OpenJTalk で合成し、Raspberry Pi のスピーカーで再生する。"""
+    data = request.get_json(silent=True) or {}
+    text = data.get("text", "")
+
+    if not isinstance(text, str) or not text.strip():
+        return jsonify({"status": "error", "message": "Text is empty"}), 400
+    if not is_tts_available():
+        return jsonify({"status": "error", "message": "OpenJTalk is unavailable"}), 503
+
+    try:
+        synthesize_and_play(text)
+        return jsonify({"status": "ok", "message": "Speech playback started"})
+    except (OSError, subprocess.SubprocessError, RuntimeError) as error:
+        print(f"[TTS] Error: {error}")
+        return jsonify({"status": "error", "message": str(error)}), 500
 
 
 @app.route("/start-nfc", methods=["POST"])
@@ -186,6 +297,7 @@ if __name__ == "__main__":
     print("🚀 NFC API Server starting on http://localhost:8000")
     print("📡 Endpoints:")
     print("   GET  /health       - Health check")
+    print("   POST /speak        - Text-to-speech synthesis and playback")
     print("   POST /start-nfc    - Start NFC reading")
     print("   GET  /check-nfc    - Check NFC reading status")
     print("   GET  /read-nfc     - Get latest NFC reading result")

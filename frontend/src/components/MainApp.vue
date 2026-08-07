@@ -337,6 +337,7 @@ import { ref, onMounted, nextTick, onUnmounted } from 'vue';
 import { signOut, getIdToken } from "firebase/auth";
 import { auth } from '../firebaseConfig';
 import { api } from '../services/api'; 
+import { isRaspiTtsAvailable, speakOnRaspi } from '../services/nfc';
 import BookSearch from './BookSearch.vue';
 import MemberInfoPage from './MemberInfoPage.vue'; 
 
@@ -349,6 +350,7 @@ const handleImageLoad = () => {
 
 const isSpeechEnabled = ref(true);
 const selectedVoice = ref(null);
+const useRaspiTts = ref(false);
 
 const loadVoices = () => {
     const voices = window.speechSynthesis.getVoices();
@@ -374,7 +376,7 @@ const toggleSpeech = () => {
     }
 };
 
-const speakText = (text) => {
+const speakText = async (text) => {
     // 修正: 新しい発話リクエストが来たら、現在再生中の音声を即座にキャンセルする
     window.speechSynthesis.cancel();
 
@@ -387,7 +389,7 @@ const speakText = (text) => {
     };
 
     // 音声OFFまたはAPI非対応の場合でも、一定時間後にidleに戻す
-    if (!isSpeechEnabled.value || !window.speechSynthesis) {
+    if (!isSpeechEnabled.value) {
         const duration = text ? Math.min(text.length * 100 + 1000, 5000) : 2000;
         finishInteraction(duration);
         return;
@@ -404,6 +406,24 @@ const speakText = (text) => {
     // テキストが無い場合（表情のみの場合など）も、2秒後にidleに戻す
     if (!plainText.trim()) {
         finishInteraction(2000);
+        return;
+    }
+
+    if (useRaspiTts.value) {
+        try {
+            await speakOnRaspi(plainText);
+            const duration = Math.min(plainText.length * 100 + 1000, 5000);
+            finishInteraction(duration);
+            return;
+        } catch (error) {
+            console.warn('Raspberry Pi TTS failed; falling back to browser speech:', error);
+            useRaspiTts.value = false;
+        }
+    }
+
+    if (!window.speechSynthesis) {
+        const duration = Math.min(plainText.length * 100 + 1000, 5000);
+        finishInteraction(duration);
         return;
     }
 
@@ -769,12 +789,13 @@ const toggleSpeechRecognition = () => {
     if (isRecording.value) { recognition.stop(); } else { recognition.start(); isRecording.value = true; }
 };
 
-onMounted(() => {
+onMounted(async () => {
     // OSコマンドで開く場合は自動オープンしない
     // openSecondaryDisplay(); 
-    fetchUserGreeting();
     loadVoices();
     setTimeout(loadVoices, 500);
+    useRaspiTts.value = await isRaspiTtsAvailable();
+    fetchUserGreeting();
 });
 
 onUnmounted(() => {
