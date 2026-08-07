@@ -1,5 +1,6 @@
 # Standard Library
 import os
+import re
 
 from typing import Optional, List, Dict, Any, TypedDict, Annotated, Sequence
 import logging
@@ -20,6 +21,48 @@ from backend.search.rakuten_books import rakuten_search_books
 
 # Logger
 logger = logging.getLogger("uvicorn.error")
+
+
+# Gemini の内部応答をユーザー向けテキストとして扱わないための定義。
+# 正式なツール呼び出しは AIMessage.tool_calls で処理し、ここには現れない。
+_INTERNAL_RESPONSE_PATTERN = re.compile(
+	r"(?:^|\n)(?:tool_code|thought)\s*(?:\n|$)|default_api\.|"
+	r"(?:search_books|recommend_books|update_expression)\s*\(",
+	re.IGNORECASE,
+)
+
+
+def extract_user_visible_text(content: Any) -> str:
+	"""Gemini/LangChain の応答からユーザー向けテキストだけを取り出す。"""
+	if isinstance(content, str):
+		return content.strip()
+
+	if not isinstance(content, list):
+		return str(content).strip()
+
+	text_parts = []
+	for part in content:
+		if isinstance(part, str):
+			text_parts.append(part)
+			continue
+		if not isinstance(part, dict):
+			continue
+
+		# 思考・ツール・コード実行の部品は表示しない。
+		part_type = str(part.get("type", "")).lower()
+		if part.get("thought") or part_type in {
+			"thinking", "reasoning", "tool_call", "tool_use", "executable_code"
+		}:
+			continue
+		if isinstance(part.get("text"), str):
+			text_parts.append(part["text"])
+
+	return "".join(text_parts).strip()
+
+
+def contains_internal_response(text: str) -> bool:
+	"""モデル内部のツール／思考形式がテキストに混入したか判定する。"""
+	return bool(_INTERNAL_RESPONSE_PATTERN.search(text))
 
 # LangChainのデバッグログを有効化（環境変数で制御）
 if os.getenv("LANGCHAIN_DEBUG", "false").lower() == "true":
@@ -474,12 +517,10 @@ def llm_chat(
 	
 	# メッセージリストを構築
 	if not history:
-		# 履歴がない場合: システムプロンプトを最初のメッセージに含める
-		first_message = f"{system_prompt}\n\n---\n\nユーザー: {message}"
-		# HumanMessageオブジェクトを作成
-		current_message = HumanMessage(content=first_message)
-		messages = [current_message]
-		logger.info(f"[DEBUG] No history, created first message with system prompt")
+		# システム指示とユーザー発話を分離する。ツール利用時の役割を正しく伝える。
+		current_message = HumanMessage(content=message)
+		messages = [SystemMessage(content=system_prompt), current_message]
+		logger.info(f"[DEBUG] No history, created system and user messages")
 	else:
 		# 履歴がある場合: システムプロンプトは最初の会話で既に送信済みなので、通常のメッセージのみ
 		current_message = HumanMessage(content=message)
@@ -524,20 +565,12 @@ def llm_chat(
 			ai_messages = [msg for msg in result["messages"] if isinstance(msg, AIMessage)]
 			if ai_messages:
 				last_message = ai_messages[-1]
-				# contentが文字列でない場合の処理
-				if isinstance(last_message.content, str):
-					response_text = last_message.content
-				elif isinstance(last_message.content, list):
-					# contentがリストの場合、テキスト部分を抽出
-					text_parts = []
-					for part in last_message.content:
-						if isinstance(part, dict) and 'text' in part:
-							text_parts.append(part['text'])
-						elif isinstance(part, str):
-							text_parts.append(part)
-					response_text = ''.join(text_parts) if text_parts else str(last_message.content)
-				else:
-					response_text = str(last_message.content)
+				response_text = extract_user_visible_text(last_message.content)
+
+				if contains_internal_response(response_text):
+					logger.error("[ERROR] Model returned internal tool or thought text")
+					response_text = "申し訳ございません。応答の生成中にエラーが発生しました。もう一度お試しください。"
+					break
 				
 				# 空の応答でなければ成功
 				if response_text.strip():
@@ -559,9 +592,9 @@ def llm_chat(
 					response_text = "申し訳ございません。応答を生成できませんでした。"
 					logger.error("No AI message found in result after retries: %s", result)
 		
-		# ツール呼び出しから表情を取得（なければ neutral）  
+		# 今回のターンのツール呼び出しから表情を取得（なければ neutral）
 		current_expression = "neutral"
-		for msg in result["messages"]:
+		for msg in result["messages"][len(messages):]:
 			if hasattr(msg, "tool_calls") and msg.tool_calls:
 				for tool_call in msg.tool_calls:
 					if tool_call["name"] == "update_expression":
@@ -572,16 +605,15 @@ def llm_chat(
 			current_expression = "neutral"
 			logger.info("[DEBUG] No expression change detected, defaulting to neutral.")
 
-		# 履歴を更新 (BaseMessageオブジェクトのリスト)
-		ai_message = AIMessage(content=response_text)
-
-		# 応答に関数名が含まれる場合（ツール呼び出しの幻覚など）、エラーメッセージにする
-		if "search_books" in response_text or "recommend_books" in response_text:
-			logger.warning("[WARNING] Response contains raw function name, replacing with fallback message.")
-			response_text = "申し訳ございません。応答の生成中にエラーが発生しました。もう一度お試しください。"
-			ai_message = AIMessage(content=response_text)
-		
-		updated_history = history + [current_message, ai_message]
+		# LangGraph が生成した AIMessage / ToolMessage をそのまま保存する。
+		# Gemini のツール文脈（thought signature を含む）を次ターンへ保持するため。
+		turn_messages = list(result["messages"][len(messages):])
+		if turn_messages and isinstance(turn_messages[-1], AIMessage):
+			turn_messages[-1] = AIMessage(content=response_text)
+		else:
+			turn_messages.append(AIMessage(content=response_text))
+		base_history = history if history else [messages[0]]
+		updated_history = base_history + [current_message] + turn_messages
 		
 		# 推薦された書籍を取得 (クロージャ変数から)
 		recommended_books = list(recommended_books_state)
