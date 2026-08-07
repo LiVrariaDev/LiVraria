@@ -88,7 +88,7 @@ _global_state = {
 
 # LLM Initialization
 
-def get_llm(backend: str = None, temperature: float = 0.3, max_tokens: int = 512, system_prompt: Optional[str] = None):
+def get_llm(backend: str = None, temperature: float = 0.3, max_tokens: int = 1024, system_prompt: Optional[str] = None):
 	"""
 	LLMインスタンスを取得
 	
@@ -377,7 +377,7 @@ def llm_chat(
 	ai_insight: Optional[str] = None,
 	model: Optional[str] = None,
 	temperature: float = 0.3,
-	max_tokens: int = 512
+	max_tokens: int = 1024
 ) -> tuple[str, List[BaseMessage], List[dict]]:
 	"""
 	LangGraphを使ったチャット対話
