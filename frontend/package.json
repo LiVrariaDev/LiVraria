@@ -13,7 +13,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "firebase": "^12.16.0",
+    "firebase": "^12.17.1",
     "qrcode": "^1.5.4",
     "vue": "^3.5.40"
   },
@@ -22,9 +22,9 @@
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-vue": "^6.0.8",
     "autoprefixer": "^10.5.4",
-    "postcss": "^8.5.23",
+    "postcss": "^8.5.26",
     "tailwindcss": "^4.1.17",
-    "vite": "^8.1.5",
+    "vite": "^8.2.0",
     "vite-plugin-vue-devtools": "^8.2.1"
   },
   "pnpm": {
