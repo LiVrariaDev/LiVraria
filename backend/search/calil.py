@@ -2,10 +2,11 @@ import os
 import requests
 import time
 import pprint
-from dotenv import load_dotenv
 
-# .envファイルをロード
-load_dotenv()
+# .env は backend パッケージの import 時に読み込み済み
+
+# 外部APIが応答しない場合に端末を待たせ続けないためのタイムアウト（秒）
+HTTP_TIMEOUT = 10
 
 # Calil API endpoints
 CALIL_LIBRARY_ENDPOINT = "https://api.calil.jp/library"
@@ -25,7 +26,7 @@ def search_libraries(pref: str, limit: int = 1) -> list[dict]:
     }
 
     try:
-        response = requests.get(CALIL_LIBRARY_ENDPOINT, headers=headers, params=params)
+        response = requests.get(CALIL_LIBRARY_ENDPOINT, headers=headers, params=params, timeout=HTTP_TIMEOUT)
         response.raise_for_status()
         json_data = response.json()
         return json_data
@@ -49,7 +50,7 @@ def search_books(isbn: str, systemid: str) -> dict:
     print(f"[Calil] Searching: ISBN={isbn}, System={clean_systemid}")
 
     try:
-        response = requests.get(CALIL_BOOK_ENDPOINT, headers=headers, params=params)
+        response = requests.get(CALIL_BOOK_ENDPOINT, headers=headers, params=params, timeout=HTTP_TIMEOUT)
         
         if not response.ok:
             # ★修正: 絵文字(😱, 📝)を削除しました
@@ -72,7 +73,7 @@ def search_books(isbn: str, systemid: str) -> dict:
                 'callback': 'no'
             }
             
-            response = requests.get(CALIL_BOOK_ENDPOINT, headers=headers, params=polling_params)
+            response = requests.get(CALIL_BOOK_ENDPOINT, headers=headers, params=polling_params, timeout=HTTP_TIMEOUT)
             response.raise_for_status()
             json_data = response.json()
             retry_count += 1

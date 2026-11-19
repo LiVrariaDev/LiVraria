@@ -7,6 +7,9 @@ from pathlib import Path
 
 import pprint
 
+# 外部APIが応答しない場合に端末を待たせ続けないためのタイムアウト（秒）
+HTTP_TIMEOUT = 10
+
 RAKUTEN_BOOKTOTAL_ENDPOINT = "https://openapi.rakuten.co.jp/services/api/BooksTotal/Search/20170404"
 RAKUTEN_BOOK_ENDPOINT = "https://openapi.rakuten.co.jp/services/api/BooksBook/Search/20170404"
 
@@ -39,7 +42,7 @@ def rakuten_search_books(keywords: list[str], count: int = 10, genre_id: str = "
         "page": 1,
     }
 
-    response = requests.get(RAKUTEN_BOOKTOTAL_ENDPOINT, headers=headers, params=params)
+    response = requests.get(RAKUTEN_BOOKTOTAL_ENDPOINT, headers=headers, params=params, timeout=HTTP_TIMEOUT)
     response.raise_for_status()
     json_data = response.json().get("Items", [])
     
@@ -87,7 +90,7 @@ def rakuten_search_info(isbn: str) -> dict:
         "page": 1,
     }
 
-    response = requests.get(RAKUTEN_BOOK_ENDPOINT, headers=headers, params=params)
+    response = requests.get(RAKUTEN_BOOK_ENDPOINT, headers=headers, params=params, timeout=HTTP_TIMEOUT)
     response.raise_for_status()
     items = response.json().get("Items", [])
     
@@ -137,7 +140,7 @@ def rakuten_search_books_random(keywords: list[str], count: int = 30) -> list[di
     }
 
     try:
-        response = requests.get(RAKUTEN_BOOK_ENDPOINT, headers=headers, params=params)
+        response = requests.get(RAKUTEN_BOOK_ENDPOINT, headers=headers, params=params, timeout=HTTP_TIMEOUT)
         response.raise_for_status()
         json_data = response.json().get("Items", [])
         
