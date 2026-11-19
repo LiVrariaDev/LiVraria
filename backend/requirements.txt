@@ -15,7 +15,7 @@ firebase_admin==7.1.0  # Firebase Auth & Firestore
 # ============================================================================
 # LangChain
 langchain-core==1.5.3  # LangChain core components
-langgraph==1.2.9  # LangGraph for stateful workflows
+langgraph==1.2.14  # LangGraph for stateful workflows
 langchain-google-genai==4.2.0  # LangChain Gemini integration
 langchain-ollama==1.0.1  # LangChain Ollama integration
 
