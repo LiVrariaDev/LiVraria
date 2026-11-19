@@ -17,6 +17,8 @@ from backend.api.llm import llm_summary
 from backend.search.calil import search_libraries, search_books as check_stock_calil
 # rakuten_books.py から: ランダム検索(豪華版)
 from backend.search.rakuten_books import rakuten_search_books_random as search_books_random
+# cinii.py から: 大学図書館（CiNii Books）の書誌・所蔵館検索
+from backend.search import cinii
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -81,3 +83,31 @@ def check_availability_endpoint(isbn: str, systemid: str):
 	except Exception as e:
 		logger.error(f"[ERROR] Calil availability check failed: {e}")
 		raise HTTPException(status_code=502, detail="Availability check failed")
+
+
+# ----------------------------------------------------------------
+# 大学図書館検索（CiNii Books）
+# ----------------------------------------------------------------
+def _cinii_call(func, *args, **kwargs):
+	try:
+		return func(*args, **kwargs)
+	except cinii.CiNiiNotConfigured:
+		raise HTTPException(status_code=503, detail="University library search is not configured (CINII_APPID)")
+	except Exception as e:
+		logger.error(f"[ERROR] CiNii request failed: {e}")
+		raise HTTPException(status_code=502, detail="University library search failed")
+
+
+@router.get("/search/university/books")
+def search_university_books_endpoint(q: str = "", isbn: str = "", count: int = 20):
+	"""大学図書館の総合目録（CiNii Books）から、キーワードまたは ISBN で書誌を探す。"""
+	keywords = q.replace("　", " ").split()
+	if not keywords and not isbn.strip():
+		raise HTTPException(status_code=400, detail="q or isbn is required")
+	return _cinii_call(cinii.search_university_books, keywords or None, isbn.strip() or None, count)
+
+
+@router.get("/search/university/holders")
+def search_university_holders_endpoint(ncid: str, pref: str = "", count: int = 50):
+	"""NCID の本を所蔵している大学図書館の一覧。pref（都道府県名）で絞り込める。"""
+	return _cinii_call(cinii.search_holders, ncid, pref or None, count)
