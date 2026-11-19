@@ -65,6 +65,14 @@ def contains_internal_response(text: str) -> bool:
 	return bool(_INTERNAL_RESPONSE_PATTERN.search(text))
 
 
+# 利用者向けの失敗メッセージ（読み上げられるため、内部情報は含めない）。
+# 詳細はサーバーログに出力する。
+MESSAGE_INTERNAL_FORMAT = "申し訳ございません。応答の生成中にエラーが発生しました。もう一度お試しください。"
+MESSAGE_EMPTY_RESPONSE = "申し訳ございません。うまくお答えできませんでした。もう一度お話しいただけますか。"
+MESSAGE_EXCEPTION = "申し訳ございません。ただいま応答できません。少し時間をおいてお試しください。"
+FALLBACK_MESSAGES = (MESSAGE_INTERNAL_FORMAT, MESSAGE_EMPTY_RESPONSE, MESSAGE_EXCEPTION)
+
+
 def select_expression(
 	response_text: str,
 	messages: Sequence[BaseMessage],
@@ -73,13 +81,7 @@ def select_expression(
 	"""処理結果から暫定的な表情を決定する。"""
 	# TODO: 最終回答を軽量モデルで分類し、会話内容に応じた表情を選択する。
 	# Candidate: gemini-2.5-flash-lite
-	error_markers = (
-		"LLM処理中に例外が発生しました",
-		"LLMから空の応答が返されました",
-		"LLM応答にAIMessageが含まれていません",
-		"応答の生成中にエラーが発生しました",
-	)
-	if any(marker in response_text for marker in error_markers):
+	if response_text in FALLBACK_MESSAGES:
 		return "sorry"
 
 	search_messages = [
@@ -115,12 +117,6 @@ class AgentState(TypedDict):
 	search_results: Dict[int, dict]  # 検索結果（番号 → 書籍データ）
 	recommended_books: List[dict]  # 推薦された書籍
 
-
-# グローバルステート（ツール間で共有）
-_global_state = {
-	"search_results": {},
-	"recommended_books": []
-}
 
 # LLM Initialization
 
@@ -164,103 +160,6 @@ def get_llm(backend: str = None, temperature: float = 0.3, max_tokens: int = 102
 			temperature=temperature,
 			num_predict=max_tokens
 		)
-
-
-# Tools Definition
-
-@tool
-def search_books(keywords: list[str], count: int = 30) -> str:
-	"""
-	楽天Books APIを使って書籍を検索
-	
-	検索結果は番号付きリストで返されます。
-	推薦する本を選ぶ際は、この番号を使用してください。
-	
-	Args:
-		keywords: 検索キーワードのリスト（例: ["SF", "初心者", "おすすめ"]）
-		count: 取得する書籍数（デフォルト: 10, 10冊以上を指定すること）
-		
-	Returns:
-		番号付き書籍リスト
-	"""
-	try:
-		logger.info(f"[DEBUG] search_books called with keywords: {keywords}, count: {count}")
-		
-		# キーワードのバリデーション
-		if not keywords or not isinstance(keywords, list):
-			logger.error(f"[ERROR] Invalid keywords: {keywords}")
-			return "検索キーワードが指定されていません。"
-		
-		# rakuten_search_booksは list[dict] を返す
-		books = rakuten_search_books(keywords, count=max(count, 10), orflag=0) # AND検索
-		
-		if not books:
-			books = rakuten_search_books(keywords, count=max(count * 2, 20), orflag=1) # OR検索
-			if not books:
-				logger.error("No books found for keywords: %s", keywords)
-				return "申し訳ございません。該当する書籍が見つかりませんでした。"
-			
-		# グローバルステートに保存（番号 → 書籍データ）
-		_global_state["search_results"] = {i+1: book for i, book in enumerate(books)}
-		
-		# LLMには番号付きリストとして返す
-		book_list = []
-		for i, book in enumerate(books, 1):
-			title = book.get("title", "不明")
-			# authorsはリスト形式なので、最初の著者を取得
-			authors = book.get("authors", [])
-			author = authors[0] if authors else "不明"
-			book_list.append(f"{i}. 『{title}』 - {author}")
-		
-		logger.info(f"[DEBUG] Found {len(books)} books")
-		logger.info(f"[DEBUG] Found {len(books)} books")
-		return f"検索結果（{len(books)}冊）:\n" + "\n".join(book_list) + "\n\nこれらの結果から、ユーザーに合った本を選び、必ず `recommend_books` を呼び出してください。テキストで検索結果を要約しないでください。もし推薦する本がない場合は、空のリスト `[]` を引数にして `recommend_books` を呼び出してください。"
-		
-	except Exception as e:
-		logger.error(f"[ERROR] search_books error: {e}", exc_info=True)
-		return f"検索中にエラーが発生しました: {str(e)}"
-
-
-@tool
-def recommend_books(selections: list[dict]) -> str:
-	"""
-	検索結果から推薦する本を選択
-	
-	Args:
-		selections: 推薦する本のリスト
-			各要素は {"number": 番号, "reason": "推薦理由"} の形式
-			例: [{"number": 1, "reason": "初心者向けで分かりやすい"}, {"number": 3, "reason": "実践的な内容"}]
-		
-	Returns:
-		推薦完了メッセージ
-	"""
-	try:
-		recommended = []
-		search_results = _global_state.get("search_results", {})
-		
-		for selection in selections:
-			num = selection.get("number")
-			reason = selection.get("reason", "")
-			
-			if num in search_results:
-				book = search_results[num].copy()
-				book["recommendation_reason"] = reason
-				recommended.append(book)
-		
-		_global_state["recommended_books"] = recommended
-		
-		if recommended:
-			# LLMに返すメッセージを作成（番号を振り直して提示）
-			msg_lines = [f"{len(recommended)}冊の本を推薦リストに追加しました。以下の番号と情報を使って、ユーザーに推薦してください。"]
-			for i, book in enumerate(recommended, 1):
-				msg_lines.append(f"{i}. 『{book['title']}』 (理由: {book['recommendation_reason']})")
-			
-			return "\n".join(msg_lines)
-		else:
-			return "推薦する本が選択されませんでした。ユーザーに「条件に合う本が見つかりませんでした」と報告してください。"
-			
-	except Exception as e:
-		return f"推薦処理中にエラーが発生しました: {str(e)}"
 
 
 # Prompt Management
@@ -582,7 +481,7 @@ def llm_chat(
 
 				if contains_internal_response(response_text):
 					logger.error("[ERROR] Model returned internal tool or thought text")
-					response_text = "申し訳ございません。応答の生成中にエラーが発生しました。もう一度お試しください。"
+					response_text = MESSAGE_INTERNAL_FORMAT
 					break
 				
 				# 空の応答でなければ成功
@@ -602,24 +501,21 @@ def llm_chat(
 						logger.warning(f"[WARNING] Empty response from LLM (attempt {retry_count}/{LLM_MAX_RETRIES}), retrying...")
 					else:
 						logger.error(f"[ERROR] Empty response from LLM after {LLM_MAX_RETRIES} attempts")
-						response_text = (
-							"LLMから空の応答が返されました"
-							f"（{LLM_MAX_RETRIES}回試行）。"
-						)
+						response_text = MESSAGE_EMPTY_RESPONSE
 			else:
 				retry_count += 1
 				if retry_count < LLM_MAX_RETRIES:
 					logger.warning(f"[WARNING] No AI message found (attempt {retry_count}/{LLM_MAX_RETRIES}), retrying...")
 				else:
-					response_text = (
-						"LLM応答にAIMessageが含まれていません"
-						f"（{LLM_MAX_RETRIES}回試行）。"
-					)
+					response_text = MESSAGE_EMPTY_RESPONSE
 					logger.error("No AI message found in result after retries: %s", result)
 		
 		# 正式なツール呼び出しはこのターン内で完結させ、表示用テキストだけを履歴に保存する。
-		ai_message = AIMessage(content=response_text)
-		updated_history = history + [current_message, ai_message]
+		# 失敗時の定型文は履歴に残さない（以降の会話の文脈を汚さないため）。
+		if response_text in FALLBACK_MESSAGES:
+			updated_history = list(history)
+		else:
+			updated_history = history + [current_message, AIMessage(content=response_text)]
 		
 		# 推薦された書籍を取得 (クロージャ変数から)
 		recommended_books = list(recommended_books_state)
@@ -632,24 +528,10 @@ def llm_chat(
 		
 		return response_text, updated_history, recommended_books, current_expression
 		
-	except Exception as e:
-		# logger.exception は traceback を含めてサーバーログへ出力する。
+	except Exception:
+		# 例外の詳細（APIキーやURLを含みうる）はサーバーログのみに出力する。
 		logger.exception("Error in llm_chat")
-		detail = re.sub(r"\s+", " ", str(e)).strip()[:500]
-		error_message = (
-			f"LLM処理中に例外が発生しました: {type(e).__name__}"
-			f"{': ' + detail if detail else ''}"
-		)
-		
-		# エラー時も履歴オブジェクトを返す
-		ai_message = AIMessage(content=error_message)
-		if 'current_message' in locals():
-			updated_history = history + [current_message, ai_message]
-		else:
-			updated_history = history + [AIMessage(content=error_message)]
-			
-		# 開発中の原因特定のため、例外の型とメッセージをクライアントにも返す。
-		return error_message, updated_history, [], "sorry"
+		return MESSAGE_EXCEPTION, list(history), [], "sorry"
 
 
 def llm_summary(
@@ -659,65 +541,47 @@ def llm_summary(
 	model: Optional[str] = None,
 	temperature: float = 0.3,
 	max_tokens: int = 512
-) -> str:
+) -> Optional[str]:
 	"""
-	LangChainを使った要約生成（履歴なし）
-	
-	Args:
-		prompt_file: プロンプトファイルのパス
-		message: ユーザーメッセージ
-		ai_insight: ユーザー情報
-		model: 使用するLLMバックエンド
-		temperature: 温度パラメータ
-		max_tokens: 最大トークン数
-		
+	ツールを使わない単発の生成（要約・AI Insights・キーワード抽出用）。
+	書籍推薦用の指示は付けない。
+
 	Returns:
-		要約テキスト
+		生成テキスト。失敗時や空応答時は None（呼び出し側で既存データを保持すること）。
 	"""
-	# プロンプト読み込み
-	base_prompt = load_prompt_text(prompt_file)
-	system_prompt = create_system_prompt(base_prompt, ai_insight)
-	
-	# LLM初期化
+	system_prompt = load_prompt_text(prompt_file)
+	if ai_insight and ai_insight.strip():
+		system_prompt += f"\n\n## ユーザー情報\n以下は、これまでの会話から学習したユーザーの傾向です。\n\n{ai_insight}\n"
+
 	llm = get_llm(backend=model, temperature=temperature, max_tokens=max_tokens)
-	
-	# メッセージ作成
 	messages = [
 		SystemMessage(content=system_prompt),
 		HumanMessage(content=message)
 	]
-	
-	# LLM実行
+
 	try:
 		response = llm.invoke(messages)
-		return response.content
-	except Exception as e:
-		print(f"Error in llm_summary: {e}")
-		return f"エラーが発生しました: {str(e)}"
+	except Exception:
+		logger.exception("Error in llm_summary")
+		return None
+
+	text = extract_user_visible_text(response.content)
+	if not text or contains_internal_response(text):
+		logger.warning("[WARNING] llm_summary returned empty or internal text")
+		return None
+	return text
 
 
 # Main (for testing)
 
 if __name__ == "__main__":
-	# テスト用
-	test_message = "Pythonの機械学習に関する本を教えてください"
-	
-	# プロンプトファイルのパスを設定（適宜変更）
-	from backend import PROMPT_LIBRARIAN
-	
-	print("Testing LangGraph LLM chat...")
-	# historyはBaseMessageのリスト
-	response, history, recommended_books = llm_chat(
-		prompt_file=str(PROMPT_LIBRARIAN),
-		message=test_message,
+	from backend import PROMPT_DEFAULT
+
+	response, history, recommended_books, expression = llm_chat(
+		prompt_file=str(PROMPT_DEFAULT),
+		message="Pythonの機械学習に関する本を教えてください",
 		history=[]
 	)
-	
-	print(f"\nResponse:\n{response}")
-	print(f"\nHistory length: {len(history)}")
-	print(f"\nRecommended books: {len(recommended_books)}")
-	
-	if recommended_books:
-		print("\n推薦された書籍:")
-		for book in recommended_books:
-			print(f"  - {book.get('title')} ({book.get('recommendation_reason')})")
+	print(f"Response:\n{response}\nExpression: {expression}")
+	for book in recommended_books:
+		print(f"  - {book.get('title')} ({book.get('recommendation_reason')})")
