@@ -20,9 +20,9 @@ fastapi-cli==0.0.20  # FastAPI CLI
 # ============================================================================
 # Testing & Quality Assurance
 # ============================================================================
-# pytest==8.0.0  # Testing framework (add if needed)
+pytest  # Testing framework
 # pytest-asyncio==0.23.0  # Async testing
-# httpx==0.28.1  # Test client (already in dependencies)
+httpx  # FastAPI TestClient
 
 # ============================================================================
 # Monitoring & Debugging
