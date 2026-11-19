@@ -108,6 +108,9 @@ def search_university_books_endpoint(q: str = "", isbn: str = "", count: int = 2
 
 
 @router.get("/search/university/holders")
-def search_university_holders_endpoint(ncid: str, pref: str = "", count: int = 50):
-	"""NCID の本を所蔵している大学図書館の一覧。pref（都道府県名）で絞り込める。"""
-	return _cinii_call(cinii.search_holders, ncid, pref or None, count)
+def search_university_holders_endpoint(ncid: str, pref: str = ""):
+	"""
+	NCID の本を所蔵している大学図書館の一覧。
+	pref（都道府県名）を指定するとその都道府県の図書館に絞り、住所・Webサイトも返す。
+	"""
+	return _cinii_call(cinii.search_holders, ncid, pref or None)
