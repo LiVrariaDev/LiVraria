@@ -11,7 +11,7 @@ NFC API サーバーは Flask で動く Raspberry Pi 向けのローカル API �
 - Python 環境: `/home/livraria/LiVraria/raspi/.venv`
 - 実行プログラム: `/home/livraria/LiVraria/raspi/raspi_api_server.py`
 - systemd サービス: `raspi-api.service`、root ユーザーで実行
-- 待受ポート: `0.0.0.0:8000`
+- 待受: `127.0.0.1:8000`（環境変数 `NFC_HOST` / `NFC_PORT` で変更可）
 
 NFC の読み取り処理は `pyscard` の `smartcard.System.readers()` と PC/SC を使い、APDU `FF CA 00 00 00` で IDm を取得する。
 
@@ -63,6 +63,7 @@ Environment="VOSK_MODEL_PATH=/opt/vosk-model-ja"
 
 ## 注意事項
 
-- API は `0.0.0.0:8000` で待ち受け、CORS はすべてのオリジンを許可する実装である。公開ネットワークへ直接公開する用途は確認していない。
+- API は同じ端末のブラウザからのみ使う前提で、既定では `127.0.0.1` で待ち受け、CORS は `localhost:5173` 系のみ許可する。フロントエンドを別オリジンで開く場合は `NFC_ALLOWED_ORIGINS`（カンマ区切り）を設定する。
+- `/speak` は新しい読み上げが来ると再生中の音声を止める（読み上げの重なり防止）。
 - FastAPI バックエンドの既定ポートも 8000 である。同一ホストに両方を置く場合のポート・プロキシ設定は未確認である。
 - `.env` の内容や認証情報はこの文書に記載しない。
