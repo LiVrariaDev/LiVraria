@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, nextTick, watch } from 'vue';
 import { getAuth } from 'firebase/auth';
 import { api } from '../services/api';
+import QRCode from 'qrcode';
 
 // 既存の変数...
 const query = ref(''); // 初期値は空にする（onMountedで設定）
@@ -52,6 +53,54 @@ const isSelected = (lib) => {
     return myLibraries.value.some(l => l.systemid === lib.systemid);
 };
 
+// ----- 大学図書館（CiNii Books） -----
+const userPref = ref('東京都');
+const uniBook = ref(null);       // 対象の本（楽天の検索結果）
+const uniRecord = ref({});       // CiNii の書誌
+const uniHolders = ref([]);      // 居住都道府県の所蔵館
+const uniLoading = ref(false);
+const uniError = ref('');
+const uniQrCode = ref('');
+
+const closeUniversity = () => {
+  uniBook.value = null;
+};
+
+const checkUniversity = async (book) => {
+  uniBook.value = book;
+  uniRecord.value = {};
+  uniHolders.value = [];
+  uniError.value = '';
+  uniQrCode.value = '';
+  uniLoading.value = true;
+
+  try {
+    const user = getAuth().currentUser;
+    if (!user) throw new Error('ログインが必要です');
+    const token = await user.getIdToken();
+
+    const records = await api.searchUniversityBooks({ isbn: book.isbn }, token);
+    if (!records.length || !records[0].ncid) {
+      uniError.value = '大学図書館の所蔵が見つかりませんでした。';
+      return;
+    }
+    // 版違いなどで複数ヒットした場合は所蔵館数が最も多いものを使う
+    const record = records.reduce((a, b) => ((b.owner_count || 0) > (a.owner_count || 0) ? b : a));
+    uniRecord.value = record;
+    if (record.url) {
+      uniQrCode.value = await QRCode.toDataURL(record.url).catch(() => '');
+    }
+    uniHolders.value = await api.searchUniversityHolders(record.ncid, userPref.value, token);
+  } catch (e) {
+    console.error('University library search failed:', e);
+    uniError.value = e.status === 503
+      ? '大学図書館検索は現在利用できません（サーバー設定が必要です）。'
+      : '大学図書館の検索に失敗しました。時間をおいてお試しください。';
+  } finally {
+    uniLoading.value = false;
+  }
+};
+
 // ユーザーの居住地を取得してリストを準備
 onMounted(async () => {
   console.log("BookSearch component mounted.");
@@ -90,6 +139,7 @@ onMounted(async () => {
         const token = await user.getIdToken();
         const userData = await api.getUser(user.uid, token);
         const pref = userData.personal?.live_pref || userData.personal?.address || userData.personal?.prefecture || '東京都'; 
+        userPref.value = pref;
         
         console.log(`User prefecture: ${pref}`);
 
@@ -343,12 +393,21 @@ const checkAvailability = async (book) => {
                     <h3 class="font-bold text-lg leading-tight mb-1 line-clamp-2">{{ book.title }}</h3>
                     <p class="text-sm text-gray-600 mb-2">{{ book.author }}</p>
                 </div>
-                <button 
-                    @click="checkAvailability(book)"
-                    class="mt-3 w-full bg-emerald-500 text-white py-2 px-4 rounded-md text-sm font-bold hover:bg-emerald-600 transition-colors flex items-center justify-center gap-1"
-                >
-                    図書館で探す
-                </button>
+                <div class="mt-3 flex gap-2">
+                    <button 
+                        @click="checkAvailability(book)"
+                        class="flex-1 bg-emerald-500 text-white py-2 px-2 rounded-md text-sm font-bold hover:bg-emerald-600 transition-colors flex items-center justify-center gap-1"
+                    >
+                        図書館で探す
+                    </button>
+                    <button 
+                        v-if="book.isbn"
+                        @click="checkUniversity(book)"
+                        class="flex-1 bg-indigo-500 text-white py-2 px-2 rounded-md text-sm font-bold hover:bg-indigo-600 transition-colors flex items-center justify-center gap-1"
+                    >
+                        大学図書館で探す
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -420,6 +479,53 @@ const checkAvailability = async (book) => {
 
                     <div v-else class="text-center py-6 text-gray-500">
                         <p>この地域の図書館には蔵書情報が見つかりませんでした。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 大学図書館（CiNii Books）の所蔵 -->
+    <div v-if="uniBook" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="closeUniversity">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col animate-fade-in-up">
+            <div class="p-4 border-b flex justify-between items-start bg-indigo-50 rounded-t-xl">
+                <div>
+                    <p class="text-xs text-indigo-600 font-bold">大学図書館の所蔵（CiNii Books）</p>
+                    <h3 class="font-bold text-lg leading-tight line-clamp-2">{{ uniBook.title }}</h3>
+                </div>
+                <button @click="closeUniversity" class="text-gray-400 hover:text-gray-600 font-bold text-xl ml-4">✕</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4">
+                <div v-if="uniLoading" class="flex flex-col items-center justify-center py-8">
+                    <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500 mb-2"></div>
+                    <p class="text-gray-500">大学図書館の所蔵を確認中...</p>
+                </div>
+
+                <div v-else-if="uniError" class="text-center py-6 text-gray-500">
+                    <p>{{ uniError }}</p>
+                </div>
+
+                <div v-else>
+                    <div class="flex gap-4 items-start mb-4">
+                        <div class="flex-1 text-sm text-gray-600 space-y-1">
+                            <p>全国 <span class="font-bold text-indigo-700 text-lg">{{ uniRecord.owner_count ?? '-' }}</span> の大学図書館などが所蔵しています。</p>
+                            <p><span class="font-bold">{{ userPref }}</span> の所蔵館: {{ uniHolders.length }} 館</p>
+                            <p class="text-xs text-gray-400">利用条件（学外者の利用可否など）は各図書館のWebサイトでご確認ください。</p>
+                        </div>
+                        <div v-if="uniQrCode" class="text-center flex-shrink-0">
+                            <img :src="uniQrCode" alt="CiNii Books のページ" class="w-24 h-24">
+                            <p class="text-xs text-gray-400">スマホで詳細を見る</p>
+                        </div>
+                    </div>
+
+                    <div v-if="uniHolders.length === 0" class="text-center py-4 text-gray-500 bg-gray-50 rounded">
+                        {{ userPref }}内の大学図書館では所蔵が見つかりませんでした。
+                    </div>
+                    <div v-else class="space-y-2">
+                        <div v-for="lib in uniHolders" :key="lib.fano" class="p-3 bg-gray-50 rounded border border-gray-100">
+                            <p class="font-medium text-gray-800">{{ lib.name }}</p>
+                            <p v-if="lib.address" class="text-xs text-gray-500">〒{{ lib.postal_code }} {{ lib.address }}</p>
+                        </div>
                     </div>
                 </div>
             </div>

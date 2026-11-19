@@ -29,7 +29,21 @@ backend/.venv/bin/python -m backend.run
 - `backend/api/data/conversations.json`
 - `backend/api/data/nfc_users.json`
 
+- `backend/api/data/cinii_libraries.json`（CiNii の図書館所在地キャッシュ）
+
 上記は実行時データであり、Git 管理対象外です。Firebase、Gemini、書籍検索 API への接続には `.env` の設定が必要です。
+
+### 大学図書館検索（CiNii Books）
+
+`.env` に `CINII_APPID` を設定します。所蔵館を都道府県で絞り込むには各図書館の所在地が必要なため、
+バックエンドのサーバーで一度だけ全図書館の所在地を取得しておきます（約1,900館、5分程度）。
+
+```bash
+backend/.venv/bin/python -m backend.search.cinii --prefetch
+```
+
+実施しない場合も動作しますが、初めて検索する本では絞り込みに数十秒かかります。
+動作確認は `python -m backend.search.cinii --isbn 9784003101018 --pref 東京都` で行えます。
 
 ## API
 
@@ -39,8 +53,11 @@ backend/.venv/bin/python -m backend.run
 
 ## 検証
 
-テストは `backend/test/` にあります。外部サービスと Firebase の設定を必要とするものが含まれるため、実行可否は個別に確認してください。
+外部サービスや実データを使わない単体テスト（CI でも実行）:
 
 ```bash
-backend/.venv/bin/python -m pytest backend/test/
+backend/.venv/bin/python -m pytest backend/test/test_datastore.py backend/test/test_llm_response_sanitization.py \
+  backend/test/test_llm_failures.py backend/test/test_server_api.py backend/test/test_cinii.py
 ```
+
+`backend/test/` のその他のテストは、起動中のサーバーや Firebase の設定を必要とします。
