@@ -159,26 +159,31 @@ const startNfcLogin = async () => {
   isReadingNfc.value = true;
 
   try {
-    await readNfcCard(async (idm) => {
-      isReadingNfc.value = false;
-      
-      // 1. バックエンドでNFC認証 -> Custom Token取得
-      const result = await api.authenticateNfc(idm);
-      if (!result.custom_token) {
-        throw new Error('認証トークンの取得に失敗しました');
-      }
+    // 0. カードを読み取る（読み取り完了で resolve される）
+    let idm = null;
+    await readNfcCard((value) => { idm = value; });
+    isReadingNfc.value = false;
 
-      // 2. FirebaseにCustom Tokenでログイン
-      await signInWithCustomToken(auth, result.custom_token);
-      console.log('NFCログイン完了');
-    });
+    // 1. バックエンドでNFC認証 -> Custom Token取得
+    // （以前はコールバック内で await していたため、ここでの失敗が catch に届かなかった）
+    const result = await api.authenticateNfc(idm);
+    if (!result.custom_token) {
+      throw new Error('認証トークンの取得に失敗しました');
+    }
+
+    // 2. FirebaseにCustom Tokenでログイン
+    await signInWithCustomToken(auth, result.custom_token);
+    console.log('NFCログイン完了');
   } catch (error) {
     console.error('NFCログインエラー:', error);
-    if (error.message.includes('NFC ID not registered')) {
+    if (error.status === 404) {
       errorMessage.value = 'このカードは未登録です。';
+    } else if (error.status === 403 || error.status === 503) {
+      errorMessage.value = 'この端末はNFCログインが許可されていません。管理者に連絡してください。';
     } else {
       errorMessage.value = `NFCログインエラー: ${error.message}`;
     }
+  } finally {
     isReadingNfc.value = false;
   }
 };

@@ -254,7 +254,9 @@ const registerCard = async (cardId) => {
     }, 3000);
   } catch (error) {
     console.error('カード登録エラー:', error);
-    errorMessage.value = `登録エラー: ${error.message}`;
+    errorMessage.value = error.status === 409
+      ? 'このカードは別の会員が登録済みです。'
+      : `登録エラー: ${error.message}`;
   }
 };
 
