@@ -1,4 +1,23 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+// 端末共有キー: バックエンドの LIVRARIA_DEVICE_KEY と同じ値を設定する（NFC ログインに必要）
+const DEVICE_KEY = import.meta.env.VITE_DEVICE_KEY || ''
+
+/**
+ * エラーレスポンスの detail を含む Error を作る。
+ * 画面側で status や detail によってメッセージを出し分けられるようにする。
+ */
+async function apiError(response, fallback) {
+    let detail = ''
+    try {
+        detail = (await response.json()).detail || ''
+    } catch {
+        // JSON でないレスポンスは無視
+    }
+    const error = new Error(detail ? `${fallback}: ${detail}` : fallback)
+    error.status = response.status
+    error.detail = detail
+    return error
+}
 
 export const api = {
     // ========================================
@@ -142,7 +161,7 @@ export const api = {
             body: JSON.stringify({ nfc_id: nfcId, user_id: userId })
         })
 
-        if (!response.ok) throw new Error('Failed to register NFC')
+        if (!response.ok) throw await apiError(response, 'Failed to register NFC')
         return response.json()
     },
 
@@ -150,12 +169,13 @@ export const api = {
         const response = await fetch(`${API_BASE_URL}/nfc/auth`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-Device-Key': DEVICE_KEY
             },
             body: JSON.stringify({ nfc_id: nfcId })
         })
 
-        if (!response.ok) throw new Error('Failed to authenticate NFC')
+        if (!response.ok) throw await apiError(response, 'Failed to authenticate NFC')
         return response.json()
     },
 
