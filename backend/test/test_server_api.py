@@ -102,3 +102,9 @@ def test_cors_does_not_allow_arbitrary_origin(client):
 		headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "GET"},
 	)
 	assert "access-control-allow-origin" not in response.headers
+
+
+def test_university_search_without_appid_is_503(client, monkeypatch):
+	monkeypatch.delenv("CINII_APPID", raising=False)
+	assert client.get("/search/university/books", params={"q": "Python"}).status_code == 503
+	assert client.get("/search/university/books").status_code == 400

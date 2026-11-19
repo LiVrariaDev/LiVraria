@@ -262,6 +262,31 @@ export const api = {
         return response.json();
     },
 
+    /*
+     * 大学図書館（CiNii Books）の書誌検索
+     * query か isbn のどちらかを指定する
+     */
+    async searchUniversityBooks({ query = '', isbn = '' }, idToken) {
+        const params = new URLSearchParams({ q: query, isbn })
+        const response = await fetch(`${API_BASE_URL}/search/university/books?${params}`, {
+            headers: { 'Authorization': `Bearer ${idToken}` }
+        })
+        if (!response.ok) throw await apiError(response, 'University book search failed')
+        return response.json()
+    },
+
+    /*
+     * 大学図書館（CiNii Books）の所蔵館検索
+     */
+    async searchUniversityHolders(ncid, pref, idToken) {
+        const params = new URLSearchParams({ ncid, pref: pref || '' })
+        const response = await fetch(`${API_BASE_URL}/search/university/holders?${params}`, {
+            headers: { 'Authorization': `Bearer ${idToken}` }
+        })
+        if (!response.ok) throw await apiError(response, 'University holder search failed')
+        return response.json()
+    },
+
     async getUserNfc(userId, idToken) {
         const response = await fetch(`${API_BASE_URL}/users/${userId}/nfc`, {
             method: 'GET',
