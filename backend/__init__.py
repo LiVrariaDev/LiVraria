@@ -1,14 +1,14 @@
 # Backend package initialization
 import os
 from pathlib import Path
-from dotenv import load_dotenv, find_dotenv
+from dotenv import load_dotenv
 
-# .envのディレクトリがProject ROOT
-DOTENV_ROOT = find_dotenv(usecwd=True)
-PROJECT_ROOT = Path(DOTENV_ROOT).parent
+# リポジトリのルート（このファイルの1つ上）を Project ROOT とする
+# 以前は find_dotenv(usecwd=True) で探していたため、起動ディレクトリによって結果が変わった
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# .envの読み込み
-load_dotenv(dotenv_path=DOTENV_ROOT)
+# .envの読み込み（環境変数が既に設定されている場合はそちらを優先）
+load_dotenv(dotenv_path=Path(PROJECT_ROOT, ".env"))
 
 # ============================================================================
 # Configuration Settings
@@ -39,10 +39,6 @@ MONGODB_DB = "livraria_dev"
 # End of Configuration
 # ============================================================================
 
-# Directories
-if not Path(PROJECT_ROOT, ".env").exists():
-	raise FileNotFoundError(".env file not found")
-
 # 環境変数の取得
 firebase_key_env = os.getenv("FIREBASE_ACCOUNT_KEY_PATH")
 
@@ -66,7 +62,8 @@ if not os.getenv("FIREBASE_API_KEY"):
 	)
 
 PROMPTS_DIR = Path(PROJECT_ROOT, PROMPTS_DIR_REL)
-DATA_DIR = Path(PROJECT_ROOT, DATA_DIR_REL)
+# 複数インスタンスやテストでデータ置き場を分けられるよう、環境変数で上書き可能
+DATA_DIR = Path(os.getenv("LIVRARIA_DATA_DIR") or Path(PROJECT_ROOT, DATA_DIR_REL))
 
 if not DATA_DIR.exists():
 	DATA_DIR.mkdir(parents=True, exist_ok=True)
