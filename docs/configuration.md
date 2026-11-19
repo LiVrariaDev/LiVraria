@@ -32,7 +32,9 @@ cp .env.template .env
 
 `VITE_API_BASE_URL` を設定すると、フロントエンドの API 接続先を変更できる。未設定時は `http://localhost:8000` となる。
 
-Vite の `VITE_` 変数はブラウザ向けビルドに埋め込まれる。公開してよい Firebase クライアント設定だけを入れ、秘密情報を入れない。
+`VITE_DEVICE_KEY` は NFC ログイン時に `X-Device-Key` ヘッダーとして送る端末共有キーで、バックエンドの `LIVRARIA_DEVICE_KEY` と同じ値にする。未設定または不一致の場合、NFC ログインはできない（メールアドレスでのログインは可能）。
+
+Vite の `VITE_` 変数はブラウザ向けビルドに埋め込まれる。公開してよい Firebase クライアント設定だけを入れ、秘密情報を入れない。`VITE_DEVICE_KEY` も端末のブラウザから読めるため、端末を不特定多数のブラウザに公開しない前提でのみ有効である。
 
 ## 任意の値
 
@@ -40,7 +42,10 @@ Vite の `VITE_` 変数はブラウザ向けビルドに埋め込まれる。公
 | --- | --- |
 | `BACKEND_HOST` / `BACKEND_PORT` | `backend.run` の待受先。既定は `0.0.0.0:8000`。 |
 | `USE_SSL` | `true` のとき、開発用の `certs/key.pem` と `certs/cert.pem` を使用する。 |
-| `PRODUCTION_ORIGINS` | バックエンド CORS 許可オリジンをカンマ区切りで追加する。 |
+| `ALLOWED_ORIGINS` | バックエンド CORS 許可オリジンをカンマ区切りで追加する（`localhost:5173` は既定で許可）。旧名 `PRODUCTION_ORIGINS` も使用可。 |
+| `LIVRARIA_DEVICE_KEY` | NFC ログイン（`/nfc/auth`）を許可する端末共有キー。未設定時は NFC ログインを無効にする。 |
+| `CINII_APPID` | CiNii Books API（大学図書館検索）のアプリケーション ID。未設定時は大学図書館検索が 503 を返す。 |
+| `LIVRARIA_DATA_DIR` | JSON データの保存先。既定は `backend/api/data`。 |
 | `LLM_BACKEND` | 現行運用は `gemini`。未指定時も `gemini` となる。`ollama` を指定する実装はあるが、運用対象外である。 |
 | `RAKUTEN_APP_ID` | 現行で利用する楽天ブックス API のアプリケーション ID。 |
 | `SESSION_TIMEOUT` | セッション監視の秒数。既定は 1800。 |
@@ -49,7 +54,7 @@ Vite の `VITE_` 変数はブラウザ向けビルドに埋め込まれる。公
 
 ## 現行の外部サービス
 
-LLM は Gemini を利用する。`backend/api/llm.py` は Gemini のモデルとして `gemini-2.5-flash` を指定している。書籍検索は楽天ブックス API を利用する。CiNii、Calil、Google Books 向けの実装もリポジトリには存在するが、現行運用の対象ではない。
+LLM は Gemini を利用する。`backend/api/llm.py` は Gemini のモデルとして `gemini-2.5-flash` を指定している。書籍検索は楽天ブックス API、公共図書館の蔵書確認はカーリル、大学図書館の所蔵検索は CiNii Books を利用する。Google Books 向けの実装もリポジトリには存在するが、現行運用の対象ではない。
 
 ## 本番公開時の設定
 
