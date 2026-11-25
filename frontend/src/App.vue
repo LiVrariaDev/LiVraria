@@ -3,6 +3,9 @@
   <div v-if="isAuthReady" class="select-none">
     <!-- URLパラメータ '?view=secondary' がある場合はセカンダリディスプレイを表示 -->
     <SecondaryDisplay v-if="isSecondaryView" />
+
+    <!-- '?view=debug' の場合はデバッグ画面を表示 -->
+    <DebugView v-else-if="isDebugView" />
     
     <!-- 通常の画面 -->
     <div v-else>
@@ -40,7 +43,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch, defineAsyncComponent } from 'vue';
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from './firebaseConfig';
 import { api } from './services/api';
@@ -50,10 +53,13 @@ import { getDisplaySender } from './services/displayChannel';
 import MainApp from './components/MainApp.vue';
 import Login from './components/Login.vue';
 import SecondaryDisplay from './components/SecondaryDisplay.vue';
+// デバッグ画面は mermaid を含んで大きいので、開いたときだけ読み込む（端末画面の読み込みを重くしない）
+const DebugView = defineAsyncComponent(() => import('./components/DebugView.vue'));
 
 const user = ref(null);
 const isAuthReady = ref(false);
 const isSecondaryView = ref(false);
+const isDebugView = ref(false);
 let unsubscribe = null;
 
 // --- 自動ログアウト設定 ---
@@ -69,7 +75,7 @@ let countdownInterval = null;
 // タイマーリセット（ユーザーの操作があった時に呼ぶ）
 const resetTimer = () => {
   // ログインしていない、またはセカンダリ画面なら何もしない
-  if (!user.value || isSecondaryView.value) return;
+  if (!user.value || isSecondaryView.value || isDebugView.value) return;
 
   // 既存のタイマーをクリア
   if (idleTimer) clearTimeout(idleTimer);
@@ -137,12 +143,12 @@ const removeActivityListeners = () => {
 // ユーザー状態の監視とタイマー制御
 watch(user, (newUser, oldUser) => {
   // セカンダリ画面へログイン/ログアウトを通知する(通知はここ1か所から送る)
-  if (!isSecondaryView.value) {
+  if (!isSecondaryView.value && !isDebugView.value) {
     if (newUser && !oldUser) getDisplaySender().sessionLoggedIn();
     else if (!newUser && oldUser) getDisplaySender().sessionLoggedOut();
   }
 
-  if (newUser && !isSecondaryView.value) {
+  if (newUser && !isSecondaryView.value && !isDebugView.value) {
     // ログイン時: 監視開始
     setupActivityListeners();
     resetTimer();
@@ -158,14 +164,17 @@ watch(user, (newUser, oldUser) => {
 onMounted(() => {
   const urlParams = new URLSearchParams(window.location.search);
   isSecondaryView.value = urlParams.get('view') === 'secondary';
+  isDebugView.value = urlParams.get('view') === 'debug';
 
   if (isSecondaryView.value) {
     document.title = "Secondary Display";
+  } else if (isDebugView.value) {
+    document.title = "LiVraria Debug";
   } else {
     document.title = "LiVraria Main";
   }
 
-  if (!isSecondaryView.value) {
+  if (!isSecondaryView.value && !isDebugView.value) {
     const sender = getDisplaySender();
     // セカンダリ画面が再読み込みされたときに現在の状態を返す
     sender.onSyncRequest(() => {
@@ -186,7 +195,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (unsubscribe) unsubscribe();
-  if (!isSecondaryView.value) getDisplaySender().close();
+  if (!isSecondaryView.value && !isDebugView.value) getDisplaySender().close();
   removeActivityListeners();
   if (idleTimer) clearTimeout(idleTimer);
   if (countdownInterval) clearInterval(countdownInterval);

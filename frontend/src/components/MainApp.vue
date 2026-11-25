@@ -178,6 +178,7 @@
                             <div class="max-w-[80%] rounded-2xl px-6 py-4 shadow-sm text-base leading-relaxed" 
                                  :class="msg.sender === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-slate-100 text-slate-800 rounded-bl-none border border-slate-200'">
                                 <p>{{ msg.text }}</p>
+                                <p v-if="msg.traceId" class="mt-1 text-xs text-slate-400">trace: {{ msg.traceId.slice(0, 8) }}</p>
                             </div>
                         </div>
                         <div v-if="isLoading" class="flex justify-start">
@@ -527,6 +528,7 @@ const sendHomeMessage = async () => {
         const data = await api.sendMessage(currentSessionId.value, message, token, 'default');
         
         if (data.session_id) currentSessionId.value = data.session_id;
+        if (data.trace_id) console.info('[LiVraria] trace_id', data.trace_id);
         
         const aiResponse = data.response || data.reply || data.message || '';
         // 2. 受信時：表情フラグと回答を送信
@@ -572,12 +574,13 @@ const sendChatMessage = async () => {
         const data = await api.sendMessage(currentSessionId.value, message, token, 'default');
         
         if (data.session_id) currentSessionId.value = data.session_id;
+        if (data.trace_id) console.info('[LiVraria] trace_id', data.trace_id);
         
         const aiResponse = data.response || data.reply || data.message || '';
         let expression = data.expression || 'neutral';
         if (expression === 'none') expression = 'neutral';
         
-        chatHistory.value.push({ sender: 'ai', text: aiResponse });
+        chatHistory.value.push({ sender: 'ai', text: aiResponse, traceId: data.failed ? data.trace_id : undefined });
         speakText(aiResponse);
         sendMessageToSecondary(aiResponse, expression);
 
@@ -663,12 +666,13 @@ const askAboutBookFromModal = async () => {
         const data = await api.sendMessage(currentSessionId.value, question, token, 'default');
         
         if (data.session_id) currentSessionId.value = data.session_id;
+        if (data.trace_id) console.info('[LiVraria] trace_id', data.trace_id);
         
         const aiResponse = data.response || data.reply || data.message || '';
         let expression = data.expression || 'neutral';
         if (expression === 'none') expression = 'neutral';
         
-        chatHistory.value.push({ sender: 'ai', text: aiResponse });
+        chatHistory.value.push({ sender: 'ai', text: aiResponse, traceId: data.failed ? data.trace_id : undefined });
         speakText(aiResponse);
         sendMessageToSecondary(aiResponse, expression);
         
