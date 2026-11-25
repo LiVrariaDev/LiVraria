@@ -35,7 +35,7 @@ def extract_keywords(text: str) -> str:
 	"""AI で自然文から検索キーワードを抽出する。失敗時は元の文字列を返す。"""
 	if not PROMPT_KEYWORD_SEARCH.exists():
 		return text
-	extracted = llm_summary(str(PROMPT_KEYWORD_SEARCH), text, max_tokens=64)
+	extracted = llm_summary(str(PROMPT_KEYWORD_SEARCH), text, max_tokens=64, role="light")
 	if extracted and extracted.strip():
 		# 1行目だけを使う（説明文が付いてきた場合の保険）
 		return extracted.strip().splitlines()[0]

@@ -16,6 +16,16 @@ cp .env.template .env
 | `FIREBASE_API_KEY` | バックエンドの起動時チェック対象となる Firebase API キー |
 | `GEMINI_API_KEY` | 現行の Gemini LLM 設定 |
 
+以下は任意で、未設定時は既定値を使う。
+
+| 変数 | 用途 |
+| --- | --- |
+| `GEMINI_CHAT_MODEL` | 会話用モデル。既定は `gemini-3.5-flash-lite`。 |
+| `GEMINI_SUMMARY_MODEL` | 要約と AI Insights 用モデル。既定は `gemini-4-hydrogen`。 |
+| `GEMINI_LIGHT_MODEL` | キーワード抽出などの軽量処理用モデル。既定は `gemini-2.5-flash-lite`。 |
+| `GEMINI_API_MAX_RETRIES` | Gemini SDK 内のリトライ回数。既定は 1。 |
+| `GEMINI_API_TIMEOUT` | Gemini API のタイムアウト秒数。既定は 30。 |
+
 サービスアカウント鍵の実ファイルはリポジトリ外で管理する。相対パスを指定する場合は、バックエンドをリポジトリルートから起動する前提で解決される。
 
 ## フロントエンドで使う値
@@ -52,9 +62,19 @@ Vite の `VITE_` 変数はブラウザ向けビルドに埋め込まれる。公
 
 `.env.template` には MongoDB 用の値も残っているが、現行のデータストア実装は JSON ファイルを利用する。MongoDB 用の値は通常の設定対象にしない。
 
+## デモアカウントの学習停止
+
+展示で共有デモアカウントを使う場合は、`backend/tools/demo_account.py` で学習(要約と AI Insights の更新)を止められる。**バックエンドの停止中に実行すること**(稼働中に実行すると、バックエンドの次の保存で上書きされる)。
+
+```bash
+python -m backend.tools.demo_account show <user_id>
+python -m backend.tools.demo_account learning <user_id> on|off
+python -m backend.tools.demo_account set-insights <user_id> <file>
+```
+
 ## 現行の外部サービス
 
-LLM は Gemini を利用する。`backend/api/llm.py` は Gemini のモデルとして `gemini-2.5-flash` を指定している。書籍検索は楽天ブックス API、公共図書館の蔵書確認はカーリル、大学図書館の所蔵検索は CiNii Books を利用する。Google Books 向けの実装もリポジトリには存在するが、現行運用の対象ではない。
+LLM は Gemini を利用する。`backend/api/llm.py` は、会話・要約・軽量処理の役割ごとに Gemini のモデルを選ぶ（上記の環境変数）。書籍検索は楽天ブックス API、公共図書館の蔵書確認はカーリル、大学図書館の所蔵検索は CiNii Books を利用する。Google Books 向けの実装もリポジトリには存在するが、現行運用の対象ではない。
 
 ## 本番公開時の設定
 

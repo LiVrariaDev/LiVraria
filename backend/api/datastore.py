@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import tempfile
+import re
 import threading
 import uuid
 from datetime import datetime, timedelta
@@ -34,7 +35,7 @@ from langchain_core.messages import (
 logger = logging.getLogger("uvicorn.error")
 
 # ファイルパス (DBへ移行するため, 一時的なもの. 本番はENVへまとめる)
-from backend import DATA_DIR, USERS_FILE, CONVERSATIONS_FILE, NFC_USERS_FILE, PROMPT_SUMMARY, PROMPT_AI_INSIGHT, SESSION_TIMEOUT
+from backend import DATA_DIR, USERS_FILE, CONVERSATIONS_FILE, NFC_USERS_FILE, PROMPT_SUMMARY_AND_INSIGHT, SESSION_TIMEOUT
 
 
 def _locked(method):
@@ -87,6 +88,25 @@ def _load_json(path: Path, default):
 		path.replace(backup)
 		logger.error(f"[ERROR] {path.name} is corrupted ({e}). Moved to {backup.name} and starting empty.")
 		return default
+
+
+_SUMMARY_TAG = re.compile(r"<summary>(.*?)</summary>", re.DOTALL)
+_INSIGHTS_TAG = re.compile(r"<ai_insights>(.*?)</ai_insights>", re.DOTALL)
+
+
+def parse_summary_and_insights(result: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+	"""LLM の出力から (要約, AI Insights) を取り出す。取れないものは None。"""
+	if not result or not result.strip():
+		return None, None
+	summary_match = _SUMMARY_TAG.search(result)
+	if not summary_match:
+		# 形式を守らなかった場合は、タグを除いた全文を要約として残す。
+		text = re.sub(r"</?(?:summary|ai_insights)>", "", result).strip()
+		return (text or None), None
+	insights_match = _INSIGHTS_TAG.search(result)
+	summary = summary_match.group(1).strip() or None
+	insights = (insights_match.group(1).strip() or None) if insights_match else None
+	return summary, insights
 
 
 class DataStore:
@@ -376,8 +396,9 @@ class DataStore:
 
 	def generate_summary_and_insights(self, session_id: str) -> None:
 		"""
-		セッションの要約とai_insightsを生成する（BackgroundTasks / タイムアウト監視から呼ばれる）。
+		セッションの要約とai_insightsを1回のLLM呼び出しで生成する（BackgroundTasks / タイムアウト監視から呼ばれる）。
 		LLM 呼び出しはロック外で行い、結果の反映だけロック内で行う。
+		ユーザーの learning_enabled が False なら LLM を呼ばず、何も更新しない。
 		"""
 		logger.info(f"[INFO] [BackgroundTask] Starting summary/ai_insights generation: session_id={session_id}")
 		try:
@@ -390,41 +411,42 @@ class DataStore:
 				history_objs = list(self.sessions.get(session_id) or self._messages_from_conv(conv))
 				user = self.users.get(conv.user_id)
 				existing_insights = (user.ai_insights if user else "") or ""
+				learning_enabled = user.learning_enabled if user else True
+
+			if not learning_enabled:
+				logger.info(f"[INFO] [BackgroundTask] Learning disabled for user, skipped: {session_id}")
+				return
 
 			if not history_objs:
 				logger.info(f"[INFO] [BackgroundTask] Empty conversation, skipped: {session_id}")
 				return
 
-			conversation_text = "".join(f"{m.type}: {m.content}\n\n" for m in history_objs)
-
-			if not PROMPT_SUMMARY.exists():
-				logger.warning(f"[WARNING] [BackgroundTask] summary prompt not found: {PROMPT_SUMMARY}")
+			if not PROMPT_SUMMARY_AND_INSIGHT.exists():
+				logger.warning(f"[WARNING] [BackgroundTask] summary_and_insight prompt not found: {PROMPT_SUMMARY_AND_INSIGHT}")
 				return
-			summary_text = summary_function(str(PROMPT_SUMMARY), conversation_text, ai_insight=existing_insights)
+
+			conversation_text = "".join(f"{m.type}: {m.content}\n\n" for m in history_objs)
+			message = f"""**既存のAI Insights:**
+```
+{existing_insights or "（なし）"}
+```
+
+**今回の会話履歴:**
+```
+{conversation_text}
+```
+"""
+			result = summary_function(str(PROMPT_SUMMARY_AND_INSIGHT), message)
+			summary_text, new_insights = parse_summary_and_insights(result)
 			if not summary_text:
 				logger.warning("[WARNING] [BackgroundTask] Summary generation failed; keeping existing data")
 				return
-
-			new_insights = None
-			if user and PROMPT_AI_INSIGHT.exists():
-				message = f"""
-**既存のAI Insights:**
-```
-{existing_insights if existing_insights else "（なし）"}
-```
-
-**今回の会話要約:**
-```
-{summary_text}
-```
-"""
-				new_insights = summary_function(str(PROMPT_AI_INSIGHT), message, ai_insight=None)
-				if not new_insights:
-					logger.warning("[WARNING] [BackgroundTask] ai_insights generation failed; keeping existing insights")
+			if user and new_insights is None:
+				logger.warning("[WARNING] [BackgroundTask] ai_insights not found in result; keeping existing insights")
 
 			with self._lock:
 				conv.summary = summary_text
-				if user and new_insights:
+				if user and new_insights is not None:
 					user.ai_insights = new_insights
 				self.save_file()
 			logger.info(f"[SUCCESS] [BackgroundTask] Completed: session_id={session_id}")

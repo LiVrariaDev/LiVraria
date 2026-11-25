@@ -18,6 +18,8 @@ from langgraph.prebuilt import ToolNode
 # User-defined
 from backend import PROMPTS_DIR, LLM_MAX_RETRIES, LLM_HISTORY_LIMIT
 from backend.search.rakuten_books import rakuten_search_books
+from backend.api import llm_usage
+from backend.api.llm_usage import is_rate_limit_error
 
 # Logger
 logger = logging.getLogger("uvicorn.error")
@@ -70,7 +72,8 @@ def contains_internal_response(text: str) -> bool:
 MESSAGE_INTERNAL_FORMAT = "申し訳ございません。応答の生成中にエラーが発生しました。もう一度お試しください。"
 MESSAGE_EMPTY_RESPONSE = "申し訳ございません。うまくお答えできませんでした。もう一度お話しいただけますか。"
 MESSAGE_EXCEPTION = "申し訳ございません。ただいま応答できません。少し時間をおいてお試しください。"
-FALLBACK_MESSAGES = (MESSAGE_INTERNAL_FORMAT, MESSAGE_EMPTY_RESPONSE, MESSAGE_EXCEPTION)
+MESSAGE_BUSY = "ただいま混雑しています。少し時間をおいてお試しください。"
+FALLBACK_MESSAGES = (MESSAGE_INTERNAL_FORMAT, MESSAGE_EMPTY_RESPONSE, MESSAGE_EXCEPTION, MESSAGE_BUSY)
 
 
 def select_expression(
@@ -120,11 +123,29 @@ class AgentState(TypedDict):
 
 # LLM Initialization
 
-def get_llm(backend: str = None, temperature: float = 0.3, max_tokens: int = 1024, system_prompt: Optional[str] = None):
+LLM_ROLES = ("chat", "summary", "light")
+
+DEFAULT_GEMINI_MODELS = {
+	"chat": "gemini-3.5-flash-lite",
+	"summary": "gemini-4-hydrogen",
+	"light": "gemini-2.5-flash-lite",
+}
+MODEL_ENV = {"chat": "GEMINI_CHAT_MODEL", "summary": "GEMINI_SUMMARY_MODEL", "light": "GEMINI_LIGHT_MODEL"}
+
+
+def get_gemini_model(role: str) -> str:
+	"""役割に対応する Gemini のモデル名を返す。環境変数があればそれを優先する。"""
+	if role not in LLM_ROLES:
+		raise ValueError(f"Unknown LLM role: {role}")
+	return os.getenv(MODEL_ENV[role]) or DEFAULT_GEMINI_MODELS[role]
+
+
+def get_llm(role: str = "chat", backend: Optional[str] = None, temperature: float = 0.3, max_tokens: int = 1024, system_prompt: Optional[str] = None):
 	"""
 	LLMインスタンスを取得
 	
 	Args:
+		role: 用途（'chat' / 'summary' / 'light'）。Gemini のモデル選択に使う
 		backend: LLMバックエンド（'gemini' または 'ollama'）
 		temperature: 温度パラメータ
 		max_tokens: 最大トークン数
@@ -137,21 +158,20 @@ def get_llm(backend: str = None, temperature: float = 0.3, max_tokens: int = 102
 		backend = os.getenv("LLM_BACKEND", "gemini")
 	
 	if backend == "gemini":
-		# Geminiの場合、system_instructionとして渡す
+		model_name = get_gemini_model(role)
 		kwargs = {
-			"model": "gemini-2.5-flash",
+			"model": model_name,
 			"temperature": temperature,
 			"max_tokens": max_tokens,
-			# 2.5 Flash の動的思考が出力枠を使い切り、最終テキストが
-			# 空になることを防ぐ。雑談・書籍推薦では思考を必要としない。
-			"thinking_budget": 0,
-			"google_api_key": os.getenv("GEMINI_API_KEY")
+			"google_api_key": os.getenv("GEMINI_API_KEY"),
+			# SDK 内のリトライが多いと、429 のとき端末が長く固まる
+			"max_retries": int(os.getenv("GEMINI_API_MAX_RETRIES", "1")),
+			"timeout": float(os.getenv("GEMINI_API_TIMEOUT", "30")),
 		}
-		if system_prompt:
-			# LangChainのChatGoogleGenerativeAIはsystem_instructionをサポート
-			# ただし、メッセージとして渡す必要がある場合もあるため、
-			# ここでは含めずに、メッセージリストに追加する方式を採用
-			pass
+		if model_name.startswith("gemini-2.5-"):
+			# 2.5 系の動的思考が出力枠を使い切り、最終テキストが
+			# 空になることを防ぐ。それ以外のモデルには思考関連の引数を渡さない。
+			kwargs["thinking_budget"] = 0
 		return ChatGoogleGenerativeAI(**kwargs)
 	else:  # ollama
 		return ChatOllama(
@@ -224,7 +244,12 @@ def create_agent_workflow(llm, tools):
 			logger.error("[ERROR] agent_node: Empty messages list!")
 			raise ValueError("Messages list is empty in agent_node")
 
-		response = llm_with_tools.invoke(messages)
+		try:
+			response = llm_with_tools.invoke(messages)
+		except Exception as exc:
+			llm_usage.record_error("chat", exc)
+			raise
+		llm_usage.record_success("chat", response)
 		return {"messages": [response]}
 
 	def force_tool_node(state: AgentState):
@@ -414,7 +439,7 @@ def llm_chat(
 	system_prompt = create_system_prompt(base_prompt, ai_insight)
 	
 	# LLM初期化
-	llm = get_llm(backend=model, temperature=temperature, max_tokens=max_tokens)
+	llm = get_llm(role="chat", backend=model, temperature=temperature, max_tokens=max_tokens)
 	
 	# ツール定義
 	tools = [search_books, recommend_books]
@@ -528,7 +553,11 @@ def llm_chat(
 		
 		return response_text, updated_history, recommended_books, current_expression
 		
-	except Exception:
+	except Exception as exc:
+		if is_rate_limit_error(exc):
+			# 上限超過は想定内の事象なので traceback は出さない。
+			logger.warning("[WARNING] Gemini rate limit (429) in llm_chat")
+			return MESSAGE_BUSY, list(history), [], "sorry"
 		# 例外の詳細（APIキーやURLを含みうる）はサーバーログのみに出力する。
 		logger.exception("Error in llm_chat")
 		return MESSAGE_EXCEPTION, list(history), [], "sorry"
@@ -540,7 +569,8 @@ def llm_summary(
 	ai_insight: Optional[str] = None,
 	model: Optional[str] = None,
 	temperature: float = 0.3,
-	max_tokens: int = 512
+	max_tokens: int = 2048,
+	role: str = "summary"
 ) -> Optional[str]:
 	"""
 	ツールを使わない単発の生成（要約・AI Insights・キーワード抽出用）。
@@ -553,7 +583,7 @@ def llm_summary(
 	if ai_insight and ai_insight.strip():
 		system_prompt += f"\n\n## ユーザー情報\n以下は、これまでの会話から学習したユーザーの傾向です。\n\n{ai_insight}\n"
 
-	llm = get_llm(backend=model, temperature=temperature, max_tokens=max_tokens)
+	llm = get_llm(role=role, backend=model, temperature=temperature, max_tokens=max_tokens)
 	messages = [
 		SystemMessage(content=system_prompt),
 		HumanMessage(content=message)
@@ -561,9 +591,14 @@ def llm_summary(
 
 	try:
 		response = llm.invoke(messages)
-	except Exception:
-		logger.exception("Error in llm_summary")
+	except Exception as exc:
+		llm_usage.record_error(role, exc)
+		if is_rate_limit_error(exc):
+			logger.warning("[WARNING] Gemini rate limit (429) in llm_summary")
+		else:
+			logger.exception("Error in llm_summary")
 		return None
+	llm_usage.record_success(role, response)
 
 	text = extract_user_visible_text(response.content)
 	if not text or contains_internal_response(text):

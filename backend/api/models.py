@@ -76,6 +76,7 @@ class User(BaseModel):
 	old_session: List[str] = Field(default_factory=list, description="Old chat session IDs")
 	recommend_log: List[RecommendationLogEntry] = Field(default_factory=list, description="Recommendation log")
 	lastlogin: datetime = Field(default_factory=datetime.now, description="Last login time")
+	learning_enabled: bool = Field(True, description="False なら要約と AI Insights の更新を行わない(共有デモアカウント用)")
 
 	model_config = ConfigDict(populate_by_name=True)
 

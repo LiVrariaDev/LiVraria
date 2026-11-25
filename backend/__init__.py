@@ -94,6 +94,7 @@ else:
 	PROMPT_SUMMARY = Path(PROMPTS_DIR, os.getenv("PROMPT_SUMMARY", "summary.md"))
 	PROMPT_AI_INSIGHT = Path(PROMPTS_DIR, os.getenv("PROMPT_AI_INSIGHT", "ai_insight.md"))
 
+PROMPT_SUMMARY_AND_INSIGHT = Path(PROMPTS_DIR, os.getenv("PROMPT_SUMMARY_AND_INSIGHT", "summary_and_insight.md"))
 PROMPT_LIBRARIAN = Path(PROMPTS_DIR, os.getenv("PROMPT_LIBRARIAN", "librarian.md"))
 PROMPT_DEBUG = Path(PROMPTS_DIR, os.getenv("PROMPT_DEBUG", "debug.md"))
 
