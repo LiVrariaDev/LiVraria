@@ -23,6 +23,21 @@ backend/.venv/bin/python -m backend.run
 
 既定では `http://0.0.0.0:8000` で起動し、`BACKEND_HOST` と `BACKEND_PORT` で変更できます。`backend.run` は開発用に自動リロードを有効にします。
 
+## 常駐させる(systemd)
+
+`backend/livraria-backend.service` を使うと、サーバーでバックエンドを systemd で常駐させられます。コピーする前に、`User` と `WorkingDirectory`、`ExecStart` のパスをサーバーに合わせて書き換えてください。
+
+```bash
+sudo cp backend/livraria-backend.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now livraria-backend
+journalctl -u livraria-backend -f
+```
+
+- 必ず1プロセスで動かします。会話中の履歴とロックをプロセスのメモリに持っているため、`--workers` を増やさないでください。
+- 停止時に、進行中のセッションの要約と保存が行われます。完了を待つため `TimeoutStopSec=60` としています。
+- サーバーでの起動確認はまだ行っていません。
+
 ## データと外部サービス
 
 - `backend/api/data/users.json`
