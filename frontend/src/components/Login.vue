@@ -129,7 +129,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue';
+import { ref, reactive } from 'vue';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from '../firebaseConfig'; 
 import { api } from '../services/api'; 
@@ -187,25 +187,6 @@ const startNfcLogin = async () => {
     isReadingNfc.value = false;
   }
 };
-
-// BroadcastChannelを作成（MainAppと同じ名前を使うことで通信可能）
-const channel = new BroadcastChannel('livraria_channel');
-
-// 画面が表示された時に実行
-onMounted(() => {
-  // アプリ起動時（ログイン画面表示時）に、セカンダリディスプレイを「待機状態」にする
-  setTimeout(() => {
-    channel.postMessage({ 
-      type: 'chat', 
-      text: 'いらっしゃいませ。\nログインしてください。', 
-      state: 'idle' 
-    });
-  }, 1000); 
-});
-
-onUnmounted(() => {
-  channel.close();
-});
 
 const prefectures = [
   "北海道","青森県","岩手県","宮城県","秋田県","山形県","福島県",

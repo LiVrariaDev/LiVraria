@@ -44,6 +44,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from './firebaseConfig';
 import { api } from './services/api';
+import { getDisplaySender } from './services/displayChannel';
 
 // コンポーネント
 import MainApp from './components/MainApp.vue';
@@ -134,26 +135,17 @@ const removeActivityListeners = () => {
 };
 
 // ユーザー状態の監視とタイマー制御
-watch(user, (newUser) => {
+watch(user, (newUser, oldUser) => {
+  // セカンダリ画面へログイン/ログアウトを通知する(通知はここ1か所から送る)
+  if (!isSecondaryView.value) {
+    if (newUser && !oldUser) getDisplaySender().sessionLoggedIn();
+    else if (!newUser && oldUser) getDisplaySender().sessionLoggedOut();
+  }
+
   if (newUser && !isSecondaryView.value) {
     // ログイン時: 監視開始
     setupActivityListeners();
     resetTimer();
-    
-    // ログイン成功時、Secondaryディスプレイを自動で開く
-    setTimeout(() => {
-      const width = 1920;
-      const height = 1080;
-      const left = window.screen.width;
-      const top = 0;
-      
-      window.open(
-        `${window.location.origin}/?view=secondary`,
-        'SecondaryDisplay',
-        `width=${width},height=${height},left=${left},top=${top}`
-      );
-      console.log('[App] Secondary display auto-opened after login');
-    }, 1000); // 1秒遅延でUIの安定化を待つ
   } else {
     // ログアウト時: 監視終了
     removeActivityListeners();
@@ -174,9 +166,18 @@ onMounted(() => {
   }
 
   if (!isSecondaryView.value) {
+    const sender = getDisplaySender();
+    // セカンダリ画面が再読み込みされたときに現在の状態を返す
+    sender.onSyncRequest(() => {
+      sender.syncState({ loggedIn: !!user.value, lastSpeak: sender.getState().lastSpeak });
+    });
+
     unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      const isFirstAuthEvent = !isAuthReady.value;
       user.value = currentUser;
       isAuthReady.value = true;
+      // 起動直後に未ログインなら、セカンダリ画面を待機表示にする
+      if (isFirstAuthEvent && !currentUser) sender.sessionLoggedOut();
     });
   } else {
     isAuthReady.value = true;
@@ -185,6 +186,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (unsubscribe) unsubscribe();
+  if (!isSecondaryView.value) getDisplaySender().close();
   removeActivityListeners();
   if (idleTimer) clearTimeout(idleTimer);
   if (countdownInterval) clearInterval(countdownInterval);
