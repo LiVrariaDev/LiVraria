@@ -43,6 +43,8 @@ class ChatResponse(BaseModel):
 	session_id: str
 	recommended_books: List[dict] = Field(default_factory=list, description="推薦された書籍リスト")
 	expression: str = Field("none", description="司書の表情ステータス")
+	trace_id: Optional[str] = Field(None, description="このターンのトレース ID")
+	failed: bool = Field(False, description="応答が失敗時の定型文なら True")
 
 # Data Models
 # Message Class : 廃止, LangChainの方へ合わせる

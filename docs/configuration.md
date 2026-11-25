@@ -54,6 +54,9 @@ Vite の `VITE_` 変数はブラウザ向けビルドに埋め込まれる。公
 | `USE_SSL` | `true` のとき、開発用の `certs/key.pem` と `certs/cert.pem` を使用する。 |
 | `ALLOWED_ORIGINS` | バックエンド CORS 許可オリジンをカンマ区切りで追加する（`localhost:5173` は既定で許可）。旧名 `PRODUCTION_ORIGINS` も使用可。 |
 | `LIVRARIA_DEVICE_KEY` | NFC ログイン（`/nfc/auth`）を許可する端末共有キー。未設定時は NFC ログインを無効にする。 |
+| `LIVRARIA_DEBUG` | `true` のとき、デバッグ API（`/debug/*`）を有効にし、会話のトレースを記録する。開発用 PC でのみ `true` にする。既定は `false`。 |
+| `LIVRARIA_ADMIN_KEY` | デバッグ API の管理者キー（`X-Admin-Key` ヘッダー）。`LIVRARIA_DEVICE_KEY` とは別の値にする。未設定時、デバッグ API は 503 を返す。 |
+| `LIVRARIA_TRACE_LIMIT` | メモリに残すトレースのターン数。既定は 500。 |
 | `CINII_APPID` | CiNii Books API（大学図書館検索）のアプリケーション ID。未設定時は大学図書館検索が 503 を返す。 |
 | `LIVRARIA_DATA_DIR` | JSON データの保存先。既定は `backend/api/data`。 |
 | `LLM_BACKEND` | 現行運用は `gemini`。未指定時も `gemini` となる。`ollama` を指定する実装はあるが、運用対象外である。 |
@@ -79,3 +82,9 @@ LLM は Gemini を利用する。`backend/api/llm.py` は、会話・要約・�
 ## 本番公開時の設定
 
 Nginx を用いる公開構成では、少なくとも `VITE_API_BASE_URL` と `PRODUCTION_ORIGINS` が公開 URL と一致している必要がある。Nginx、TLS、バックエンドプロセス管理の具体的な設定は未検証であり、[デプロイ方針](deployment.md) の確認待ち事項を解消してから確定する。
+
+## デバッグ画面
+
+開発用 PC で `LIVRARIA_DEBUG=true` と `LIVRARIA_ADMIN_KEY` を設定してバックエンドを起動し、`http://localhost:5173/?view=debug` を開いて管理者キーを入力すると、セッションごとのターン一覧、LangGraph のグラフ、ノードごとの処理内容、役割別の LLM 使用量を確認できる。
+
+トレースは `DATA_DIR/traces/YYYY-MM-DD.jsonl` に1ターン1行で追記される。全利用者の発言を含むため、取り扱いに注意する。自動では削除されないので、不要になったら手で消す。

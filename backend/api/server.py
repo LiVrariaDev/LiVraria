@@ -8,6 +8,8 @@ from backend import FIREBASE_ACCOUNT_KEY_PATH, PROMPT_DEFAULT, PROMPT_LIBRARIAN
 import asyncio
 import logging
 import os
+import traceback
+import uuid
 from contextlib import asynccontextmanager
 
 import uvicorn
@@ -17,12 +19,13 @@ from langchain_core.messages import messages_to_dict
 
 from .models import ChatRequest, ChatResponse, Personal, ChatStatus, UserStatus, NfcIdRequest, UserUpdate
 from .datastore import DataStore
-from .llm import llm_chat
+from .llm import llm_chat, FALLBACK_MESSAGES
+from .trace_store import current_trace_id, current_turn, get_trace_store, install_log_filter
 from .auth import get_current_user_id, verify_device_key, device_key_configured
 from . import LLM_BACKEND
 
 # 検索機能
-from backend.api.routers import search
+from backend.api.routers import search, debug
 
 # firebase import
 import firebase_admin
@@ -30,6 +33,9 @@ from firebase_admin import credentials, auth
 
 # ロガー設定
 logger = logging.getLogger("uvicorn.error")
+
+# ログの各行に trace_id を付ける
+install_log_filter()
 
 # DataStoreインスタンス
 data_store = DataStore()
@@ -332,28 +338,70 @@ class Server:
 
 	def chat_prompt(self, message: str, session_id: str | None, prompt_file: str, user_id: str) -> ChatResponse:
 		"""会話の1ターンを処理する（ブロッキング。スレッドから呼ぶこと）。"""
-		session_id = self._resolve_session(user_id, session_id)
-		history = self.data_store.get_history(session_id)
-		user = self.data_store.get_user(user_id)
+		trace_id = uuid.uuid4().hex
+		id_token = current_trace_id.set(trace_id)
+		turn_token = None
+		store = get_trace_store()
+		turn = None
+		try:
+			session_id = self._resolve_session(user_id, session_id)
+			history = self.data_store.get_history(session_id)
+			user = self.data_store.get_user(user_id)
 
-		response_text, new_history, recommended_books, current_expression = llm_chat(
-			prompt_file,
-			message,
-			history,
-			ai_insight=self._build_user_context(user) if user else ""
-		)
+			if store is not None:
+				turn = store.start_turn(trace_id, session_id, user_id, message)
+				turn_token = current_turn.set(turn)
 
-		# メモリ上の履歴を更新（ディスク書き込みは close/pause 時に行う）
-		self.data_store.update_history(session_id, new_history)
+			response_text, new_history, recommended_books, current_expression = llm_chat(
+				prompt_file,
+				message,
+				history,
+				ai_insight=self._build_user_context(user) if user else ""
+			)
+			failed = response_text in FALLBACK_MESSAGES
 
-		logger.info(f"[DEBUG] chat_prompt: session={session_id}, books={len(recommended_books)}, expression={current_expression}")
-		return ChatResponse(
-			response=response_text,
-			session_id=session_id,
-			recommended_books=recommended_books,
-			expression=current_expression
-		)
+			if turn is not None:
+				turn.response_text = response_text
+				turn.expression = current_expression
+				turn.recommended_count = len(recommended_books)
+				turn.failed = failed
 
+			# メモリ上の履歴を更新（ディスク書き込みは close/pause 時に行う）
+			self.data_store.update_history(session_id, new_history)
+
+			logger.info(f"[DEBUG] chat_prompt: session={session_id}, books={len(recommended_books)}, expression={current_expression}")
+			return ChatResponse(
+				response=response_text,
+				session_id=session_id,
+				recommended_books=recommended_books,
+				expression=current_expression,
+				trace_id=trace_id,
+				failed=failed
+			)
+		except Exception as exc:
+			if turn is not None:
+				turn.failed = True
+				if turn.error is None:
+					turn.error = {"type": type(exc).__name__, "message": str(exc), "traceback": traceback.format_exc()}
+			raise
+		finally:
+			if turn is not None and store is not None:
+				store.finish_turn(turn)
+			if turn_token is not None:
+				current_turn.reset(turn_token)
+			current_trace_id.reset(id_token)
+
+
+def register_debug_routes(target_app: FastAPI) -> bool:
+	"""LIVRARIA_DEBUG=true のときだけ /debug/* を登録する。登録したら True。"""
+	if os.getenv("LIVRARIA_DEBUG", "false").lower() != "true":
+		return False
+	target_app.include_router(debug.router)
+	logger.warning("[WARNING] Debug API is enabled (LIVRARIA_DEBUG=true): do not use this setting in production")
+	return True
+
+
+register_debug_routes(app)
 
 # Server を登録してルートを作成
 server = Server(app, data_store)

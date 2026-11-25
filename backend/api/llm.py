@@ -1,6 +1,8 @@
 # Standard Library
 import os
 import re
+import traceback
+from datetime import datetime
 
 from typing import Optional, List, Dict, Any, TypedDict, Annotated, Sequence
 import logging
@@ -20,6 +22,7 @@ from backend import PROMPTS_DIR, LLM_MAX_RETRIES, LLM_HISTORY_LIMIT
 from backend.search.rakuten_books import rakuten_search_books
 from backend.api import llm_usage
 from backend.api.llm_usage import is_rate_limit_error
+from backend.api.trace_store import current_turn, TraceStep
 
 # Logger
 logger = logging.getLogger("uvicorn.error")
@@ -306,6 +309,90 @@ def create_agent_workflow(llm, tools):
 	return workflow.compile()
 
 
+# Trace
+
+TRACE_CONTENT_LIMIT = 2000
+
+
+def _record_trace_step(node_name, new_messages, attempt, started, ended) -> None:
+	"""ノード1回分の処理をトレースに記録する。失敗しても会話は止めない。"""
+	try:
+		turn = current_turn.get()
+		if turn is None:
+			return
+		step = TraceStep(
+			index=len(turn.steps),
+			node=node_name,
+			attempt=attempt,
+			started_at=started.isoformat(),
+			ended_at=ended.isoformat(),
+			duration_ms=int((ended - started).total_seconds() * 1000),
+		)
+		for msg in new_messages:
+			if isinstance(msg, AIMessage):
+				text = extract_user_visible_text(msg.content)
+				step.ai_text = text if step.ai_text is None else step.ai_text + text
+				step.tool_calls.extend(
+					{"name": call.get("name"), "args": call.get("args")}
+					for call in (msg.tool_calls or [])
+				)
+				usage = getattr(msg, "usage_metadata", None)
+				if usage:
+					step.usage = dict(usage)
+			elif isinstance(msg, ToolMessage):
+				step.tool_results.append({
+					"name": msg.name,
+					"content": str(msg.content)[:TRACE_CONTENT_LIMIT],
+				})
+		turn.steps.append(step)
+	except Exception:
+		logger.exception("Failed to record trace step")
+
+
+def _record_trace_error(exc: BaseException) -> None:
+	"""llm_chat 全体で捕まえた例外をトレースに記録する。"""
+	try:
+		turn = current_turn.get()
+		if turn is None:
+			return
+		turn.error = {
+			"type": type(exc).__name__,
+			"message": str(exc),
+			"traceback": traceback.format_exc(),
+		}
+	except Exception:
+		logger.exception("Failed to record trace error")
+
+
+_graph_mermaid_cache: Optional[str] = None
+
+
+def get_graph_mermaid() -> str:
+	"""create_agent_workflow の構造を mermaid の文字列で返す(LLM は呼ばない)。"""
+	global _graph_mermaid_cache
+	if _graph_mermaid_cache is None:
+		class _DummyLLM:
+			def bind_tools(self, tools):
+				return self
+
+			def invoke(self, messages):
+				raise RuntimeError("dummy LLM is never invoked")
+
+		@tool
+		def search_books(keywords: list[str], count: int = 30) -> str:
+			"""ダミー"""
+			return ""
+
+		@tool
+		def recommend_books(selections: list[dict]) -> str:
+			"""ダミー"""
+			return ""
+
+		graph = create_agent_workflow(_DummyLLM(), [search_books, recommend_books])
+		_graph_mermaid_cache = graph.get_graph().draw_mermaid()
+	return _graph_mermaid_cache
+
+
 # Chat Functions
 
 def llm_chat(
@@ -483,11 +570,24 @@ def llm_chat(
 			# 初期ステートに search_results は空で渡すが、
 			# 実際のデータ管理はツール内のクロージャ変数が担うため、
 			# StateGraph上の search_results は実質ダミーまたはログ用となる
-			result = app.invoke({
+			# stream_mode="updates" の各 update は {ノード名: {"messages": [...]}}。
+			# add_messages は新しいメッセージを末尾に足すだけなので、順に足せば invoke の結果と同じ並びになる。
+			result_messages = list(messages)
+			step_started = datetime.now()
+			for update in app.stream({
 				"messages": messages,
 				"search_results": {},
 				"recommended_books": []
-			})
+			}, stream_mode="updates"):
+				step_ended = datetime.now()
+				for node_name, node_output in update.items():
+					new_messages = (node_output or {}).get("messages") or []
+					if not isinstance(new_messages, (list, tuple)):
+						new_messages = [new_messages]
+					result_messages.extend(new_messages)
+					_record_trace_step(node_name, new_messages, retry_count, step_started, step_ended)
+				step_started = step_ended
+			result = {"messages": result_messages}
 			
 			# デバッグ: 結果の詳細をログ出力
 			logger.info(f"[DEBUG] LangGraph result keys: {list(result.keys())}")
@@ -554,6 +654,7 @@ def llm_chat(
 		return response_text, updated_history, recommended_books, current_expression
 		
 	except Exception as exc:
+		_record_trace_error(exc)
 		if is_rate_limit_error(exc):
 			# 上限超過は想定内の事象なので traceback は出さない。
 			logger.warning("[WARNING] Gemini rate limit (429) in llm_chat")

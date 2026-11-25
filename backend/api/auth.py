@@ -38,3 +38,17 @@ def verify_device_key(x_device_key: str = Header(default="")) -> None:
 		raise HTTPException(status_code=503, detail="NFC login is disabled: LIVRARIA_DEVICE_KEY is not set on the server")
 	if not hmac.compare_digest(x_device_key.encode(), expected.encode()):
 		raise HTTPException(status_code=403, detail="Unknown device")
+
+
+def verify_admin_key(x_admin_key: str = Header(default="")) -> None:
+	"""
+	デバッグ API 用の管理者キー（X-Admin-Key ヘッダー）を検証する。
+	LIVRARIA_DEVICE_KEY とは別のキーを使う。
+	"""
+	expected = os.getenv("LIVRARIA_ADMIN_KEY", "")
+	if not expected:
+		raise HTTPException(status_code=503, detail="Debug API is disabled: LIVRARIA_ADMIN_KEY is not set")
+	if not x_admin_key:
+		raise HTTPException(status_code=401, detail="Admin key required")
+	if not hmac.compare_digest(x_admin_key.encode(), expected.encode()):
+		raise HTTPException(status_code=403, detail="Invalid admin key")
