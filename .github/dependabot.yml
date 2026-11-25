@@ -1,20 +1,29 @@
 version: 2
+# 2026-12 の発表までは月1回にし、メジャー更新は無視する（破壊的変更の確認が間に合わないため）。
+# 発表直前はバージョン更新の PR を止め、セキュリティ更新だけにする:
+#   各エコシステムに open-pull-requests-limit: 0 を設定する（セキュリティ更新はこの上限の影響を受けない）
 updates:
   # ルートのnpm依存関係
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       npm-dependencies:
         patterns:
           - "*"
-  
+
   # フロントエンドのnpm依存関係
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       frontend-dependencies:
         patterns:
@@ -24,22 +33,28 @@ updates:
       vue-ecosystem:
         patterns:
           - "vue*"
-  
+
   # バックエンドのPython依存関係
   - package-ecosystem: "pip"
     directory: "/backend"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       backend-dependencies:
         patterns:
           - "*"
-  
+
   # Raspberry Pi NFCのPython依存関係
   - package-ecosystem: "pip"
     directory: "/raspi/nfc"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       raspi-dependencies:
         patterns:
