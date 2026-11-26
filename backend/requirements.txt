@@ -3,7 +3,7 @@
 # ============================================================================
 fastapi==0.165.0
 uvicorn[standard]==0.54.0  # ASGI server (includes uvloop, httptools)
-pydantic==2.14.3  # Data validation
+pydantic==2.14.4  # Data validation
 
 # ============================================================================
 # Authentication & Firebase
@@ -14,9 +14,9 @@ firebase_admin==7.8.0  # Firebase Auth & Firestore
 # AI/LLM
 # ============================================================================
 # LangChain
-langchain-core==1.8.3  # LangChain core components
-langgraph==1.2.23  # LangGraph for stateful workflows
-langchain-google-genai==4.5.1  # LangChain Gemini integration
+langchain-core==1.8.4  # LangChain core components
+langgraph==1.2.24  # LangGraph for stateful workflows
+langchain-google-genai==4.5.2  # LangChain Gemini integration
 langchain-ollama==1.1.0  # LangChain Ollama integration
 
 # ============================================================================
