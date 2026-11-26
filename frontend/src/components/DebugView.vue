@@ -177,7 +177,7 @@ const STORAGE_KEY = 'livraria_admin_key';
 // /debug/graph の mermaid に現れるノード id（色付け対象）
 const GRAPH_NODES = {
   v1: ['agent', 'tools', 'force_tool'],
-  v2: ['understand', 'route', 'interview', 'crd', 'plan', 'search', 'select', 'answer'],
+  v2: ['understand', 'interview_draft', 'route', 'interview', 'crd', 'plan', 'search', 'select', 'answer'],
 };
 
 const readStoredKey = () => {

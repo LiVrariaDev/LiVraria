@@ -3,10 +3,13 @@
 LIVRARIA_GRAPH=v2 のときに llm_chat から呼ばれる（既定は v1）。設計は SilverBullet の
 Notes/LiVraria/Graph-Redesign を参照。
 
-    START → understand → route ┬→ interview ──────────────────────→ END
-                               ├→ search → select ────────────────→ END
-                               ├→ crd → plan → search → select ───→ END
-                               └→ answer ─────────────────────────→ END
+    START ┬→ understand ──────┬→ route ┬→ interview ──────────────────────→ END
+          └→ interview_draft ─┘        ├→ search → select ────────────────→ END
+                                       ├→ crd → plan → search → select ───→ END
+                                       └→ answer ─────────────────────────→ END
+
+- understand と interview_draft（聞き取りの下書き）は並列に動き、両方が終わってから route で合流する。
+  下書きは前のターンのプロフィールで作り、聞き取りに回ったときだけ使う（それ以外は捨てる）
 
 - understand / plan / select は構造化出力（pydantic）。interview / answer は文章
 - understand が検索キーワードも作る。レファ協を引くとき（うろ覚えのタイトル、調べ物）だけ、
@@ -18,12 +21,14 @@ Notes/LiVraria/Graph-Redesign を参照。
 
 import json
 import logging
+import operator
+import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Literal, Optional, TypedDict
+from typing import Annotated, Any, List, Literal, Optional, TypedDict
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from langgraph.graph import END, StateGraph
+from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, Field, ValidationError
 
 from backend import PROMPTS_DIR
@@ -38,7 +43,7 @@ logger = logging.getLogger("uvicorn.error")
 PROMPTS_V2_DIR = Path(PROMPTS_DIR, "v2")
 
 # 各 LLM ノードの出力枠。思考で出力枠を使い切らないよう、文章を返すノードは余裕を持たせる
-MAX_TOKENS = {"understand": 1536, "plan": 512, "select": 2048, "interview": 1024, "answer": 1024}
+MAX_TOKENS = {"understand": 1536, "plan": 512, "select": 2048, "interview": 1024, "interview_draft": 1024, "answer": 1024}
 EMPTY_RETRIES = 1           # 文章を返すノードが空応答だったときのやり直し回数
 SELECT_RETRIES = 1          # 選書の構造化出力が読み取れなかったときのやり直し回数
 HISTORY_TURNS_FOR_LLM = 12  # LLM に渡す直近の履歴のメッセージ数
@@ -115,9 +120,12 @@ class V2State(TypedDict, total=False):
 	queries: List[List[str]]
 	candidates: List[dict]
 	picks: List[dict]
+	interview_draft: str         # 聞き取りの下書き（understand と並列に、前のターンのプロフィールで作る）
 	response_text: str
 	expression: str
-	path: List[str]              # 通ったノード（表情の決定とトレース用）
+	# 通ったノード（表情の決定とトレース用）。understand と interview_draft が同じステップで書くので、
+	# 上書きではなく連結する reducer を付ける（付けないと LangGraph が同時更新のエラーにする）
+	path: Annotated[List[str], operator.add]
 
 
 class _Options:
@@ -291,6 +299,9 @@ def _usage(message: Any) -> Optional[dict]:
 	return dict(usage) if usage else None
 
 
+_trace_lock = threading.Lock()  # 並列のノードが同じターンに書き足すため
+
+
 def _trace_step(node: str, started: datetime, *, attempt: int = 0, ai_text: Optional[str] = None,
 	            results: Optional[List[dict]] = None, usage: Optional[dict] = None,
 	            error: Optional[BaseException] = None) -> None:
@@ -301,7 +312,7 @@ def _trace_step(node: str, started: datetime, *, attempt: int = 0, ai_text: Opti
 			return
 		ended = datetime.now()
 		step = TraceStep(
-			index=len(turn.steps),
+			index=0,
 			node=node,
 			attempt=attempt,
 			started_at=started.isoformat(),
@@ -317,7 +328,9 @@ def _trace_step(node: str, started: datetime, *, attempt: int = 0, ai_text: Opti
 			})
 		if error is not None:
 			step.error = {"type": type(error).__name__, "message": str(error)}
-		turn.steps.append(step)
+		with _trace_lock:
+			step.index = len(turn.steps)
+			turn.steps.append(step)
 	except Exception:
 		logger.exception("Failed to record v2 trace step")
 
@@ -438,11 +451,11 @@ def _make_nodes(options: _Options):
 				if not queries and intent in SEARCH_INTENTS:
 					queries = fallback_queries(profile, [])
 				return {"profile": profile.model_dump(), "intent": intent, "queries": queries,
-				        "path": [*state.get("path", []), "understand"]}
+				        "path": ["understand"]}
 
 		# どちらでも読み取れなければ、プロフィールは前のまま、聞き取りに回す
 		return {"profile": previous.model_dump(), "intent": "need_more", "queries": [],
-		        "path": [*state.get("path", []), "understand"]}
+		        "path": ["understand"]}
 
 	def route(state: V2State) -> dict:
 		"""② 振り分け（コード）。"""
@@ -450,16 +463,43 @@ def _make_nodes(options: _Options):
 		profile = normalize_profile(state.get("profile"))
 		decision = decide_route(state.get("intent", "need_more"), profile, state.get("last_picks") or [])
 		_trace_step("route", started, results=[{"name": "route", "content": f"intent={state.get('intent')} -> {decision}"}])
-		return {"route": decision, "path": [*state.get("path", []), "route"]}
+		return {"route": decision, "path": ["route"]}
 
-	def interview(state: V2State) -> dict:
-		"""③ 次に聞くことを発話で返す。"""
-		profile = normalize_profile(state.get("profile"))
+	def interview_messages(state: V2State, profile: ReadingProfile) -> List[BaseMessage]:
 		prompt = load_v2_prompt("interview", profile=profile_text(profile),
 		                        user_context=user_context_text(state.get("user_context", "")))
-		text = _text_with_retry("interview", "chat", _chat_messages(prompt, state.get("messages") or [], state["message"]), options)
+		return _chat_messages(prompt, state.get("messages") or [], state["message"])
+
+	def interview_draft(state: V2State) -> dict:
+		"""③' 聞き取りの下書き。understand と並列に、前のターンのプロフィール＋会話＋今の発言から作る。
+
+		state["profile"] は、同じステップの understand の結果ではなく前のターンの値（並列のノードは
+		同じ入力を読む）。空応答なら1回やり直し、それでも空なら "" を書く。
+		429 でもターン全体は止めない（下書きは検索するターンでは使わないため）。聞き取りに回れば
+		interview が呼び直し、そこで 429 なら混雑の定型文になる。
+		"""
+		profile = normalize_profile(state.get("profile"))
+		try:
+			text = _text_with_retry("interview_draft", "chat", interview_messages(state, profile), options)
+		except Exception as exc:
+			if not is_rate_limit_error(exc):
+				raise
+			logger.warning("[WARNING] v2 interview_draft hit the rate limit; continuing without a draft")
+			text = ""
+		return {"interview_draft": text, "path": ["interview_draft"]}
+
+	def interview(state: V2State) -> dict:
+		"""③ 聞き取りの発話を返す。下書きがあればそのまま使い、なければ今のプロフィールで作る。"""
+		draft = state.get("interview_draft") or ""
+		if draft:
+			started = datetime.now()
+			_trace_step("interview", started, ai_text=draft,
+			            results=[{"name": "interview", "content": "下書きを使用"}])
+			return {"response_text": draft, "picks": [], "path": ["interview"]}
+		profile = normalize_profile(state.get("profile"))
+		text = _text_with_retry("interview", "chat", interview_messages(state, profile), options)
 		return {"response_text": text or llm_module.MESSAGE_EMPTY_RESPONSE, "picks": [],
-		        "path": [*state.get("path", []), "interview"]}
+		        "path": ["interview"]}
 
 	def crd_node(state: V2State) -> dict:
 		"""④a レファ協の事例から手がかりを取り出す（うろ覚えのタイトル、調べ物のとき）。失敗しても先へ進む。
@@ -479,7 +519,7 @@ def _make_nodes(options: _Options):
 			if words:
 				hints = crd.search_crd_hints(words, field=field)[:CRD_HINT_LIMIT]
 		_trace_step("crd", started, results=[{"name": "crd", "content": json.dumps(hints, ensure_ascii=False)}])
-		return {"crd_hints": hints, "path": [*state.get("path", []), "crd"]}
+		return {"crd_hints": hints, "path": ["crd"]}
 
 	def plan(state: V2State) -> dict:
 		"""④b 検索キーワードを2〜4組作る。読み取れなければプロフィールから作る。"""
@@ -497,7 +537,7 @@ def _make_nodes(options: _Options):
 			source = "fallback"
 		_trace_step("plan", started, usage=_usage(raw), error=error,
 		            results=[{"name": f"plan ({source})", "content": json.dumps(queries, ensure_ascii=False)}])
-		return {"queries": queries, "path": [*state.get("path", []), "plan"]}
+		return {"queries": queries, "path": ["plan"]}
 
 	def search(state: V2State) -> dict:
 		"""⑤ 楽天を検索して重複を除く（コード）。"""
@@ -506,11 +546,11 @@ def _make_nodes(options: _Options):
 		candidates = collect_candidates(state.get("queries") or [], exclude)
 		summary = "\n".join(f"{c['candidate_id']}. {_book_label(c)} [{c['source']}]" for c in candidates)
 		_trace_step("search", started, results=[{"name": "search", "content": summary or "(0件)"}])
-		return {"candidates": candidates, "path": [*state.get("path", []), "search"]}
+		return {"candidates": candidates, "path": ["search"]}
 
 	def select(state: V2State) -> dict:
 		"""⑥ 候補から最大3冊を枠付きで選び、紹介の言葉を返す。候補にない ID は捨てる。"""
-		path = [*state.get("path", []), "select"]
+		path = ["select"]
 		candidates = state.get("candidates") or []
 		if not candidates:
 			return {"picks": [], "response_text": MESSAGE_NO_CANDIDATES, "path": path}
@@ -556,9 +596,9 @@ def _make_nodes(options: _Options):
 		                        user_context=user_context_text(state.get("user_context", "")))
 		text = _text_with_retry("answer", "chat", _chat_messages(prompt, state.get("messages") or [], state["message"]), options)
 		return {"response_text": text or llm_module.MESSAGE_EMPTY_RESPONSE, "picks": [],
-		        "path": [*state.get("path", []), "answer"]}
+		        "path": ["answer"]}
 
-	return {"understand": understand, "route": route, "interview": interview, "crd": crd_node,
+	return {"understand": understand, "interview_draft": interview_draft, "route": route, "interview": interview, "crd": crd_node,
 	        "plan": plan, "search": search, "select": select, "answer": answer}
 
 
@@ -694,8 +734,10 @@ def create_graph_v2(options: Optional[_Options] = None):
 	workflow = StateGraph(V2State)
 	for name, fn in nodes.items():
 		workflow.add_node(name, fn)
-	workflow.set_entry_point("understand")
-	workflow.add_edge("understand", "route")
+	# understand と interview_draft を並列に動かし、両方が終わってから route に進む
+	workflow.add_edge(START, "understand")
+	workflow.add_edge(START, "interview_draft")
+	workflow.add_edge(["understand", "interview_draft"], "route")
 	workflow.add_conditional_edges("route", _after_route, {"interview": "interview", "search": "search", "crd": "crd", "answer": "answer"})
 	workflow.add_edge("crd", "plan")
 	workflow.add_edge("plan", "search")

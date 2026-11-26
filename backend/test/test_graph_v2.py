@@ -1,8 +1,11 @@
 """会話グラフ v2（backend/api/graph_v2.py）の検証。LLM・楽天・レファ協はすべて差し替え、実際には呼ばない。"""
 
+import threading
+
 import pytest
 import requests
 from langchain_core.messages import AIMessage, HumanMessage
+from langgraph.config import get_config
 
 import backend.api.graph_v2 as graph_v2
 import backend.api.llm as llm
@@ -23,22 +26,38 @@ class _RateLimitError(Exception):
 	code = 429
 
 
-class FakeLLMs:
-	"""get_llm の差し替え。schema 名（または "text"）ごとに、返す値を順に並べておく。
+DEFAULT_DRAFT = "（使われない下書き）"
 
-	値には pydantic のインスタンス、dict、None（読み取れない）、例外、文字列（text 用）を使える。
+
+def _current_node():
+	try:
+		return get_config().get("metadata", {}).get("langgraph_node")
+	except RuntimeError:
+		return None
+
+
+class FakeLLMs:
+	"""get_llm の差し替え。schema 名（または "text" / "draft"）ごとに、返す値を順に並べておく。
+
+	値には pydantic のインスタンス、dict、None（読み取れない）、例外、文字列（text / draft 用）を使える。
+	文章の呼び出しのうち、聞き取りの下書き（interview_draft ノード）は "draft"、それ以外は "text"。
+	下書きは毎ターン並列に呼ばれるので、"draft" を並べていなければ DEFAULT_DRAFT を返す。
 	呼び出しは calls に (role, kind, messages) で記録する。
 	"""
 
 	def __init__(self, **scripts):
 		self.scripts = {key: list(values) for key, values in scripts.items()}
 		self.calls = []
+		self._lock = threading.Lock()
 
 	def _next(self, kind):
-		values = self.scripts.get(kind)
-		if not values:
-			raise AssertionError(f"unexpected LLM call: {kind}")
-		value = values.pop(0)
+		with self._lock:
+			values = self.scripts.get(kind)
+			if kind == "draft" and "draft" not in self.scripts:
+				return DEFAULT_DRAFT
+			if not values:
+				raise AssertionError(f"unexpected LLM call: {kind}")
+			value = values.pop(0)
 		if isinstance(value, BaseException):
 			raise value
 		return value
@@ -51,7 +70,8 @@ class FakeLLMs:
 				self.schema = schema
 
 			def invoke(self, messages):
-				fakes.calls.append((role, self.schema.__name__, messages))
+				with fakes._lock:
+					fakes.calls.append((role, self.schema.__name__, messages))
 				parsed = fakes._next(self.schema.__name__)
 				return {"raw": AIMessage(content=""), "parsed": parsed, "parsing_error": None}
 
@@ -60,16 +80,26 @@ class FakeLLMs:
 				return _Structured(schema)
 
 			def invoke(self, messages):
-				fakes.calls.append((role, "text", messages))
-				return AIMessage(content=fakes._next("text"))
+				kind = "draft" if _current_node() == "interview_draft" else "text"
+				with fakes._lock:
+					fakes.calls.append((role, kind, messages))
+				return AIMessage(content=fakes._next(kind))
 
 			def bind_tools(self, tools):
 				raise AssertionError("v1 should not run")
 
 		return _LLM()
 
-	def kinds(self):
-		return [(role, kind) for role, kind, _ in self.calls]
+	def kinds(self, include_draft=False):
+		"""呼び出しの (role, kind)。下書きは並列なので順序が決まらず、既定では除く。"""
+		return [(role, kind) for role, kind, _ in self.calls if include_draft or kind != "draft"]
+
+	def main_calls(self):
+		"""下書きを除いた呼び出し（順序が決まる）。"""
+		return [call for call in self.calls if call[1] != "draft"]
+
+	def messages_of(self, kind):
+		return [messages for _role, k, messages in self.calls if k == kind]
 
 
 def understood(intent, queries=(), **profile):
@@ -161,14 +191,15 @@ def test_decide_route(intent, profile, last_picks, expected):
 
 @pytest.mark.parametrize("intent", ["chit_chat", "need_more"])
 def test_interview_turn(monkeypatch, rakuten, intent):
-	fakes = FakeLLMs(UnderstandOutput=[understood(intent, interests=["猫"])], text=["最近はどんなふうに過ごしていますか。"])
+	fakes = FakeLLMs(UnderstandOutput=[understood(intent, interests=["猫"])], draft=["最近はどんなふうに過ごしていますか。"])
 	state = {}
 
 	text, history, books, expression = run(fakes, monkeypatch, "こんにちは", state=state)
 
 	assert text == "最近はどんなふうに過ごしていますか。"
 	assert books == [] and expression == "neutral"
-	assert fakes.kinds() == [("light", "UnderstandOutput"), ("chat", "text")]  # 聞き取りのターンは2回
+	# 聞き取りのターンは、理解と下書きの2回だけ（下書きをそのまま返す）
+	assert sorted(fakes.kinds(include_draft=True)) == [("chat", "draft"), ("light", "UnderstandOutput")]
 	assert rakuten.calls == []
 	assert history[-2:] == [HumanMessage("こんにちは"), AIMessage("最近はどんなふうに過ごしていますか。")]
 	assert state["profile"]["interests"] == ["猫"]
@@ -200,9 +231,11 @@ def test_search_turn(monkeypatch, rakuten):
 	assert books[0]["image_url"] == "https://example.com/1.jpg"
 	assert "candidate_id" not in books[0] and "source" not in books[0]
 	assert state["last_picks"] == books
+	# 下書きは並列に作られたが、検索するターンでは捨てる
+	assert ("chat", "draft") in fakes.kinds(include_draft=True) and text != DEFAULT_DRAFT
 
 	# 候補リストは重複を除き、内容紹介・ジャンル・レビューを載せている
-	select_prompt = fakes.calls[1][2][-1].content
+	select_prompt = fakes.main_calls()[1][2][-1].content
 	assert select_prompt.count("『本2』") == 1
 	assert "レビュー: 4.0（3件）" in select_prompt and "内容: " in select_prompt
 
@@ -256,7 +289,7 @@ def test_ask_book_answers_from_last_picks(monkeypatch, rakuten):
 	assert text == "北欧の森で暮らす猫のお話ですよ。"
 	assert books == [] and expression == "neutral"
 	assert rakuten.calls == []
-	answer_system = fakes.calls[1][2][0].content
+	answer_system = fakes.main_calls()[1][2][0].content
 	assert "『本7』" in answer_system and "北欧の森で暮らす猫の一年" in answer_system
 	assert state["last_picks"] == last  # 答えただけでは選んだ本は変わらない
 
@@ -291,7 +324,7 @@ def test_lookup_title_uses_crd_anywhere_with_mentioned_books(monkeypatch, rakute
 	assert text == "この本でしょうか。" and books[0]["title"] == "本1"
 	# 興味ではなく会話に出た本の言葉（先頭2つ）で、事例全体を検索する
 	assert seen == [(["青い鳥", "森の小人"], "anywhere")]
-	assert "回答に書名あり" in fakes.calls[1][2][0].content  # 手がかりは検索方針に渡る
+	assert "回答に書名あり" in fakes.main_calls()[1][2][0].content  # 手がかりは検索方針に渡る
 
 
 def test_lookup_title_without_mentioned_books_skips_crd(monkeypatch, rakuten):
@@ -304,6 +337,101 @@ def test_lookup_title_without_mentioned_books_skips_crd(monkeypatch, rakuten):
 	)
 	_text, _history, books, _expression = run(fakes, monkeypatch, "鳥の本の題名が思い出せない", state={})
 	assert books[0]["title"] == "本1"
+
+
+# ---------------------------------------------------------------------------
+# 1b. 理解と聞き取りの下書きの並列実行
+# ---------------------------------------------------------------------------
+
+def test_understand_and_draft_run_in_parallel(monkeypatch, rakuten):
+	"""どちらも相手が呼ばれるまで待つ。順番に動いていたら Barrier がタイムアウトする。"""
+	barrier = threading.Barrier(2, timeout=5)
+	threads = {}
+	fakes = FakeLLMs(UnderstandOutput=[understood("need_more", interests=["猫"])], draft=["猫はお好きですか。"])
+	original = fakes._next
+
+	def waiting_next(kind):
+		if kind in ("UnderstandOutput", "draft"):
+			threads[kind] = threading.get_ident()
+			barrier.wait()
+		return original(kind)
+
+	monkeypatch.setattr(fakes, "_next", waiting_next)
+	text, _h, _b, _e = run(fakes, monkeypatch, "こんにちは", state={})
+
+	assert text == "猫はお好きですか。"
+	assert not barrier.broken
+	assert threads["UnderstandOutput"] != threads["draft"]
+
+
+def test_draft_uses_previous_profile_and_is_returned(monkeypatch, rakuten):
+	fakes = FakeLLMs(UnderstandOutput=[understood("need_more", interests=["猫", "宇宙"])], draft=["猫のどんなところが好きですか。"])
+	state = {"profile": {"interests": ["猫"]}}
+
+	text, _h, books, expression = run(fakes, monkeypatch, "宇宙も好き", state=state)
+
+	assert text == "猫のどんなところが好きですか。"
+	assert books == [] and expression == "neutral"
+	assert ("chat", "text") not in fakes.kinds()  # 聞き取りは下書きを使い、LLM を呼び直さない
+	draft_system = fakes.messages_of("draft")[0][0].content
+	assert '"猫"' in draft_system and "宇宙" not in draft_system  # 前のターンのプロフィールで作る
+	assert state["profile"]["interests"] == ["猫", "宇宙"]  # プロフィールは understand の結果
+
+
+def test_failed_draft_reinterviews_with_current_profile(monkeypatch, rakuten):
+	fakes = FakeLLMs(UnderstandOutput=[understood("need_more", interests=["猫", "宇宙"])],
+	                 draft=["", ""], text=["宇宙と猫、どちらの話が読みたいですか。"])
+	text, _h, _b, _e = run(fakes, monkeypatch, "宇宙も好き", state={"profile": {"interests": ["猫"]}})
+
+	assert text == "宇宙と猫、どちらの話が読みたいですか。"
+	interview_system = fakes.messages_of("text")[0][0].content
+	assert "宇宙" in interview_system  # 今のターンのプロフィールで呼び直す
+
+
+def test_draft_rate_limit_does_not_stop_search_turn(monkeypatch, rakuten):
+	rakuten.results["猫"] = [book(1)]
+	fakes = FakeLLMs(
+		UnderstandOutput=[understood("ready", [["猫"]], interests=["猫"])],
+		draft=[_RateLimitError("429 Resource exhausted")],
+		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "a"}], response="この本はいかがですか。")],
+	)
+	text, _h, books, _e = run(fakes, monkeypatch, "猫の本", state={})
+	assert text == "この本はいかがですか。" and books[0]["title"] == "本1"
+	assert llm_usage.snapshot()["roles"]["chat"]["rate_limited"] == 1
+
+
+def test_draft_rate_limit_on_interview_turn_returns_busy(monkeypatch, rakuten):
+	fakes = FakeLLMs(UnderstandOutput=[understood("chit_chat")],
+	                 draft=[_RateLimitError("429")], text=[_RateLimitError("429")])
+	text, _h, _b, expression = run(fakes, monkeypatch, "こんにちは", state={})
+	assert text == llm.MESSAGE_BUSY and expression == "sorry"
+
+
+def test_parallel_nodes_are_traced_and_counted(monkeypatch, rakuten):
+	"""並列に動いた understand と下書きが、トレースと使用量の両方に残る（contextvar がスレッドに引き継がれる）。"""
+	clear_data_dir()
+	monkeypatch.setenv("LIVRARIA_DEBUG", "true")
+	trace_store.reset_trace_store()
+	store = DataStore()
+	monkeypatch.setattr(server_module.server, "data_store", store)
+	store.create_user("alice", Personal(name="alice", gender="other", age=20))
+	fakes = FakeLLMs(UnderstandOutput=[understood("chit_chat")], draft=["こんにちは、今日はどんな一日でしたか。"])
+	monkeypatch.setattr(llm, "get_llm", fakes.get_llm)
+	try:
+		response = server_module.server.chat_prompt("こんにちは", None, str(PROMPT_DEFAULT), "alice")
+		turn = trace_store.get_trace_store().get_turn(response.trace_id)
+	finally:
+		trace_store.reset_trace_store()
+
+	assert response.response == "こんにちは、今日はどんな一日でしたか。"
+	nodes = [s["node"] for s in turn["steps"]]
+	assert sorted(nodes[:2]) == ["interview_draft", "understand"]
+	assert nodes[2:] == ["route", "interview"]
+	assert sorted(turn["path"][:2]) == ["interview_draft", "understand"] and turn["path"][2:] == ["route", "interview"]
+	draft_step = next(s for s in turn["steps"] if s["node"] == "interview_draft")
+	assert draft_step["ai_text"] == "こんにちは、今日はどんな一日でしたか。"
+	usage = llm_usage.snapshot()["roles"]
+	assert usage["light"]["calls"] == 1 and usage["chat"]["calls"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -426,9 +554,9 @@ def test_crd_hints_are_passed_to_plan_only(monkeypatch, rakuten):
 	text, _h, _b, _e = run(fakes, monkeypatch, "猫の本", state={})
 
 	assert seen == [(["猫", "冬"], "question")]  # 調べ物は興味で質問文を検索する
-	plan_system = fakes.calls[1][2][0].content
+	plan_system = fakes.main_calls()[1][2][0].content
 	assert "日本の小説" in plan_system and "913" in plan_system and "件名で検索" in plan_system
-	select_messages = "".join(m.content for m in fakes.calls[2][2])
+	select_messages = "".join(m.content for m in fakes.main_calls()[2][2])
 	assert "件名で検索" not in select_messages  # 事例は利用者向けの文を作るノードには渡さない
 
 
@@ -484,7 +612,7 @@ def test_clean_queries():
 # ---------------------------------------------------------------------------
 
 def test_understand_falls_back_to_chat_model(monkeypatch, rakuten):
-	fakes = FakeLLMs(UnderstandOutput=[None, understood("chit_chat", mood="眠い")], text=["眠いときは無理せずに。"])
+	fakes = FakeLLMs(UnderstandOutput=[None, understood("chit_chat", mood="眠い")], draft=["眠いときは無理せずに。"])
 	state = {}
 	run(fakes, monkeypatch, "眠い", state=state)
 	assert fakes.kinds()[:2] == [("light", "UnderstandOutput"), ("chat", "UnderstandOutput")]
@@ -492,7 +620,7 @@ def test_understand_falls_back_to_chat_model(monkeypatch, rakuten):
 
 
 def test_understand_failure_keeps_profile_and_interviews(monkeypatch, rakuten):
-	fakes = FakeLLMs(UnderstandOutput=[ValueError("x"), None], text=["もう少し教えてください。"])
+	fakes = FakeLLMs(UnderstandOutput=[ValueError("x"), None], draft=["もう少し教えてください。"])
 	state = {"profile": {"interests": ["猫"]}}
 	text, _h, _b, _e = run(fakes, monkeypatch, "探して", state=state)
 	assert text == "もう少し教えてください。"
@@ -501,28 +629,30 @@ def test_understand_failure_keeps_profile_and_interviews(monkeypatch, rakuten):
 
 
 def test_ask_book_without_picks_becomes_need_more(monkeypatch, rakuten):
-	fakes = FakeLLMs(UnderstandOutput=[understood("ask_book")], text=["どの本のことでしょう。"])
+	fakes = FakeLLMs(UnderstandOutput=[understood("ask_book")], draft=["どの本のことでしょう。"])
 	text, _h, _b, _e = run(fakes, monkeypatch, "その本は？", state={})
 	assert text == "どの本のことでしょう。"
 
 
 def test_empty_text_retries_then_fallback(monkeypatch, rakuten):
-	fakes = FakeLLMs(UnderstandOutput=[understood("chit_chat")], text=["", "  "])
+	# 下書きが2回とも空 → 聞き取りを今のプロフィールで呼び直し、それも2回とも空
+	fakes = FakeLLMs(UnderstandOutput=[understood("chit_chat")], draft=["", "  "], text=["", ""])
 	history = [HumanMessage("a"), AIMessage("b")]
 	text, new_history, _b, expression = run(fakes, monkeypatch, "こんにちは", history=history, state={})
 	assert text == llm.MESSAGE_EMPTY_RESPONSE and expression == "sorry"
 	assert new_history == history
-	assert [k for _r, k in fakes.kinds()].count("text") == 2
+	kinds = [k for _r, k in fakes.kinds(include_draft=True)]
+	assert kinds.count("draft") == 2 and kinds.count("text") == 2
 
 
 def test_empty_text_retry_succeeds(monkeypatch, rakuten):
-	fakes = FakeLLMs(UnderstandOutput=[understood("chit_chat")], text=["", "こんにちは！"])
+	fakes = FakeLLMs(UnderstandOutput=[understood("chit_chat")], draft=["", "こんにちは！"])
 	text, _h, _b, _e = run(fakes, monkeypatch, "こんにちは", state={})
 	assert text == "こんにちは！"
 
 
 def test_internal_text_is_not_shown(monkeypatch, rakuten):
-	fakes = FakeLLMs(UnderstandOutput=[understood("chit_chat")], text=["search_books(keywords=['猫'])", "こんにちは！"])
+	fakes = FakeLLMs(UnderstandOutput=[understood("chit_chat")], draft=["search_books(keywords=['猫'])", "こんにちは！"])
 	text, _h, _b, _e = run(fakes, monkeypatch, "こんにちは", state={})
 	assert text == "こんにちは！"
 
@@ -558,7 +688,7 @@ def test_profile_persists_across_turns_and_restart(monkeypatch, rakuten):
 			understood("need_more", interests=["猫"]),
 			understood("ready", [["猫"]], interests=["猫"], reader="子ども"),
 		],
-		text=["猫が好きなんですね。"],
+		draft=["猫が好きなんですね。", "（2ターン目の下書き）"],
 		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "a"}])],
 	)
 	monkeypatch.setattr(llm, "get_llm", fakes.get_llm)
@@ -570,7 +700,7 @@ def test_profile_persists_across_turns_and_restart(monkeypatch, rakuten):
 	second = server_module.server.chat_prompt("子どもに読ませたい", session_id, str(PROMPT_DEFAULT), "alice")
 	assert [b["title"] for b in second.recommended_books] == ["本1"]
 	# 2ターン目の understand には、1ターン目のプロフィールが渡っている
-	understand_input = fakes.calls[2][2][-1].content
+	understand_input = fakes.main_calls()[1][2][-1].content
 	assert '"猫"' in understand_input
 	conv = store.conversations[session_id]
 	assert conv.profile["reader"] == "子ども"
@@ -656,8 +786,11 @@ def test_trace_records_path_profile_and_crd_hints(monkeypatch, rakuten):
 
 	assert turn["graph"] == "v2"
 	assert turn["intent"] == "ready" and turn["route"] == "crd"
-	assert turn["path"] == ["understand", "route", "crd", "plan", "search", "select"]
-	assert [s["node"] for s in turn["steps"]] == turn["path"]
+	# understand と interview_draft は並列なので、先頭2つの順序は決まらない
+	assert sorted(turn["path"][:2]) == ["interview_draft", "understand"]
+	assert turn["path"][2:] == ["route", "crd", "plan", "search", "select"]
+	assert sorted(s["node"] for s in turn["steps"]) == sorted(turn["path"])
+	assert [s["index"] for s in turn["steps"]] == list(range(len(turn["steps"])))
 	assert turn["profile"]["interests"] == ["猫"]
 	assert turn["crd_hints"] == hints
 	search_step = next(s for s in turn["steps"] if s["node"] == "search")
