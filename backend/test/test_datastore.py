@@ -9,6 +9,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 import backend.api.datastore as datastore_module
 from backend import CONVERSATIONS_FILE, DATA_DIR, USERS_FILE
 from backend.api.models import ChatStatus, Personal, UserStatus
+from conftest import clear_data_dir
 
 
 @pytest.fixture
@@ -26,8 +27,7 @@ def summaries(monkeypatch):
 
 @pytest.fixture
 def store():
-	for path in DATA_DIR.iterdir():
-		path.unlink()
+	clear_data_dir()
 	return datastore_module.DataStore()
 
 

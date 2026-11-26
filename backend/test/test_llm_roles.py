@@ -7,10 +7,11 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 import backend.api.datastore as datastore_module
 import backend.api.llm as llm
-from backend import DATA_DIR, PROMPT_DEFAULT, PROMPT_SUMMARY, USERS_FILE
+from backend import PROMPT_DEFAULT, PROMPT_SUMMARY, USERS_FILE
 from backend.api import llm_usage
 from backend.api.models import Personal
 from backend.tools import demo_account
+from conftest import clear_data_dir
 
 
 @pytest.fixture(autouse=True)
@@ -159,8 +160,7 @@ def test_parse_summary_and_insights():
 
 @pytest.fixture
 def store():
-	for path in DATA_DIR.iterdir():
-		path.unlink()
+	clear_data_dir()
 	return datastore_module.DataStore()
 
 

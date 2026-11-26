@@ -6,16 +6,15 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 import backend.api.routers.search as search_router
 import backend.api.server as server_module
-from backend import DATA_DIR
 from backend.api.auth import get_current_user_id
 from backend.api.datastore import DataStore
 from backend.api.models import Personal
+from conftest import clear_data_dir
 
 
 @pytest.fixture
 def client(monkeypatch):
-	for path in DATA_DIR.iterdir():
-		path.unlink()
+	clear_data_dir()
 	store = DataStore()
 	monkeypatch.setattr(server_module.server, "data_store", store)
 

@@ -8,10 +8,11 @@ import backend.api.graph_v2 as graph_v2
 import backend.api.llm as llm
 import backend.api.server as server_module
 import backend.search.crd as crd
-from backend import DATA_DIR, PROMPT_DEFAULT
+from backend import PROMPT_DEFAULT
 from backend.api import llm_usage, trace_store
 from backend.api.datastore import DataStore
 from backend.api.models import Personal
+from conftest import clear_data_dir
 
 
 # ---------------------------------------------------------------------------
@@ -483,9 +484,7 @@ def test_normalize_profile_handles_broken_data():
 # ---------------------------------------------------------------------------
 
 def test_profile_persists_across_turns_and_restart(monkeypatch, rakuten):
-	for path in DATA_DIR.iterdir():
-		if path.is_file():
-			path.unlink()
+	clear_data_dir()
 	store = DataStore()
 	monkeypatch.setattr(server_module.server, "data_store", store)
 	store.create_user("alice", Personal(name="alice", gender="other", age=20))
@@ -571,9 +570,7 @@ def test_v2_selected_by_env(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_trace_records_path_profile_and_crd_hints(monkeypatch, rakuten):
-	for path in DATA_DIR.iterdir():
-		if path.is_file():
-			path.unlink()
+	clear_data_dir()
 	monkeypatch.setenv("LIVRARIA_DEBUG", "true")
 	trace_store.reset_trace_store()
 	store = DataStore()
