@@ -153,6 +153,7 @@ def get_llm(role: str = "chat", backend: Optional[str] = None, temperature: floa
 		backend: LLMバックエンド（'gemini' または 'ollama'）
 		temperature: 温度パラメータ
 		max_tokens: 最大トークン数
+		conversation_state: 会話グラフ v2 が読み書きする状態 {"profile", "last_picks"}（v1 では使わない）
 		system_prompt: システムプロンプト（オプション）
 		
 	Returns:
@@ -448,7 +449,8 @@ def llm_chat(
 	ai_insight: Optional[str] = None,
 	model: Optional[str] = None,
 	temperature: float = 0.3,
-	max_tokens: int = 1024
+	max_tokens: int = 1024,
+	conversation_state: Optional[dict] = None,
 ) -> tuple[str, List[BaseMessage], List[dict]]:
 	"""
 	LangGraphを使ったチャット対話

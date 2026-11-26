@@ -88,6 +88,9 @@ class Conversation(BaseModel):
 	status: ChatStatus = Field(default=ChatStatus.active, description="Chat status")
 	messages: List[dict] = Field(default_factory=list, description="Chat messages")
 	summary: Optional[str] = Field(None, description="AI-generated summary at session end")
+	# 会話グラフ v2 用（v1 では使わない）。既存データでは空として読み込まれる
+	profile: dict = Field(default_factory=dict, description="読書プロフィール（会話グラフ v2）")
+	last_picks: List[dict] = Field(default_factory=list, description="前のターンで選んだ本（会話グラフ v2 の ask_book 用）")
 	last_accessed: datetime = Field(default_factory=datetime.now, description="Last accessed time")
 
 	model_config = ConfigDict(populate_by_name=True)

@@ -352,11 +352,15 @@ class Server:
 				turn = store.start_turn(trace_id, session_id, user_id, message)
 				turn_token = current_turn.set(turn)
 
+			# 会話グラフ v2 が読み書きする状態（読書プロフィールなど）。v1 では変更されない
+			conversation_state = self.data_store.get_conversation_state(session_id)
+
 			response_text, new_history, recommended_books, current_expression = llm_chat(
 				prompt_file,
 				message,
 				history,
-				ai_insight=self._build_user_context(user) if user else ""
+				ai_insight=self._build_user_context(user) if user else "",
+				conversation_state=conversation_state,
 			)
 			failed = response_text in FALLBACK_MESSAGES
 
@@ -368,6 +372,7 @@ class Server:
 
 			# メモリ上の履歴を更新（ディスク書き込みは close/pause 時に行う）
 			self.data_store.update_history(session_id, new_history)
+			self.data_store.update_conversation_state(session_id, conversation_state)
 
 			logger.info(f"[DEBUG] chat_prompt: session={session_id}, books={len(recommended_books)}, expression={current_expression}")
 			return ChatResponse(

@@ -184,7 +184,7 @@ def test_chat_response_has_trace_id(monkeypatch):
 	store = DataStore()
 	monkeypatch.setattr(server_module.server, "data_store", store)
 
-	def fake_llm_chat(prompt_file, message, history, ai_insight=""):
+	def fake_llm_chat(prompt_file, message, history, ai_insight="", **kwargs):
 		return "ok", history + [HumanMessage(message), AIMessage("ok")], [], "neutral"
 
 	monkeypatch.setattr(server_module, "llm_chat", fake_llm_chat)

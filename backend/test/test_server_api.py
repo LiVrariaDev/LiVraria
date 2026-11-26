@@ -19,7 +19,7 @@ def client(monkeypatch):
 	store = DataStore()
 	monkeypatch.setattr(server_module.server, "data_store", store)
 
-	def fake_llm_chat(prompt_file, message, history, ai_insight=""):
+	def fake_llm_chat(prompt_file, message, history, ai_insight="", **kwargs):
 		new_history = history + [HumanMessage(message), AIMessage(f"echo:{message}")]
 		return f"echo:{message}", new_history, [], "neutral"
 

@@ -5,6 +5,7 @@
 #   同じ DataStore を同時に触るため、状態の読み書きは self._lock で直列化する。
 #   LLM 呼び出し（要約・AI Insights 生成）は時間がかかるため、ロックの外で実行する。
 
+import copy
 import json
 import logging
 import os
@@ -340,6 +341,23 @@ class DataStore:
 			conv.last_accessed = datetime.now()
 			if conv.status != ChatStatus.active:
 				conv.status = ChatStatus.active
+
+	@_locked
+	def get_conversation_state(self, session_id: str) -> dict:
+		"""会話グラフ v2 が使う状態（読書プロフィールと前のターンで選んだ本）のコピーを返す。"""
+		conv = self.conversations.get(session_id)
+		if conv is None:
+			return {"profile": {}, "last_picks": []}
+		return {"profile": copy.deepcopy(conv.profile), "last_picks": copy.deepcopy(conv.last_picks)}
+
+	@_locked
+	def update_conversation_state(self, session_id: str, state: dict) -> None:
+		"""会話グラフ v2 の状態をメモリ上の Conversation に反映する（ディスク書き込みは close/pause 時）。"""
+		conv = self.conversations.get(session_id)
+		if conv is None:
+			return
+		conv.profile = copy.deepcopy(state.get("profile") or {})
+		conv.last_picks = copy.deepcopy(state.get("last_picks") or [])
 
 	def _flush_history(self, session_id: str) -> Optional[Conversation]:
 		"""in-memory の履歴を Conversation.messages に書き出し、メモリから解放する（要ロック）。"""
