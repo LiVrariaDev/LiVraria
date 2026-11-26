@@ -156,9 +156,16 @@ def rakuten(monkeypatch):
 	return fake
 
 
-def run(fakes, monkeypatch, message, history=None, state=None):
+def run(fakes, monkeypatch, message, history=None, state=None, user_context=""):
 	monkeypatch.setattr(llm, "get_llm", fakes.get_llm)
-	return llm.llm_chat(str(PROMPT_DEFAULT), message, history or [], ai_insight="", conversation_state=state)
+	return llm.llm_chat(str(PROMPT_DEFAULT), message, history or [], ai_insight=user_context, conversation_state=state)
+
+
+# server._build_user_context と同じ形（シナリオ17）
+USER_CONTEXT = (
+	"## ユーザー情報\nニックネーム: はなさん（会話の中で親しみを込めて呼びかけてください）\n性別: female\n年齢: 20歳"
+	"\n\n## AI Insights（過去の会話から学習）\nミステリーとSFが好き。長編より短編を好む。"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -433,6 +440,76 @@ def test_parallel_nodes_are_traced_and_counted(monkeypatch, rakuten):
 	assert draft_step["ai_text"] == "こんにちは、今日はどんな一日でしたか。"
 	usage = llm_usage.snapshot()["roles"]
 	assert usage["light"]["calls"] == 1 and usage["chat"]["calls"] == 1
+
+
+# ---------------------------------------------------------------------------
+# 1c. AI Insights とニックネーム
+# ---------------------------------------------------------------------------
+
+def test_nickname_and_insights_are_extracted():
+	assert graph_v2.nickname_of(USER_CONTEXT) == "はな"
+	assert graph_v2.insights_of(USER_CONTEXT) == "ミステリーとSFが好き。長編より短編を好む。"
+	# 会員情報がなければ AI Insights の本文だけが渡る
+	assert graph_v2.insights_of("ミステリーが好き") == "ミステリーが好き"
+	assert graph_v2.nickname_of("ミステリーが好き") == ""
+	only_user = "## ユーザー情報\nニックネーム: たろうさん（会話の中で親しみを込めて呼びかけてください）"
+	assert graph_v2.insights_of(only_user) == "" and graph_v2.nickname_of(only_user) == "たろう"
+	assert graph_v2.insights_of("") == "" and graph_v2.nickname_of(None) == ""
+
+
+def test_persona_mentions_nickname_only_when_known():
+	assert "「はな」さん" in graph_v2.persona_text("はな") and "毎回は呼ばない" in graph_v2.persona_text("はな")
+	assert "ニックネーム" not in graph_v2.persona_text("")
+	for name in ("interview", "select", "answer"):
+		prompt = graph_v2.load_v2_prompt(name, nickname="はな", profile="{}", picks="", user_context="")
+		assert "「はな」さん" in prompt
+
+
+@pytest.mark.parametrize("intent, queries, has_insights, expected", [
+	("ready", [["ミステリー"]], True, "search"),
+	("ready", [["ミステリー"]], False, "interview"),  # AI Insights がなければ、空のプロフィールでは探さない
+	("ready", [], True, "interview"),                  # キーワードを作れなかった
+	("need_more", [["ミステリー"]], True, "interview"),
+	("chit_chat", [["ミステリー"]], True, "interview"),
+])
+def test_decide_route_with_insights(intent, queries, has_insights, expected):
+	assert graph_v2.decide_route(intent, EMPTY, [], queries=queries, has_insights=has_insights) == expected
+
+
+def test_insights_drive_search_and_nickname_reaches_nodes(monkeypatch, rakuten):
+	"""シナリオ17の2ターン目: 今の会話に手がかりがなくても、AI Insights から探す。"""
+	rakuten.results["ミステリー 短編"] = [book(1)]
+	rakuten.results["SF 短編"] = [book(2)]
+	fakes = FakeLLMs(
+		UnderstandOutput=[understood("ready", [["ミステリー", "短編"], ["SF", "短編"]])],
+		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "短編のミステリー"}], response="はなさん、短編はいかがですか。")],
+	)
+	state = {}
+	text, _h, books, _e = run(fakes, monkeypatch, "今日は何かおすすめありますか？", state=state, user_context=USER_CONTEXT)
+
+	assert text == "はなさん、短編はいかがですか。" and books[0]["title"] == "本1"
+	assert ("light", "PlanOutput") not in fakes.kinds()
+	assert "ミステリーとSFが好き" in fakes.main_calls()[0][2][-1].content  # understand に AI Insights が渡る
+	assert "「はな」さん" in fakes.main_calls()[1][2][0].content         # 選書の人格にニックネーム
+	assert "「はな」さん" in fakes.messages_of("draft")[0][0].content     # 下書きにも
+	assert state["profile"]["interests"] == []  # AI Insights はプロフィールに入れない
+
+
+def test_insights_are_passed_to_plan(monkeypatch, rakuten):
+	rakuten.results["青い鳥"] = [book(1)]
+	fakes = FakeLLMs(
+		UnderstandOutput=[understood("lookup_title", mentioned_books=["青い鳥"])],
+		PlanOutput=[plan_of(["青い鳥"])],
+		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "a"}])],
+	)
+	run(fakes, monkeypatch, "青い鳥の本", state={}, user_context=USER_CONTEXT)
+	plan_system = fakes.main_calls()[1][2][0].content
+	assert "ミステリーとSFが好き" in plan_system
+
+
+def test_understand_prompt_keeps_insights_out_of_profile():
+	prompt = graph_v2.load_v2_prompt("understand")
+	assert "プロフィールには入れない" in prompt
 
 
 # ---------------------------------------------------------------------------

@@ -22,6 +22,7 @@ Notes/LiVraria/Graph-Redesign を参照。
 import json
 import logging
 import operator
+import re
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -141,11 +142,45 @@ class _Options:
 # 補助関数
 # ---------------------------------------------------------------------------
 
-def load_v2_prompt(name: str, **values: str) -> str:
-	"""prompts/v2/<name>.md を読み、{{key}} を値で置き換える。"""
+NICKNAME_PATTERN = re.compile(r"ニックネーム[:：]\s*(.+?)(?:さん)?(?:（|\(|$)", re.MULTILINE)
+INSIGHTS_MARKER = "## AI Insights"
+USER_INFO_HEADER = "## ユーザー情報"
+
+
+def nickname_of(user_context: str) -> str:
+	"""利用者の情報（server._build_user_context の文）からニックネームを取り出す。なければ ""。"""
+	match = NICKNAME_PATTERN.search(user_context or "")
+	return match.group(1).strip() if match else ""
+
+
+def insights_of(user_context: str) -> str:
+	"""利用者の情報から AI Insights（過去の会話から学習した傾向）の本文を取り出す。なければ ""。
+
+	_build_user_context は、会員情報があれば「## ユーザー情報」の後に「## AI Insights …」の節を置き、
+	会員情報がなければ AI Insights の本文だけを渡す。
+	"""
+	text = (user_context or "").strip()
+	if INSIGHTS_MARKER in text:
+		section = text.split(INSIGHTS_MARKER, 1)[1]
+		return section.split("\n", 1)[1].strip() if "\n" in section else ""
+	if text.startswith(USER_INFO_HEADER):
+		return ""
+	return text
+
+
+def persona_text(nickname: str = "") -> str:
+	"""人格・口調の指示。ニックネームがあれば、ときどき名前で呼びかけるよう足す。"""
+	text = Path(PROMPTS_V2_DIR, "persona.md").read_text(encoding="utf-8").strip()
+	if nickname:
+		text += f"\n- 利用者のニックネームは「{nickname}」さん。会話の中で、ときどき自然に「{nickname}さん」と呼びかける（毎回は呼ばない）"
+	return text
+
+
+def load_v2_prompt(name: str, nickname: str = "", **values: str) -> str:
+	"""prompts/v2/<name>.md を読み、{{key}} を値で置き換える。{{persona}} には persona_text(nickname) を入れる。"""
 	text = Path(PROMPTS_V2_DIR, f"{name}.md").read_text(encoding="utf-8")
 	if "{{persona}}" in text:
-		values.setdefault("persona", Path(PROMPTS_V2_DIR, "persona.md").read_text(encoding="utf-8").strip())
+		values.setdefault("persona", persona_text(nickname))
 	for key, value in values.items():
 		text = text.replace("{{" + key + "}}", value)
 	return text
@@ -210,14 +245,19 @@ def needs_crd(intent: str, profile: ReadingProfile) -> bool:
 	return intent in ("ready", "refine") and profile.purpose == "調べ物"
 
 
-def decide_route(intent: str, profile: ReadingProfile, last_picks: List[dict]) -> str:
+def decide_route(intent: str, profile: ReadingProfile, last_picks: List[dict],
+	             queries: Optional[List[List[str]]] = None, has_insights: bool = False) -> str:
 	"""意図とプロフィールの埋まり具合から次のノードを決める（"interview" / "search" / "crd" / "answer"）。
 
 	"search" は understand のキーワードでそのまま検索する。"crd" はレファ協 → plan を通ってから検索する。
+	ready でプロフィールが空でも、AI Insights があり、understand がそこからキーワードを作れていれば探す
+	（プロフィールが空なら、キーワードはプロフィールからの補完ではなく LLM が作ったもの）。
 	"""
 	if intent == "ask_book":
 		return "answer" if last_picks else "interview"
 	if intent in SEARCH_INTENTS and has_search_material(profile, intent):
+		return "crd" if needs_crd(intent, profile) else "search"
+	if intent == "ready" and has_insights and queries:
 		return "crd" if needs_crd(intent, profile) else "search"
 	return "interview"
 
@@ -465,12 +505,14 @@ def _make_nodes(options: _Options):
 		"""② 振り分け（コード）。"""
 		started = datetime.now()
 		profile = normalize_profile(state.get("profile"))
-		decision = decide_route(state.get("intent", "need_more"), profile, state.get("last_picks") or [])
+		decision = decide_route(state.get("intent", "need_more"), profile, state.get("last_picks") or [],
+		                        queries=state.get("queries") or [],
+		                        has_insights=bool(insights_of(state.get("user_context", ""))))
 		_trace_step("route", started, results=[{"name": "route", "content": f"intent={state.get('intent')} -> {decision}"}])
 		return {"route": decision, "path": ["route"]}
 
 	def interview_messages(state: V2State, profile: ReadingProfile) -> List[BaseMessage]:
-		prompt = load_v2_prompt("interview", profile=profile_text(profile),
+		prompt = load_v2_prompt("interview", nickname=nickname_of(state.get("user_context", "")), profile=profile_text(profile),
 		                        user_context=user_context_text(state.get("user_context", "")))
 		return _chat_messages(prompt, state.get("messages") or [], state["message"])
 
@@ -529,7 +571,8 @@ def _make_nodes(options: _Options):
 		"""④b 検索キーワードを2〜4組作る。読み取れなければプロフィールから作る。"""
 		profile = normalize_profile(state.get("profile"))
 		prompt = load_v2_prompt("plan", profile=profile_text(profile), intent=state.get("intent", "ready"),
-		                        crd_hints=_crd_hints_text(state.get("crd_hints") or []))
+		                        crd_hints=_crd_hints_text(state.get("crd_hints") or []),
+		                        user_context=user_context_text(state.get("user_context", "")))
 		content = f"## 直近の会話\n{_transcript(state.get('messages') or [])}\n\n## 今回の発言\n{state['message']}"
 		started = datetime.now()
 		parsed, raw, error = _invoke_structured("light", PlanOutput, [SystemMessage(content=prompt), HumanMessage(content=content)],
@@ -560,7 +603,7 @@ def _make_nodes(options: _Options):
 			return {"picks": [], "response_text": MESSAGE_NO_CANDIDATES, "path": path}
 
 		profile = normalize_profile(state.get("profile"))
-		prompt = load_v2_prompt("select", profile=profile_text(profile),
+		prompt = load_v2_prompt("select", nickname=nickname_of(state.get("user_context", "")), profile=profile_text(profile),
 		                        user_context=user_context_text(state.get("user_context", "")))
 		candidate_text = "\n".join(llm_module.format_book_candidate(c["candidate_id"], c) for c in candidates)
 		content = (
@@ -596,7 +639,7 @@ def _make_nodes(options: _Options):
 
 	def answer(state: V2State) -> dict:
 		"""推薦した本への質問に、last_picks の内容紹介をもとに答える。"""
-		prompt = load_v2_prompt("answer", picks=_picks_text(state.get("last_picks") or []),
+		prompt = load_v2_prompt("answer", nickname=nickname_of(state.get("user_context", "")), picks=_picks_text(state.get("last_picks") or []),
 		                        user_context=user_context_text(state.get("user_context", "")))
 		text = _text_with_retry("answer", "chat", _chat_messages(prompt, state.get("messages") or [], state["message"]), options)
 		return {"response_text": text or llm_module.MESSAGE_EMPTY_RESPONSE, "picks": [],
