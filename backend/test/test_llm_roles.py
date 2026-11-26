@@ -16,6 +16,7 @@ from backend.tools import demo_account
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
 	for name in ("GEMINI_CHAT_MODEL", "GEMINI_SUMMARY_MODEL", "GEMINI_LIGHT_MODEL",
+	             "GEMINI_CHAT_THINKING", "GEMINI_SUMMARY_THINKING", "GEMINI_LIGHT_THINKING",
 	             "GEMINI_API_MAX_RETRIES", "GEMINI_API_TIMEOUT"):
 		monkeypatch.delenv(name, raising=False)
 	llm_usage.reset()
@@ -93,6 +94,57 @@ def test_uses_fixed_sampling():
 	assert llm.uses_fixed_sampling("Gemini-4-Hydrogen")
 	assert not llm.uses_fixed_sampling("gemini-2.5-flash-lite")
 	assert not llm.uses_fixed_sampling("gemini-3.5-flash")
+
+
+# thinking_level
+
+def test_get_thinking_level_defaults_and_env(monkeypatch):
+	assert llm.get_thinking_level("summary") == "low"
+	assert llm.get_thinking_level("chat") is None
+	assert llm.get_thinking_level("light") is None
+	monkeypatch.setenv("GEMINI_SUMMARY_THINKING", " Medium ")
+	assert llm.get_thinking_level("summary") == "medium"
+	monkeypatch.setenv("GEMINI_SUMMARY_THINKING", "default")
+	assert llm.get_thinking_level("summary") is None  # モデルの既定に任せる
+	monkeypatch.setenv("GEMINI_SUMMARY_THINKING", "very-deep")
+	assert llm.get_thinking_level("summary") == "low"  # 不正な値は役割の既定値
+	monkeypatch.setenv("GEMINI_CHAT_THINKING", "low")
+	assert llm.get_thinking_level("chat") == "low"
+	with pytest.raises(ValueError):
+		llm.get_thinking_level("unknown")
+
+
+def test_get_llm_thinking_level_per_role(monkeypatch):
+	monkeypatch.setattr(llm, "ChatGoogleGenerativeAI", _FakeGemini)
+	assert llm.get_llm(role="summary", backend="gemini").kwargs["thinking_level"] == "low"
+	assert "thinking_level" not in llm.get_llm(role="chat", backend="gemini").kwargs
+	assert "thinking_level" not in llm.get_llm(role="light", backend="gemini").kwargs
+
+	monkeypatch.setenv("GEMINI_LIGHT_THINKING", "low")
+	assert llm.get_llm(role="light", backend="gemini").kwargs["thinking_level"] == "low"
+
+
+def test_get_llm_no_thinking_level_for_gemini_2_5(monkeypatch):
+	monkeypatch.setattr(llm, "ChatGoogleGenerativeAI", _FakeGemini)
+	monkeypatch.setenv("GEMINI_SUMMARY_MODEL", "gemini-2.5-flash")
+	summary = llm.get_llm(role="summary", backend="gemini")
+	assert "thinking_level" not in summary.kwargs
+	assert summary.kwargs["thinking_budget"] == 0
+
+
+def test_is_gemini_3_or_later():
+	assert llm.is_gemini_3_or_later("gemini-3.5-flash-lite")
+	assert llm.is_gemini_3_or_later("models/gemini-4-hydrogen")
+	assert not llm.is_gemini_3_or_later("gemini-2.5-flash-lite")
+	assert not llm.is_gemini_3_or_later("llama3.2")
+
+
+def test_real_client_sends_thinking_level():
+	"""本物の ChatGoogleGenerativeAI でリクエストを組み立て（送信はしない）、要約だけ thinking_level=low が入ること。"""
+	summary = llm.get_llm(role="summary", backend="gemini")._prepare_request([HumanMessage("こんにちは")])
+	assert str(summary["config"].thinking_config.thinking_level).lower().endswith("low")
+	chat = llm.get_llm(role="chat", backend="gemini")._prepare_request([HumanMessage("こんにちは")])
+	assert chat["config"].thinking_config is None
 
 
 @pytest.mark.parametrize("role", ["chat", "summary", "light"])
