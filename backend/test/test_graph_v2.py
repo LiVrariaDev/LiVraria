@@ -662,3 +662,8 @@ def test_understand_prompt_keeps_feelings_out_of_interests():
 	assert "題材を表す名詞だけ" in prompt
 	assert "「〜な本」" in prompt and "interests に入れない。mood に書く" in prompt
 
+
+def test_select_prompt_has_no_fixed_phrase():
+	prompt = graph_v2.load_v2_prompt("select", profile="{}", user_context="")
+	assert "ぴったりの1冊と、少し視点を変えた1冊" not in prompt
+	assert "枠の名前や決まった言い回しを使わず、3冊の違いが自然に伝わるように話す" in prompt
