@@ -34,7 +34,7 @@ class ResourceExhausted(Exception):
 def test_get_gemini_model_defaults_and_env(monkeypatch):
 	assert llm.get_gemini_model("chat") == "gemini-3.5-flash-lite"
 	assert llm.get_gemini_model("summary") == "gemini-4-hydrogen"
-	assert llm.get_gemini_model("light") == "gemini-2.5-flash-lite"
+	assert llm.get_gemini_model("light") == "gemini-3.5-flash-lite"
 	monkeypatch.setenv("GEMINI_CHAT_MODEL", "my-chat")
 	assert llm.get_gemini_model("chat") == "my-chat"
 	with pytest.raises(ValueError):
@@ -64,6 +64,48 @@ def test_get_llm_arguments(monkeypatch):
 	light = llm.get_llm(role="light", backend="gemini")
 	assert light.kwargs["thinking_budget"] == 0
 	assert light.kwargs["max_retries"] == 3
+
+
+def test_get_llm_light_default_has_no_thinking_budget(monkeypatch):
+	# gemini-2.5-flash-lite は新規ユーザーには提供終了（404）なので、既定は 3.5-flash-lite
+	monkeypatch.setattr(llm, "ChatGoogleGenerativeAI", _FakeGemini)
+	light = llm.get_llm(role="light", backend="gemini")
+	assert light.kwargs["model"] == "gemini-3.5-flash-lite"
+	assert "thinking_budget" not in light.kwargs
+
+
+@pytest.mark.parametrize("role", ["chat", "summary", "light"])
+def test_get_llm_omits_temperature_for_fixed_sampling_defaults(monkeypatch, role):
+	monkeypatch.setattr(llm, "ChatGoogleGenerativeAI", _FakeGemini)
+	created = llm.get_llm(role=role, backend="gemini", temperature=0.7)
+	assert "temperature" not in created.kwargs
+
+
+def test_get_llm_passes_temperature_to_other_models(monkeypatch):
+	monkeypatch.setattr(llm, "ChatGoogleGenerativeAI", _FakeGemini)
+	monkeypatch.setenv("GEMINI_LIGHT_MODEL", "gemini-2.5-flash-lite")
+	assert llm.get_llm(role="light", backend="gemini", temperature=0.7).kwargs["temperature"] == 0.7
+
+
+def test_uses_fixed_sampling():
+	assert llm.uses_fixed_sampling("gemini-3.5-flash-lite")
+	assert llm.uses_fixed_sampling("models/gemini-3.5-flash-lite-001")
+	assert llm.uses_fixed_sampling("Gemini-4-Hydrogen")
+	assert not llm.uses_fixed_sampling("gemini-2.5-flash-lite")
+	assert not llm.uses_fixed_sampling("gemini-3.5-flash")
+
+
+@pytest.mark.parametrize("role", ["chat", "summary", "light"])
+def test_real_client_request_has_no_sampling_warning(role):
+	"""本物の ChatGoogleGenerativeAI でリクエストを組み立て（送信はしない）、
+	"uses fixed sampling defaults" の UserWarning が出ないこと。"""
+	import warnings
+
+	with warnings.catch_warnings():
+		warnings.simplefilter("error")
+		client = llm.get_llm(role=role, backend="gemini", temperature=0.7)
+		client._prepare_request([HumanMessage("こんにちは")])
+	assert client.temperature is None
 
 
 # 3. is_rate_limit_error

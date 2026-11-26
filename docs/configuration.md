@@ -22,7 +22,7 @@ cp .env.template .env
 | --- | --- |
 | `GEMINI_CHAT_MODEL` | 会話用モデル。既定は `gemini-3.5-flash-lite`。 |
 | `GEMINI_SUMMARY_MODEL` | 要約と AI Insights 用モデル。既定は `gemini-4-hydrogen`。 |
-| `GEMINI_LIGHT_MODEL` | キーワード抽出などの軽量処理用モデル。既定は `gemini-2.5-flash-lite`。 |
+| `GEMINI_LIGHT_MODEL` | キーワード抽出などの軽量処理用モデル。既定は `gemini-3.5-flash-lite`（`gemini-2.5-flash-lite` は新規ユーザーには提供終了で 404 になる）。 |
 | `GEMINI_API_MAX_RETRIES` | Gemini SDK 内のリトライ回数。既定は 1。 |
 | `GEMINI_API_TIMEOUT` | Gemini API のタイムアウト秒数。既定は 30。 |
 

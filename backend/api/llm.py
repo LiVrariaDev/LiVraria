@@ -132,9 +132,26 @@ LLM_ROLES = ("chat", "summary", "light")
 DEFAULT_GEMINI_MODELS = {
 	"chat": "gemini-3.5-flash-lite",
 	"summary": "gemini-4-hydrogen",
-	"light": "gemini-2.5-flash-lite",
+	"light": "gemini-3.5-flash-lite",
 }
 MODEL_ENV = {"chat": "GEMINI_CHAT_MODEL", "summary": "GEMINI_SUMMARY_MODEL", "light": "GEMINI_LIGHT_MODEL"}
+
+# サンプリングの値が固定されているモデル（langchain-google-genai の一覧と同じ）。
+# temperature を渡すと「uses fixed sampling defaults」の UserWarning が出て、値は無視される。
+FIXED_SAMPLING_MODELS = frozenset({
+	"gemini-3.5-flash-lite",
+	"gemini-3.6-flash",
+	"gemini-4-carbon",
+	"gemini-4-hydrogen",
+	"gemini-4-neon",
+})
+
+
+def uses_fixed_sampling(model_name: str) -> bool:
+	"""temperature を渡してはいけないモデルか。"models/..." の接頭辞と "-001" のような版の接尾辞は無視する。"""
+	name = model_name.lower().rsplit("/", 1)[-1]
+	name = re.sub(r"-\d{3}$", "", name)
+	return name in FIXED_SAMPLING_MODELS
 
 
 def get_gemini_model(role: str) -> str:
@@ -165,13 +182,14 @@ def get_llm(role: str = "chat", backend: Optional[str] = None, temperature: floa
 		model_name = get_gemini_model(role)
 		kwargs = {
 			"model": model_name,
-			"temperature": temperature,
 			"max_tokens": max_tokens,
 			"google_api_key": os.getenv("GEMINI_API_KEY"),
 			# SDK 内のリトライが多いと、429 のとき端末が長く固まる
 			"max_retries": int(os.getenv("GEMINI_API_MAX_RETRIES", "1")),
 			"timeout": float(os.getenv("GEMINI_API_TIMEOUT", "30")),
 		}
+		if not uses_fixed_sampling(model_name):
+			kwargs["temperature"] = temperature
 		if model_name.startswith("gemini-2.5-"):
 			# 2.5 系の動的思考が出力枠を使い切り、最終テキストが
 			# 空になることを防ぐ。それ以外のモデルには思考関連の引数を渡さない。
