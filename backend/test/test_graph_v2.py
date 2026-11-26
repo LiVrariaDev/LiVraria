@@ -176,6 +176,7 @@ PICKED = [{"title": "本1"}]
 	("ready", FULL, [], "search"),
 	("ready", EMPTY, [], "interview"),                      # 手がかりがなければ聞き取りに戻る
 	("ready", graph_v2.ReadingProfile(mood="疲れている"), [], "search"),
+	("ready", graph_v2.ReadingProfile(formats=["絵本"]), [], "search"),         # 形式だけでも探せる
 	("refine", FULL, PICKED, "search"),
 	("lookup_title", graph_v2.ReadingProfile(mentioned_books=["青い鳥の話"]), [], "crd"),  # レファ協 → plan を通る
 	("ready", graph_v2.ReadingProfile(interests=["戦国"], purpose="調べ物"), [], "crd"),
@@ -601,6 +602,32 @@ def test_understand_prompt_has_keyword_rules():
 	assert "queries" in prompt and "避けたいもの（avoid）に当たる語は使わない" in prompt
 
 
+def test_fallback_queries_use_formats():
+	assert graph_v2.fallback_queries(graph_v2.ReadingProfile(formats=["絵本", "図鑑"]), []) == [["絵本"], ["図鑑"]]
+	assert graph_v2.fallback_queries(graph_v2.ReadingProfile(interests=["猫", "宇宙"], formats=["絵本"]), []) == [
+		["猫", "絵本"], ["猫", "宇宙"], ["猫"], ["宇宙"],
+	]
+
+
+def test_picture_book_only_searches_without_asking(monkeypatch, rakuten):
+	"""「絵本ある？」だけで、聞き返さずに探す（シナリオ13）。キーワードが空でも形式から作る。"""
+	rakuten.results["絵本"] = [book(1)]
+	fakes = FakeLLMs(
+		UnderstandOutput=[understood("ready", [], formats=["絵本"], reader="子ども")],
+		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "寝る前に"}], response="寝る前にどうぞ。")],
+	)
+	state = {}
+	text, _h, books, _e = run(fakes, monkeypatch, "絵本ある？", state=state)
+	assert text == "寝る前にどうぞ。" and books[0]["title"] == "本1"
+	assert rakuten.calls[0] == (("絵本",), 0)
+	assert state["profile"]["formats"] == ["絵本"]
+
+
+def test_understand_prompt_has_formats():
+	prompt = graph_v2.load_v2_prompt("understand")
+	assert "formats:" in prompt and "形式は interests ではなくここに書く" in prompt
+
+
 def test_clean_queries():
 	assert graph_v2.clean_queries([["猫", " ", "小説", "冬"], ["猫", "小説"], [], ["宇宙"], ["a"], ["b"], ["c"]]) == [
 		["猫", "小説"], ["宇宙"], ["a"], ["b"],
@@ -667,8 +694,10 @@ def test_rate_limit_returns_busy(monkeypatch, rakuten):
 
 
 def test_normalize_profile_handles_broken_data():
-	profile = graph_v2.normalize_profile({"interests": ["猫", "猫", "", 3], "purpose": "宇宙旅行", "reader": None, "mood": None})
+	profile = graph_v2.normalize_profile({"interests": ["猫", "猫", "", 3], "purpose": "宇宙旅行", "reader": None, "mood": None,
+	                                      "formats": "絵本"})
 	assert profile.interests == ["猫", "3"]
+	assert profile.formats == ["絵本"]  # 文字列1つはリストにする
 	assert profile.purpose == "不明" and profile.reader == "自分" and profile.mood == ""
 	assert graph_v2.normalize_profile(None) == graph_v2.ReadingProfile()
 

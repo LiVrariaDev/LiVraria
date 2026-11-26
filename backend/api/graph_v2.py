@@ -81,6 +81,7 @@ class ReadingProfile(BaseModel):
 	level: Literal["入門", "普通", "専門", "不明"] = Field("不明", description="内容の水準")
 	avoid: List[str] = Field(default_factory=list, description="避けたいもの")
 	mentioned_books: List[str] = Field(default_factory=list, description="会話に出た本")
+	formats: List[str] = Field(default_factory=list, description="本の形式（絵本、写真集、エッセイ、小説、図鑑、詩集、漫画、新書など）")
 
 
 class SearchQuery(BaseModel):
@@ -152,6 +153,8 @@ def load_v2_prompt(name: str, **values: str) -> str:
 
 def _clean_list(values: Any, limit: int = PROFILE_LIST_LIMIT) -> List[str]:
 	result: List[str] = []
+	if isinstance(values, str):
+		values = [values]  # 文字列が1つだけ来たときに、1文字ずつに分けない
 	for value in values or []:
 		text = str(value).strip()[:PROFILE_TEXT_LIMIT]
 		if text and text not in result:
@@ -173,6 +176,7 @@ def normalize_profile(data: Any) -> ReadingProfile:
 		"mood": str(raw.get("mood") or "").strip()[:PROFILE_TEXT_LIMIT],
 		"avoid": _clean_list(raw.get("avoid")),
 		"mentioned_books": _clean_list(raw.get("mentioned_books")),
+		"formats": _clean_list(raw.get("formats")),
 	}
 	for key in ("purpose", "reader", "level"):
 		value = raw.get(key)
@@ -196,7 +200,7 @@ def has_search_material(profile: ReadingProfile, intent: str) -> bool:
 	"""検索に使える手がかりがプロフィールにあるか。"""
 	if intent == "lookup_title":
 		return bool(profile.mentioned_books or profile.interests)
-	return bool(profile.interests or profile.mentioned_books or profile.mood)
+	return bool(profile.interests or profile.mentioned_books or profile.mood or profile.formats)
 
 
 def needs_crd(intent: str, profile: ReadingProfile) -> bool:
@@ -615,10 +619,14 @@ def clean_queries(raw_queries: List[List[str]]) -> List[List[str]]:
 def fallback_queries(profile: ReadingProfile, crd_hints: List[dict]) -> List[List[str]]:
 	"""plan が使えないときに、プロフィールとレファ協の手がかりから組を作る。"""
 	raw: List[List[str]] = []
+	if profile.interests and profile.formats:
+		raw.append([profile.interests[0], profile.formats[0]])
 	if profile.interests:
 		raw.append(profile.interests[:2])
 		raw.extend([interest] for interest in profile.interests[:3])
 	raw.extend([title] for title in profile.mentioned_books[:2])
+	if not profile.interests:
+		raw.extend([fmt] for fmt in profile.formats[:2])
 	for hint in crd_hints:
 		if hint.get("keywords"):
 			raw.append(hint["keywords"][:2])
