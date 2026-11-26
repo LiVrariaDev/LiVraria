@@ -934,3 +934,11 @@ def test_select_prompt_has_no_fixed_phrase():
 	prompt = graph_v2.load_v2_prompt("select", profile="{}", user_context="")
 	assert "ぴったりの1冊と、少し視点を変えた1冊" not in prompt
 	assert "枠の名前や決まった言い回しを使わず、3冊の違いが自然に伝わるように話す" in prompt
+
+
+def test_persona_requires_polite_style_in_every_speaking_node():
+	for name in ("interview", "select", "answer"):
+		prompt = graph_v2.load_v2_prompt(name, profile="{}", picks="", user_context="")
+		assert "「です・ます」調だけで話す" in prompt
+		assert "「だよ」「だね」「なあ」「〜じゃん」" in prompt
+		assert "友人のように" not in prompt
