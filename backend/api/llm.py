@@ -1,4 +1,5 @@
 # Standard Library
+import html
 import os
 import re
 import traceback
@@ -19,7 +20,7 @@ from langgraph.prebuilt import ToolNode
 
 # User-defined
 from backend import PROMPTS_DIR, LLM_MAX_RETRIES, LLM_HISTORY_LIMIT
-from backend.search.rakuten_books import rakuten_search_books
+from backend.search.rakuten_books import rakuten_search_books, genre_path
 from backend.api import llm_usage
 from backend.api.llm_usage import is_rate_limit_error
 from backend.api.trace_store import current_turn, TraceStep
@@ -230,6 +231,51 @@ def create_system_prompt(base_prompt: str, ai_insight: Optional[str] = None) -> 
 """
 	
 	return full_prompt
+
+# 検索結果の候補リスト
+
+CAPTION_MAX_CHARS = 150  # 候補リストに載せる内容紹介の最大文字数
+_HTML_TAG_RE = re.compile(r"<[^>]*>")
+
+
+def clean_caption(caption: Optional[str], limit: int = CAPTION_MAX_CHARS) -> str:
+	"""楽天の itemCaption から HTML タグを除き、空白をまとめて limit 文字に切り詰める。"""
+	if not caption:
+		return ""
+	text = html.unescape(_HTML_TAG_RE.sub(" ", str(caption)))
+	text = re.sub(r"\s+", " ", text).strip()
+	if len(text) > limit:
+		text = text[:limit].rstrip() + "…"
+	return text
+
+
+def format_review(average: Any, count: Any) -> str:
+	"""レビュー平均と件数を「4.3（12件）」の形にする。レビューがなければ「なし」。"""
+	try:
+		count_num = int(count or 0)
+		average_num = float(average or 0)
+	except (TypeError, ValueError):
+		return "なし"
+	if count_num <= 0:
+		return "なし"
+	return f"{average_num:.1f}（{count_num}件）"
+
+
+def format_book_candidate(number: int, book: dict) -> str:
+	"""search_books が LLM に返す候補1件分の文字列を作る。"""
+	title = book.get("title") or "不明"
+	authors = book.get("authors") or []
+	author = authors[0] if authors else "不明"
+	lines = [f"{number}. 『{title}』 - {author}"]
+	genre = genre_path(book.get("genre"))
+	if genre:
+		lines.append(f"   ジャンル: {genre}")
+	lines.append(f"   レビュー: {format_review(book.get('reviewAverage'), book.get('reviewCount'))}")
+	caption = clean_caption(book.get("itemCaption"))
+	if caption:
+		lines.append(f"   内容: {caption}")
+	return "\n".join(lines)
+
 
 # LangGraph Workflow
 
@@ -465,10 +511,7 @@ def llm_chat(
 				# ローカルステートに保存
 				search_results_state[current_id] = book
 				
-				title = book.get("title", "不明")
-				authors = book.get("authors", [])
-				author = authors[0] if authors else "不明"
-				book_list.append(f"{current_id}. 『{title}』 - {author}")
+				book_list.append(format_book_candidate(current_id, book))
 			
 			logger.info(f"[DEBUG] Found {len(books)} books. IDs assigned: {start_id} to {start_id + len(books) - 1}")
 			return f"検索結果（{len(books)}冊）:\n" + "\n".join(book_list) + "\n\nこれらの結果から、ユーザーに合った本を選び、必ず `recommend_books` を呼び出してください。テキストで検索結果を要約しないでください。もし推薦する本がない場合は、空のリスト `[]` を引数にして `recommend_books` を呼び出してください。"
