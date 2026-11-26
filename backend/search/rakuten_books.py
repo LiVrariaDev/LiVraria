@@ -26,6 +26,30 @@ def genreid_to_genre(genre_id: str) -> str:
                 return genre["fullPath"]
         return ""
 
+_genre_paths: dict[str, str] | None = None
+
+def genre_path(genre_id: str | None) -> str:
+    """楽天のジャンルID（"001004008001/001017005" のように複数のこともある）を「本 > 小説・エッセイ > ...」の形に変換する。
+
+    ジャンル一覧は3階層目までしかないため、見つからなければ末尾3桁ずつ削って上位のジャンルを探す。
+    複数のIDがあるときは先頭を使う。見つからなければ空文字を返す。
+    """
+    global _genre_paths
+    if not genre_id:
+        return ""
+    if _genre_paths is None:
+        try:
+            with open(RAKUTEN_BOOK_GENRE_FLATLIST, "r", encoding="utf-8") as f:
+                _genre_paths = {g["booksGenreId"]: g["fullPath"] for g in json.load(f)}
+        except (OSError, ValueError, KeyError):
+            _genre_paths = {}
+    first_id = str(genre_id).split("/")[0].strip()
+    while first_id:
+        if first_id in _genre_paths:
+            return _genre_paths[first_id]
+        first_id = first_id[:-3]
+    return ""
+
 def rakuten_search_books(keywords: list[str], count: int = 10, genre_id: str = "001", orflag: int = 0) -> list[dict]:
     headers = {
         "accessKey": os.getenv("RAKUTEN_ACCESS_KEY"),
@@ -60,6 +84,8 @@ def rakuten_search_books(keywords: list[str], count: int = 10, genre_id: str = "
         genre = item.get("booksGenreId")
         item_caption = item.get("itemCaption", "")
         item_price = item.get("itemPrice", 0)
+        review_average = item.get("reviewAverage")  # レビュー平均（"4.25" のような文字列のこともある）
+        review_count = item.get("reviewCount", 0)  # レビュー件数
 
         book_info = {
             "title": title,
@@ -71,7 +97,9 @@ def rakuten_search_books(keywords: list[str], count: int = 10, genre_id: str = "
             "item_url": item_url,
             "genre": genre,
             "itemCaption": item_caption,
-            "itemPrice": item_price
+            "itemPrice": item_price,
+            "reviewAverage": review_average,
+            "reviewCount": review_count,
         }
         book_list.append(book_info)
 
