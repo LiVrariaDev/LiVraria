@@ -43,7 +43,7 @@ cp .env.template .env
 
 `VITE_API_BASE_URL` を設定すると、フロントエンドの API 接続先を変更できる。未設定時は `http://localhost:8000` となる。
 
-`VITE_DEVICE_KEY` は NFC ログイン時に `X-Device-Key` ヘッダーとして送る端末共有キーで、バックエンドの `LIVRARIA_DEVICE_KEY` と同じ値にする。未設定または不一致の場合、NFC ログインはできない（メールアドレスでのログインは可能）。
+`VITE_DEVICE_KEY` は NFC ログイン時に `X-Device-Key` ヘッダーとして送る端末共有キーで、バックエンドの `LIVRARIA_DEVICE_KEY` と同じ値にする。バックエンドにキーが設定されていて値が一致しない場合、NFC ログインはできない（メールアドレスでのログインは可能）。バックエンドの `LIVRARIA_DEVICE_KEY` が空なら、キーは確認しない（下記）。
 
 Vite の `VITE_` 変数はブラウザ向けビルドに埋め込まれる。公開してよい Firebase クライアント設定だけを入れ、秘密情報を入れない。`VITE_DEVICE_KEY` も端末のブラウザから読めるため、端末を不特定多数のブラウザに公開しない前提でのみ有効である。
 
@@ -54,7 +54,7 @@ Vite の `VITE_` 変数はブラウザ向けビルドに埋め込まれる。公
 | `BACKEND_HOST` / `BACKEND_PORT` | `backend.run` の待受先。既定は `0.0.0.0:8000`。 |
 | `USE_SSL` | `true` のとき、開発用の `certs/key.pem` と `certs/cert.pem` を使用する。 |
 | `ALLOWED_ORIGINS` | バックエンド CORS 許可オリジンをカンマ区切りで追加する（`localhost:5173` は既定で許可）。旧名 `PRODUCTION_ORIGINS` も使用可。 |
-| `LIVRARIA_DEVICE_KEY` | NFC ログイン（`/nfc/auth`）を許可する端末共有キー。未設定時は NFC ログインを無効にする。 |
+| `LIVRARIA_DEVICE_KEY` | NFC ログイン（`/nfc/auth`）を許可する端末共有キー。設定時は値が違えば 403。未設定（空）なら確認せずに通し、起動時に警告を出す（会場の LAN が閉じている前提の一時的な対応。どの端末からでも NFC ログインを呼べる）。 |
 | `LIVRARIA_DEBUG` | `true` のとき、デバッグ API（`/debug/*`）を有効にし、会話のトレースを記録する。開発用 PC でのみ `true` にする。既定は `false`。 |
 | `LIVRARIA_ADMIN_KEY` | デバッグ API の管理者キー（`X-Admin-Key` ヘッダー）。`LIVRARIA_DEVICE_KEY` とは別の値にする。未設定時、デバッグ API は 503 を返す。 |
 | `LIVRARIA_TRACE_LIMIT` | メモリに残すトレースのターン数。既定は 500。 |

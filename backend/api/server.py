@@ -73,7 +73,7 @@ async def lifespan(app: FastAPI):
 	else:
 		logger.info("[LLM Backend] Using Gemini API")
 	if not device_key_configured():
-		logger.warning("[WARNING] LIVRARIA_DEVICE_KEY is not set: NFC login is disabled")
+		logger.warning("[WARNING] LIVRARIA_DEVICE_KEY is not set: the device key check is skipped, so NFC login can be called from any device")
 
 	monitor = asyncio.create_task(monitor_timeouts())
 	yield
@@ -202,7 +202,7 @@ class Server:
 		async def nfc_auth(request: NfcIdRequest):
 			"""
 			NFC IDで認証し、Firebase Custom Tokenを返す。
-			カード ID は秘密情報ではないため、登録済み端末の共有キー（X-Device-Key）を必須とする。
+			カード ID は秘密情報ではないため、LIVRARIA_DEVICE_KEY が設定されていれば端末共有キー（X-Device-Key）の一致を求める（空なら確認しない）。
 			"""
 			user_id = self.data_store.get_user_by_nfc(request.nfc_id)
 			if user_id is None or self.data_store.get_user(user_id) is None:
