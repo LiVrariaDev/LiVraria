@@ -22,7 +22,8 @@ cp .env.template .env
 | --- | --- |
 | `GEMINI_CHAT_MODEL` | 会話用モデル。既定は `gemini-3.5-flash-lite`。 |
 | `GEMINI_SUMMARY_MODEL` | 要約と AI Insights 用モデル。既定は `gemini-4-hydrogen`。 |
-| `GEMINI_LIGHT_MODEL` | キーワード抽出などの軽量処理用モデル。既定は `gemini-2.5-flash-lite`。 |
+| `GEMINI_LIGHT_MODEL` | キーワード抽出などの軽量処理用モデル。既定は `gemini-3.5-flash-lite`（`gemini-2.5-flash-lite` は新規ユーザーには提供終了で 404 になる）。 |
+| `GEMINI_CHAT_THINKING` / `GEMINI_SUMMARY_THINKING` / `GEMINI_LIGHT_THINKING` | 役割ごとの思考の段階（Gemini 3 以降のモデルの `thinking_level`）。`minimal` / `low` / `medium` / `high` / `xhigh`、または `default`（モデルの既定に任せる）。未設定時は要約だけ `low`（`gemini-4-hydrogen` は `minimal` 非対応）、会話と軽量はモデルの既定（`gemini-3.5-flash-lite` は `minimal`）。不正な値は無視して未設定時の値を使う。2.5 系のモデルには渡さない（`thinking_budget=0` を使う）。 |
 | `GEMINI_API_MAX_RETRIES` | Gemini SDK 内のリトライ回数。既定は 1。 |
 | `GEMINI_API_TIMEOUT` | Gemini API のタイムアウト秒数。既定は 30。 |
 

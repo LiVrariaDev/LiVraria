@@ -132,9 +132,60 @@ LLM_ROLES = ("chat", "summary", "light")
 DEFAULT_GEMINI_MODELS = {
 	"chat": "gemini-3.5-flash-lite",
 	"summary": "gemini-4-hydrogen",
-	"light": "gemini-2.5-flash-lite",
+	"light": "gemini-3.5-flash-lite",
 }
 MODEL_ENV = {"chat": "GEMINI_CHAT_MODEL", "summary": "GEMINI_SUMMARY_MODEL", "light": "GEMINI_LIGHT_MODEL"}
+
+# サンプリングの値が固定されているモデル（langchain-google-genai の一覧と同じ）。
+# temperature を渡すと「uses fixed sampling defaults」の UserWarning が出て、値は無視される。
+FIXED_SAMPLING_MODELS = frozenset({
+	"gemini-3.5-flash-lite",
+	"gemini-3.6-flash",
+	"gemini-4-carbon",
+	"gemini-4-hydrogen",
+	"gemini-4-neon",
+})
+
+
+# 思考の段階（Gemini 3 以降の thinking_level）。None はモデルの既定のまま（引数を渡さない）。
+# - summary（gemini-4-hydrogen）: low。このモデルは minimal に対応していない
+# - chat / light（gemini-3.5-flash-lite）: 指定しない。このモデルの既定は minimal
+THINKING_LEVELS = ("minimal", "low", "medium", "high", "xhigh")
+DEFAULT_THINKING_LEVELS = {"chat": None, "summary": "low", "light": None}
+THINKING_ENV = {"chat": "GEMINI_CHAT_THINKING", "summary": "GEMINI_SUMMARY_THINKING", "light": "GEMINI_LIGHT_THINKING"}
+_GEMINI_MAJOR_VERSION = re.compile(r"gemini-(\d+)")
+
+
+def get_thinking_level(role: str) -> Optional[str]:
+	"""役割に対応する thinking_level を返す。環境変数があればそれを優先する。
+
+	環境変数に "default" を指定すると、役割の既定値も使わずモデルの既定に任せる（None）。
+	不正な値は警告を出して役割の既定値を使う。
+	"""
+	if role not in LLM_ROLES:
+		raise ValueError(f"Unknown LLM role: {role}")
+	raw = (os.getenv(THINKING_ENV[role]) or "").strip().lower()
+	if not raw:
+		return DEFAULT_THINKING_LEVELS[role]
+	if raw == "default":
+		return None
+	if raw not in THINKING_LEVELS:
+		logger.warning("[WARNING] Unknown %s=%r, using %r", THINKING_ENV[role], raw, DEFAULT_THINKING_LEVELS[role])
+		return DEFAULT_THINKING_LEVELS[role]
+	return raw
+
+
+def is_gemini_3_or_later(model_name: str) -> bool:
+	"""thinking_level を使える Gemini 3 以降のモデルか（2.5 系は thinking_budget を使う）。"""
+	match = _GEMINI_MAJOR_VERSION.search(model_name.lower())
+	return bool(match) and int(match.group(1)) >= 3
+
+
+def uses_fixed_sampling(model_name: str) -> bool:
+	"""temperature を渡してはいけないモデルか。"models/..." の接頭辞と "-001" のような版の接尾辞は無視する。"""
+	name = model_name.lower().rsplit("/", 1)[-1]
+	name = re.sub(r"-\d{3}$", "", name)
+	return name in FIXED_SAMPLING_MODELS
 
 
 def get_gemini_model(role: str) -> str:
@@ -165,16 +216,20 @@ def get_llm(role: str = "chat", backend: Optional[str] = None, temperature: floa
 		model_name = get_gemini_model(role)
 		kwargs = {
 			"model": model_name,
-			"temperature": temperature,
 			"max_tokens": max_tokens,
 			"google_api_key": os.getenv("GEMINI_API_KEY"),
 			# SDK 内のリトライが多いと、429 のとき端末が長く固まる
 			"max_retries": int(os.getenv("GEMINI_API_MAX_RETRIES", "1")),
 			"timeout": float(os.getenv("GEMINI_API_TIMEOUT", "30")),
 		}
+		if not uses_fixed_sampling(model_name):
+			kwargs["temperature"] = temperature
+		thinking_level = get_thinking_level(role)
+		if thinking_level and is_gemini_3_or_later(model_name):
+			kwargs["thinking_level"] = thinking_level
 		if model_name.startswith("gemini-2.5-"):
 			# 2.5 系の動的思考が出力枠を使い切り、最終テキストが
-			# 空になることを防ぐ。それ以外のモデルには思考関連の引数を渡さない。
+			# 空になることを防ぐ。Gemini 3 以降は thinking_budget ではなく上の thinking_level を使う。
 			kwargs["thinking_budget"] = 0
 		return ChatGoogleGenerativeAI(**kwargs)
 	else:  # ollama
