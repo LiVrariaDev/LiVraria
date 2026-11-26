@@ -32,10 +32,13 @@ def verify_device_key(x_device_key: str = Header(default="")) -> None:
 	端末共有キー（X-Device-Key ヘッダー）を検証する。
 	NFC ログインのように Firebase トークンを持たない段階の API を、
 	登録済みの端末以外から呼べないようにするために使う。
+
+	LIVRARIA_DEVICE_KEY が空なら確認せずに通す（応急対応。会場の LAN が閉じている前提で、
+	どの端末からでも呼べる。起動時に警告を出す）。設定されていて値が違うときは 403。
 	"""
 	expected = os.getenv("LIVRARIA_DEVICE_KEY", "")
 	if not expected:
-		raise HTTPException(status_code=503, detail="NFC login is disabled: LIVRARIA_DEVICE_KEY is not set on the server")
+		return
 	if not hmac.compare_digest(x_device_key.encode(), expected.encode()):
 		raise HTTPException(status_code=403, detail="Unknown device")
 

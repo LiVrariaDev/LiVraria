@@ -73,20 +73,59 @@ def test_unknown_mode_is_rejected(client):
 	assert client.post("/sessions/new/messages?mode=librarian", json={"message": "hi"}).status_code == 400
 
 
-def test_nfc_auth_requires_device_key(client, monkeypatch):
+def _nfc_auth(client, headers=None):
+	return client.post("/nfc/auth", json={"nfc_id": "CARD1"}, headers=headers or {})
+
+
+@pytest.fixture
+def nfc_card(client, monkeypatch):
 	client.store.register_nfc("CARD1", "alice")
-
-	monkeypatch.delenv("LIVRARIA_DEVICE_KEY", raising=False)
-	assert client.post("/nfc/auth", json={"nfc_id": "CARD1"}).status_code == 503
-
-	monkeypatch.setenv("LIVRARIA_DEVICE_KEY", "kiosk-secret")
-	assert client.post("/nfc/auth", json={"nfc_id": "CARD1"}).status_code == 403
-	assert client.post("/nfc/auth", json={"nfc_id": "CARD1"}, headers={"X-Device-Key": "wrong"}).status_code == 403
-
 	monkeypatch.setattr(server_module.auth, "create_custom_token", lambda uid: b"token-" + uid.encode())
-	response = client.post("/nfc/auth", json={"nfc_id": "CARD1"}, headers={"X-Device-Key": "kiosk-secret"})
+	return client
+
+
+@pytest.mark.parametrize("headers", [None, {"X-Device-Key": "anything"}])
+def test_nfc_auth_without_device_key_skips_check(nfc_card, monkeypatch, headers):
+	"""LIVRARIA_DEVICE_KEY が空なら、端末共有キーを確認せずに通す（ヘッダーの有無・値は問わない）。"""
+	monkeypatch.setenv("LIVRARIA_DEVICE_KEY", "")
+	response = _nfc_auth(nfc_card, headers)
 	assert response.status_code == 200
 	assert response.json() == {"custom_token": "token-alice", "user_id": "alice"}
+
+	monkeypatch.delenv("LIVRARIA_DEVICE_KEY", raising=False)
+	assert _nfc_auth(nfc_card, headers).status_code == 200
+
+
+def test_nfc_auth_with_matching_device_key(nfc_card, monkeypatch):
+	monkeypatch.setenv("LIVRARIA_DEVICE_KEY", "kiosk-secret")
+	response = _nfc_auth(nfc_card, {"X-Device-Key": "kiosk-secret"})
+	assert response.status_code == 200
+	assert response.json() == {"custom_token": "token-alice", "user_id": "alice"}
+
+
+@pytest.mark.parametrize("headers", [None, {"X-Device-Key": ""}, {"X-Device-Key": "wrong"}])
+def test_nfc_auth_with_wrong_device_key_is_forbidden(nfc_card, monkeypatch, headers):
+	monkeypatch.setenv("LIVRARIA_DEVICE_KEY", "kiosk-secret")
+	assert _nfc_auth(nfc_card, headers).status_code == 403
+
+
+def test_nfc_auth_unknown_card_is_404_without_device_key(nfc_card, monkeypatch):
+	monkeypatch.delenv("LIVRARIA_DEVICE_KEY", raising=False)
+	response = nfc_card.post("/nfc/auth", json={"nfc_id": "UNKNOWN"})
+	assert response.status_code == 404
+
+
+@pytest.mark.parametrize("key, warned", [("", True), ("kiosk-secret", False)])
+def test_startup_warns_once_when_device_key_is_empty(monkeypatch, caplog, key, warned):
+	monkeypatch.setenv("LIVRARIA_DEVICE_KEY", key)
+	monkeypatch.setattr(server_module.server, "data_store", DataStore())
+	with caplog.at_level("WARNING", logger="uvicorn.error"):
+		with TestClient(server_module.app):
+			pass
+	messages = [r.getMessage() for r in caplog.records if "LIVRARIA_DEVICE_KEY is not set" in r.getMessage()]
+	assert len(messages) == (1 if warned else 0)
+	if warned:
+		assert "NFC login can be called from any device" in messages[0]
 
 
 def test_semantic_search_uses_extracted_keywords(client, monkeypatch):
