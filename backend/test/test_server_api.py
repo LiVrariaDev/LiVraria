@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage, HumanMessage
 
+import backend.api.datastore as datastore_module
 import backend.api.routers.search as search_router
 import backend.api.server as server_module
 from backend import DATA_DIR
@@ -24,6 +25,8 @@ def client(monkeypatch):
 		return f"echo:{message}", new_history, [], "neutral"
 
 	monkeypatch.setattr(server_module, "llm_chat", fake_llm_chat)
+	# ログアウトで始まる要約も差し替え、実際の Gemini を呼ばない
+	monkeypatch.setattr(datastore_module, "summary_function", lambda *a, **k: "<summary>要約</summary>")
 	current = {"uid": "alice"}
 	server_module.app.dependency_overrides[get_current_user_id] = lambda: current["uid"]
 	with TestClient(server_module.app) as test_client:
