@@ -16,7 +16,7 @@
     "firebase": "^12.19.0",
     "mermaid": "^12.3.0",
     "qrcode": "^1.5.4",
-    "vue": "^3.5.45"
+    "vue": "^3.5.46"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.5",
