@@ -22,6 +22,8 @@ CRD_RESULTS_NUM = 5
 CRD_PROCESS_MAX_CHARS = 150
 CRD_QUESTION_MAX_CHARS = 80
 CRD_CACHE_LIMIT = 256
+# 検索する項目。question は質問文だけ、anywhere は回答・回答プロセス・キーワードなども含む全体
+CRD_FIELDS = ("question", "anywhere")
 
 _cache: dict[str, list[dict]] = {}
 _cache_lock = threading.Lock()
@@ -36,11 +38,13 @@ def _truncate(text: str, limit: int) -> str:
 	return text if len(text) <= limit else text[:limit].rstrip() + "…"
 
 
-def build_query(words: list[str]) -> str:
-	"""質問文にすべての語を含む事例を探す CQL を作る。語の中の " は取り除く。"""
+def build_query(words: list[str], field: str = "question") -> str:
+	"""field（question / anywhere）にすべての語を含む事例を探す CQL を作る。語の中の " は取り除く。"""
+	if field not in CRD_FIELDS:
+		raise ValueError(f"Unknown CRD field: {field}")
 	cleaned = [w.replace('"', "").strip() for w in words]
 	cleaned = [w for w in cleaned if w]
-	return f'question all "{" ".join(cleaned)}"'
+	return f'{field} all "{" ".join(cleaned)}"'
 
 
 def parse_response(xml_text: str, limit: int = CRD_RESULTS_NUM) -> list[dict]:
@@ -61,8 +65,10 @@ def parse_response(xml_text: str, limit: int = CRD_RESULTS_NUM) -> list[dict]:
 	return hints
 
 
-def search_crd_hints(words: list[str], limit: int = CRD_RESULTS_NUM) -> list[dict]:
+def search_crd_hints(words: list[str], limit: int = CRD_RESULTS_NUM, field: str = "question") -> list[dict]:
 	"""語のリストで公共図書館の事例を検索し、手がかりのリストを返す。
+
+	field は検索する項目（"question": 質問文、"anywhere": 事例全体）。
 
 	0件・失敗・タイムアウトのときは空のリストを返す（呼び出し側はそのまま先へ進めばよい）。
 	成功した結果は同じ検索語ごとにメモリにキャッシュする（失敗はキャッシュしない）。
@@ -70,14 +76,14 @@ def search_crd_hints(words: list[str], limit: int = CRD_RESULTS_NUM) -> list[dic
 	words = [w.strip() for w in words if w and w.strip()]
 	if not words:
 		return []
-	key = " ".join(words)
+	key = f"{field}:{' '.join(words)}"
 	with _cache_lock:
 		if key in _cache:
 			return list(_cache[key])
 
 	params = {
 		"type": "reference",
-		"query": build_query(words),
+		"query": build_query(words, field),
 		"lib-group": "public",
 		"results_num": limit,
 		"sort": "fit",

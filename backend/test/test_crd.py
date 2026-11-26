@@ -51,6 +51,23 @@ def clean_cache():
 def test_build_query():
 	assert crd.build_query(["猫", "小説"]) == 'question all "猫 小説"'
 	assert crd.build_query(['a"b', " ", "c"]) == 'question all "ab c"'
+	assert crd.build_query(["ぐりとぐら"], field="anywhere") == 'anywhere all "ぐりとぐら"'
+	with pytest.raises(ValueError):
+		crd.build_query(["猫"], field="answer")
+
+
+def test_search_anywhere_is_cached_separately(monkeypatch):
+	queries = []
+
+	def fake_get(url, params=None, timeout=None):
+		queries.append(params["query"])
+		return _Response(SAMPLE_XML)
+
+	monkeypatch.setattr(crd.requests, "get", fake_get)
+	crd.search_crd_hints(["猫"])
+	crd.search_crd_hints(["猫"], field="anywhere")
+	crd.search_crd_hints(["猫"], field="anywhere")
+	assert queries == ['question all "猫"', 'anywhere all "猫"']
 
 
 def test_parse_response_extracts_hints_only():

@@ -104,7 +104,7 @@ def v2_env(monkeypatch):
 	llm_usage.reset()
 	crd.clear_cache()
 	# 既定ではレファ協は0件にしておく（個別のテストで差し替える）
-	monkeypatch.setattr(graph_v2.crd, "search_crd_hints", lambda words, limit=5: [])
+	monkeypatch.setattr(graph_v2.crd, "search_crd_hints", lambda words, limit=5, field="question": [])
 	yield
 	crd.clear_cache()
 
@@ -255,16 +255,35 @@ def test_refine_excludes_previous_picks(monkeypatch, rakuten):
 	assert state["last_picks"][0]["title"] == "本2"
 
 
-def test_lookup_title_skips_crd(monkeypatch, rakuten):
-	monkeypatch.setattr(graph_v2.crd, "search_crd_hints", lambda *a, **k: pytest.fail("crd should not be called"))
+def test_lookup_title_uses_crd_anywhere_with_mentioned_books(monkeypatch, rakuten):
+	hints = [{"question": "青い鳥が出てくる絵本", "keywords": ["青い鳥"], "ndc": ["726"], "process": "回答に書名あり"}]
+	seen = []
+	monkeypatch.setattr(graph_v2.crd, "search_crd_hints",
+	                    lambda words, limit=5, field="question": seen.append((words, field)) or hints)
 	rakuten.results["青い鳥"] = [book(1)]
 	fakes = FakeLLMs(
-		UnderstandOutput=[understood("lookup_title", mentioned_books=["青い鳥"])],
+		UnderstandOutput=[understood("lookup_title", interests=["鳥"], mentioned_books=["青い鳥", "森の小人", "三冊目"])],
 		PlanOutput=[plan_of(["青い鳥"])],
 		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "書名が一致"}], response="この本でしょうか。")],
 	)
 	text, _history, books, _expression = run(fakes, monkeypatch, "青い鳥がどうとかいう本", state={})
+
 	assert text == "この本でしょうか。" and books[0]["title"] == "本1"
+	# 興味ではなく会話に出た本の言葉（先頭2つ）で、事例全体を検索する
+	assert seen == [(["青い鳥", "森の小人"], "anywhere")]
+	assert "回答に書名あり" in fakes.calls[1][2][0].content  # 手がかりは検索方針に渡る
+
+
+def test_lookup_title_without_mentioned_books_skips_crd(monkeypatch, rakuten):
+	monkeypatch.setattr(graph_v2.crd, "search_crd_hints", lambda *a, **k: pytest.fail("crd should not be called"))
+	rakuten.results["鳥"] = [book(1)]
+	fakes = FakeLLMs(
+		UnderstandOutput=[understood("lookup_title", interests=["鳥"])],
+		PlanOutput=[plan_of(["鳥"])],
+		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "a"}])],
+	)
+	_text, _history, books, _expression = run(fakes, monkeypatch, "鳥の本の題名が思い出せない", state={})
+	assert books[0]["title"] == "本1"
 
 
 # ---------------------------------------------------------------------------
@@ -381,7 +400,7 @@ def test_crd_problems_still_reach_select(monkeypatch, rakuten, make_get):
 def test_crd_hints_are_passed_to_plan_only(monkeypatch, rakuten):
 	hints = [{"question": "猫の小説", "keywords": ["猫", "日本の小説"], "ndc": ["913"], "process": "件名で検索"}]
 	seen = []
-	monkeypatch.setattr(graph_v2.crd, "search_crd_hints", lambda words, limit=5: seen.append(words) or hints)
+	monkeypatch.setattr(graph_v2.crd, "search_crd_hints", lambda words, limit=5, field="question": seen.append((words, field)) or hints)
 	rakuten.results["猫"] = [book(1)]
 	fakes = FakeLLMs(
 		UnderstandOutput=[understood("ready", interests=["猫", "冬"])],
@@ -390,7 +409,7 @@ def test_crd_hints_are_passed_to_plan_only(monkeypatch, rakuten):
 	)
 	text, _h, _b, _e = run(fakes, monkeypatch, "猫の本", state={})
 
-	assert seen == [["猫", "冬"]]
+	assert seen == [(["猫", "冬"], "question")]  # 探せる・条件の変更は興味で質問文を検索する
 	plan_system = fakes.calls[1][2][0].content
 	assert "日本の小説" in plan_system and "913" in plan_system and "件名で検索" in plan_system
 	select_messages = "".join(m.content for m in fakes.calls[2][2])
@@ -577,7 +596,7 @@ def test_trace_records_path_profile_and_crd_hints(monkeypatch, rakuten):
 	monkeypatch.setattr(server_module.server, "data_store", store)
 	store.create_user("alice", Personal(name="alice", gender="other", age=20))
 	hints = [{"question": "猫の小説", "keywords": ["猫"], "ndc": ["913"], "process": "件名で検索"}]
-	monkeypatch.setattr(graph_v2.crd, "search_crd_hints", lambda words, limit=5: hints)
+	monkeypatch.setattr(graph_v2.crd, "search_crd_hints", lambda words, limit=5, field="question": hints)
 	rakuten.results["猫"] = [book(1)]
 	fakes = FakeLLMs(
 		UnderstandOutput=[understood("ready", interests=["猫"])],

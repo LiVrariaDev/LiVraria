@@ -52,7 +52,7 @@ PROFILE_TEXT_LIMIT = 40
 
 INTENTS = ("chit_chat", "need_more", "ready", "ask_book", "refine", "lookup_title")
 SEARCH_INTENTS = ("ready", "refine", "lookup_title")
-CRD_INTENTS = ("ready", "refine")
+CRD_INTENTS = ("ready", "refine", "lookup_title")
 SLOTS = ("ど真ん中", "少し外す", "意外な1冊")
 
 MESSAGE_NO_CANDIDATES = "ごめんなさい、今の条件では本が見つかりませんでした。言葉を変えて、もう少し教えていただけますか。"
@@ -439,13 +439,22 @@ def _make_nodes(options: _Options):
 		        "path": [*state.get("path", []), "interview"]}
 
 	def crd_node(state: V2State) -> dict:
-		"""④a レファ協の事例から手がかりを取り出す（ready / refine のときだけ）。失敗しても先へ進む。"""
+		"""④a レファ協の事例から手がかりを取り出す（ready / refine / lookup_title のとき）。失敗しても先へ進む。
+
+		ready / refine は興味（なければ気分）で質問文を検索する。lookup_title は会話に出た本の言葉で
+		事例全体（anywhere）を検索する（書名は回答や回答プロセスに書かれていることが多いため）。
+		"""
 		started = datetime.now()
 		hints: List[dict] = []
-		if state.get("intent") in CRD_INTENTS:
+		intent = state.get("intent")
+		if intent in CRD_INTENTS:
 			profile = normalize_profile(state.get("profile"))
-			words = profile.interests[:2] or ([profile.mood] if profile.mood else [])
-			hints = crd.search_crd_hints(words)[:CRD_HINT_LIMIT]
+			if intent == "lookup_title":
+				words, field = profile.mentioned_books[:2], "anywhere"
+			else:
+				words, field = (profile.interests[:2] or ([profile.mood] if profile.mood else [])), "question"
+			if words:
+				hints = crd.search_crd_hints(words, field=field)[:CRD_HINT_LIMIT]
 		_trace_step("crd", started, results=[{"name": "crd", "content": json.dumps(hints, ensure_ascii=False)}])
 		return {"crd_hints": hints, "path": [*state.get("path", []), "crd"]}
 
