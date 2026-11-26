@@ -25,6 +25,7 @@ cp .env.template .env
 | `GEMINI_LIGHT_MODEL` | キーワード抽出などの軽量処理用モデル。既定は `gemini-2.5-flash-lite`。 |
 | `GEMINI_API_MAX_RETRIES` | Gemini SDK 内のリトライ回数。既定は 1。 |
 | `GEMINI_API_TIMEOUT` | Gemini API のタイムアウト秒数。既定は 30。 |
+| `LIVRARIA_GRAPH` | 会話グラフの版。`v1` は今のグラフ（`backend/api/llm.py`）、`v2` は理解→振り分け→聞き取り／検索方針→検索→選書の新しいグラフ（`backend/api/graph_v2.py`、プロンプトは `backend/api/prompts/v2/`）。未設定や不正な値のときは `v1`。 |
 
 サービスアカウント鍵の実ファイルはリポジトリ外で管理する。相対パスを指定する場合は、バックエンドをリポジトリルートから起動する前提で解決される。
 
@@ -77,7 +78,7 @@ python -m backend.tools.demo_account set-insights <user_id> <file>
 
 ## 現行の外部サービス
 
-LLM は Gemini を利用する。`backend/api/llm.py` は、会話・要約・軽量処理の役割ごとに Gemini のモデルを選ぶ（上記の環境変数）。書籍検索は楽天ブックス API、公共図書館の蔵書確認はカーリル、大学図書館の所蔵検索は CiNii Books を利用する。Google Books 向けの実装もリポジトリには存在するが、現行運用の対象ではない。
+LLM は Gemini を利用する。`backend/api/llm.py` は、会話・要約・軽量処理の役割ごとに Gemini のモデルを選ぶ（上記の環境変数）。書籍検索は楽天ブックス API、会話グラフ v2 の検索方針の参考にレファレンス協同データベース（レファ協）API、公共図書館の蔵書確認はカーリル、大学図書館の所蔵検索は CiNii Books を利用する。Google Books 向けの実装もリポジトリには存在するが、現行運用の対象ではない。
 
 ## 本番公開時の設定
 

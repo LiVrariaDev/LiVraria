@@ -442,6 +442,18 @@ def get_graph_mermaid() -> str:
 
 # Chat Functions
 
+GRAPH_VERSIONS = ("v1", "v2")
+
+
+def get_graph_version() -> str:
+	"""LIVRARIA_GRAPH の値（"v1" / "v2"）。未設定や不正な値なら v1。"""
+	value = (os.getenv("LIVRARIA_GRAPH") or "v1").strip().lower()
+	if value not in GRAPH_VERSIONS:
+		logger.warning("[WARNING] Unknown LIVRARIA_GRAPH=%r, using v1", value)
+		return "v1"
+	return value
+
+
 def llm_chat(
 	prompt_file: str,
 	message: str,
@@ -467,6 +479,12 @@ def llm_chat(
 	Returns:
 		(応答テキスト, 更新された履歴(List[BaseMessage]), 推薦された書籍リスト)
 	"""
+	if get_graph_version() == "v2":
+		# v2 は graph_v2.py にまとめている。プロンプトは prompts/v2/ を使い、prompt_file は使わない
+		from backend.api.graph_v2 import llm_chat_v2
+		return llm_chat_v2(message, history, ai_insight=ai_insight, model=model,
+		                   temperature=temperature, conversation_state=conversation_state)
+
     # ローカルステート初期化 (スレッドセーフかつ複数回検索に対応)
 	search_results_state = {}     # 全検索結果の累積 (ID -> BookDict)
 	recommended_books_state = []  # 推薦された本のリスト
