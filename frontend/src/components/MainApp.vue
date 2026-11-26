@@ -120,10 +120,6 @@
                 </div>
 
                 <div class="flex space-x-[0.5vw] items-center justify-end flex-1">
-                     <button @click="openSecondaryDisplay" class="flex items-center px-[2.2vw] py-[2vh] bg-[#0B1026]/70 backdrop-blur-md hover:bg-[#0B1026]/80 text-cyan-300 font-bold rounded-[1.2vw] transition-all duration-300 border-2 border-cyan-400/40 hover:border-cyan-400 hover:shadow-[0_0_15px_rgba(34,211,238,0.4)] text-[1.4vw]">
-                        動画ウィンドウ
-                     </button>
-
                      <button @click="toggleSpeech" class="flex items-center px-[2.2vw] py-[2vh] bg-[#0B1026]/70 backdrop-blur-md hover:bg-[#0B1026]/80 text-indigo-200 font-bold rounded-[1.2vw] transition-all duration-300 border-2 border-indigo-400/40 hover:border-indigo-400 hover:shadow-[0_0_15px_rgba(129,140,248,0.4)] text-[1.4vw]" :class="{'text-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.2)] border-cyan-400/50': isSpeechEnabled}">
                         <span v-if="isSpeechEnabled">読み上げ ON</span>
                         <span v-else>読み上げ OFF</span>
@@ -168,9 +164,6 @@
                     <h1 class="text-xl font-bold text-slate-700">会話集中モード</h1>
                 </div>
                 <div class="flex space-x-3">
-                    <button @click="openSecondaryDisplay" class="flex items-center bg-teal-50 hover:bg-teal-100 text-teal-700 font-semibold py-2 px-4 rounded-lg transition-colors border border-teal-200">
-                         <span>動画ウィンドウ</span>
-                    </button>
                     <button @click="currentPage = 'home'" class="flex items-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">
                         <span>ホームへ</span>
                     </button>
@@ -185,6 +178,7 @@
                             <div class="max-w-[80%] rounded-2xl px-6 py-4 shadow-sm text-base leading-relaxed" 
                                  :class="msg.sender === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-slate-100 text-slate-800 rounded-bl-none border border-slate-200'">
                                 <p>{{ msg.text }}</p>
+                                <p v-if="msg.traceId" class="mt-1 text-xs text-slate-400">trace: {{ msg.traceId.slice(0, 8) }}</p>
                             </div>
                         </div>
                         <div v-if="isLoading" class="flex justify-start">
@@ -340,6 +334,7 @@ import { api } from '../services/api';
 import { isRaspiTtsAvailable, speakOnRaspi } from '../services/nfc';
 import BookSearch from './BookSearch.vue';
 import MemberInfoPage from './MemberInfoPage.vue'; 
+import { getDisplaySender } from '../services/displayChannel';
 
 const handleImageError = () => {
     alert("【画像読み込みエラー】\n publicフォルダに 'bg.jpg' が見つかりません。");
@@ -451,7 +446,6 @@ const icons = {
 const currentPage = ref('home');
 const userInput = ref('');
 const isLoading = ref(false);
-const secondaryWindow = ref(null);
 const currentSessionId = ref(null); 
 const mainButtons = ref([ 
     { id: 1, text: '書籍検索', action: 'search', icon: 'search' }, 
@@ -466,22 +460,11 @@ const suggestedBooks = ref([]);
 const selectedBook = ref(null);
 const chatHistoryEl = ref(null);
 
-const channel = new BroadcastChannel('livraria_channel'); 
-
-const openSecondaryDisplay = () => {
-    if (secondaryWindow.value && !secondaryWindow.value.closed) {
-        secondaryWindow.value.focus();
-        return;
-    }
-    const leftPosition = window.screen.width; 
-    const width = window.screen.availWidth;
-    const height = window.screen.availHeight;
-    const features = `left=${leftPosition},top=0,width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no`;
-    secondaryWindow.value = window.open('/?view=secondary', 'LivrariaSecondaryDisplay', features);
-};
-
 const sendMessageToSecondary = (text, state = 'speaking') => {
-    channel.postMessage({ type: 'chat', text, state });
+    const sender = getDisplaySender();
+    if (state === 'thinking') sender.thinking();
+    else if (state === 'idle') sender.idle();
+    else sender.speak(text ?? '', state);
 };
 
 const handleHomeButtonClick = (action) => {
@@ -545,6 +528,7 @@ const sendHomeMessage = async () => {
         const data = await api.sendMessage(currentSessionId.value, message, token, 'default');
         
         if (data.session_id) currentSessionId.value = data.session_id;
+        if (data.trace_id) console.info('[LiVraria] trace_id', data.trace_id);
         
         const aiResponse = data.response || data.reply || data.message || '';
         // 2. 受信時：表情フラグと回答を送信
@@ -590,12 +574,13 @@ const sendChatMessage = async () => {
         const data = await api.sendMessage(currentSessionId.value, message, token, 'default');
         
         if (data.session_id) currentSessionId.value = data.session_id;
+        if (data.trace_id) console.info('[LiVraria] trace_id', data.trace_id);
         
         const aiResponse = data.response || data.reply || data.message || '';
         let expression = data.expression || 'neutral';
         if (expression === 'none') expression = 'neutral';
         
-        chatHistory.value.push({ sender: 'ai', text: aiResponse });
+        chatHistory.value.push({ sender: 'ai', text: aiResponse, traceId: data.failed ? data.trace_id : undefined });
         speakText(aiResponse);
         sendMessageToSecondary(aiResponse, expression);
 
@@ -681,12 +666,13 @@ const askAboutBookFromModal = async () => {
         const data = await api.sendMessage(currentSessionId.value, question, token, 'default');
         
         if (data.session_id) currentSessionId.value = data.session_id;
+        if (data.trace_id) console.info('[LiVraria] trace_id', data.trace_id);
         
         const aiResponse = data.response || data.reply || data.message || '';
         let expression = data.expression || 'neutral';
         if (expression === 'none') expression = 'neutral';
         
-        chatHistory.value.push({ sender: 'ai', text: aiResponse });
+        chatHistory.value.push({ sender: 'ai', text: aiResponse, traceId: data.failed ? data.trace_id : undefined });
         speakText(aiResponse);
         sendMessageToSecondary(aiResponse, expression);
         
@@ -790,8 +776,6 @@ const toggleSpeechRecognition = () => {
 };
 
 onMounted(async () => {
-    // OSコマンドで開く場合は自動オープンしない
-    // openSecondaryDisplay(); 
     loadVoices();
     setTimeout(loadVoices, 500);
     useRaspiTts.value = await isRaspiTtsAvailable();
@@ -799,7 +783,6 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-    channel.close();
     if (recognition && isRecording.value) recognition.stop();
     window.speechSynthesis.cancel();
 });

@@ -1,0 +1,25 @@
+[Unit]
+Description=LiVraria Backend (FastAPI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# 実行ユーザーとパスはサーバーに合わせて書き換える(livraria と /home/livraria/LiVraria は例)
+User=livraria
+# リポジトリのルート。backend/__init__.py が直下の .env を読み、
+# FIREBASE_ACCOUNT_KEY_PATH の相対パスもルートを基準に解決されるため
+WorkingDirectory=/home/livraria/LiVraria
+# --workers は必ず 1 にする。会話中の履歴とロックをプロセスのメモリに持っているため。--reload は付けない
+ExecStart=/home/livraria/LiVraria/backend/.venv/bin/python -m uvicorn backend.api.server:app --host 0.0.0.0 --port 8000 --workers 1
+Restart=always
+RestartSec=10
+# 終了時にセッションの要約と保存を行うため(server.py の lifespan)、停止の猶予を長めに取る
+TimeoutStopSec=60
+
+StandardOutput=journal
+StandardError=journal
+Environment="PYTHONUNBUFFERED=1"
+
+[Install]
+WantedBy=multi-user.target

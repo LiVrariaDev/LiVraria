@@ -25,59 +25,61 @@ echo "Starting Livraria..."
 # マウスカーソルを消す (unclutterがインストールされていれば)
 # unclutter -idle 0.1 -root &
 
-# 1. メイン画面 (操作用) のみを起動
-# ログイン後、JavaScriptでSecondaryディスプレイが自動的に開かれる
+# メインとサブは BroadcastChannel で通信するため、同じプロファイルで起動する
+PROFILE_DIR="/tmp/chrome_livraria_profile"
+MAX_WAIT=30  # ウィンドウ検出の最大待ち秒数
+
+# place_window <タイトル> <x> <最大待ち秒>
+# タイトルのウィンドウを探し、指定位置へ移動してフルスクリーン化する
+place_window() {
+    local title="$1" x="$2" max_wait="$3"
+    local id="" counter=0
+
+    while [ "$counter" -lt "$max_wait" ]; do
+        id=$(wmctrl -l | grep "$title" | awk '{print $1}' | head -n 1)
+        if [ -n "$id" ]; then
+            sleep 0.5  # ウィンドウが完全に表示されるまで少し待つ
+            wmctrl -i -r "$id" -e 0,"$x",0,-1,-1
+            wmctrl -i -r "$id" -b add,fullscreen
+            echo "Window '$title' placed at x=$x and set to fullscreen."
+            return 0
+        fi
+        sleep 1
+        counter=$((counter + 1))
+    done
+
+    echo "Warning: Window '$title' not detected within ${max_wait}s."
+    return 1
+}
+
+# 1. メイン画面 (操作用)
 chromium \
   --app="$SERVER_URL" \
   --window-position=0,0 \
   --force-device-scale-factor=0.8 \
   --autoplay-policy=no-user-gesture-required \
   --ozone-platform=x11 \
-  --user-data-dir="/tmp/chrome_main_profile" \
+  --user-data-dir="$PROFILE_DIR" \
   --touch-events=enabled \
   --disable-touch-drag-drop \
   --unsafely-treat-insecure-origin-as-secure="$SERVER_URL" \
   --overscroll-history-navigation=0 &
 
-echo "Main display launched. Waiting for login and secondary window..."
+echo "Main display launched."
+sleep 3
 
-# 2. Mainもフルスクリーン化
-sleep 5
-MAIN_ID=$(wmctrl -l | grep "LiVraria Main" | awk '{print $1}')
-if [ -n "$MAIN_ID" ]; then
-    wmctrl -i -r "$MAIN_ID" -e 0,0,0,-1,-1
-    wmctrl -i -r "$MAIN_ID" -b add,fullscreen
-    echo "Main display set to fullscreen."
-else
-    echo "Warning: Main display window not found."
-fi
+# 2. サブ画面 (同じプロファイルへ新しいウィンドウとして渡される)
+chromium \
+  --app="$SERVER_URL/?view=secondary" \
+  --user-data-dir="$PROFILE_DIR" \
+  --autoplay-policy=no-user-gesture-required \
+  --ozone-platform=x11 \
+  --unsafely-treat-insecure-origin-as-secure="$SERVER_URL" &
 
-# 3. Secondaryウィンドウが開くまで待機（busy wait）
-MAX_WAIT=300  # 最大5分待機
-COUNTER=0
+echo "Secondary display launched."
 
-while [ $COUNTER -lt $MAX_WAIT ]; do
-    # "Secondary Display" というタイトルのウィンドウを検索
-    SEC_ID=$(wmctrl -l | grep "Secondary Display" | awk '{print $1}')
-    
-    if [ -n "$SEC_ID" ]; then
-        echo "Secondary display detected: $SEC_ID"
-        
-        # 4. Secondaryを右ディスプレイに移動してフルスクリーン化
-        sleep 0.5  # ウィンドウが完全に表示されるまで少し待つ
-        wmctrl -i -r "$SEC_ID" -e 0,$PRIMARY_WIDTH,0,-1,-1
-        wmctrl -i -r "$SEC_ID" -b add,fullscreen
-        
-        echo "Secondary display moved to right screen and set to fullscreen."
-        break
-    fi
-    
-    sleep 1
-    COUNTER=$((COUNTER + 1))
-done
-
-if [ $COUNTER -eq $MAX_WAIT ]; then
-    echo "Warning: Secondary display not detected within timeout."
-fi
+# 3. ウィンドウを配置
+place_window "LiVraria Main" 0 "$MAX_WAIT"
+place_window "Secondary Display" "$PRIMARY_WIDTH" "$MAX_WAIT"
 
 echo "Livraria system is running."

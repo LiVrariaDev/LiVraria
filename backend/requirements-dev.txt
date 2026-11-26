@@ -8,21 +8,21 @@
 # Development Tools
 # ============================================================================
 # Debug & Logging
-rich==14.3.1  # Beautiful terminal output
-rich-toolkit==0.17.1  # Rich extensions
+rich==15.0.0  # Beautiful terminal output
+rich-toolkit==0.20.6  # Rich extensions
 
 # CLI Tools
-typer==0.21.1  # CLI application framework
+typer==0.29.2  # CLI application framework
 
 # FastAPI Development Tools
-fastapi-cli==0.0.20  # FastAPI CLI
+fastapi-cli==0.0.34  # FastAPI CLI
 
 # ============================================================================
 # Testing & Quality Assurance
 # ============================================================================
-# pytest==8.0.0  # Testing framework (add if needed)
+pytest  # Testing framework
 # pytest-asyncio==0.23.0  # Async testing
-# httpx==0.28.1  # Test client (already in dependencies)
+httpx  # FastAPI TestClient
 
 # ============================================================================
 # Monitoring & Debugging

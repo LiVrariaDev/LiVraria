@@ -1,6 +1,8 @@
 # Standard Library
 import os
 import re
+import traceback
+from datetime import datetime
 
 from typing import Optional, List, Dict, Any, TypedDict, Annotated, Sequence
 import logging
@@ -18,6 +20,9 @@ from langgraph.prebuilt import ToolNode
 # User-defined
 from backend import PROMPTS_DIR, LLM_MAX_RETRIES, LLM_HISTORY_LIMIT
 from backend.search.rakuten_books import rakuten_search_books
+from backend.api import llm_usage
+from backend.api.llm_usage import is_rate_limit_error
+from backend.api.trace_store import current_turn, TraceStep
 
 # Logger
 logger = logging.getLogger("uvicorn.error")
@@ -64,6 +69,45 @@ def contains_internal_response(text: str) -> bool:
 	"""モデル内部のツール／思考形式がテキストに混入したか判定する。"""
 	return bool(_INTERNAL_RESPONSE_PATTERN.search(text))
 
+
+# 利用者向けの失敗メッセージ（読み上げられるため、内部情報は含めない）。
+# 詳細はサーバーログに出力する。
+MESSAGE_INTERNAL_FORMAT = "申し訳ございません。応答の生成中にエラーが発生しました。もう一度お試しください。"
+MESSAGE_EMPTY_RESPONSE = "申し訳ございません。うまくお答えできませんでした。もう一度お話しいただけますか。"
+MESSAGE_EXCEPTION = "申し訳ございません。ただいま応答できません。少し時間をおいてお試しください。"
+MESSAGE_BUSY = "ただいま混雑しています。少し時間をおいてお試しください。"
+FALLBACK_MESSAGES = (MESSAGE_INTERNAL_FORMAT, MESSAGE_EMPTY_RESPONSE, MESSAGE_EXCEPTION, MESSAGE_BUSY)
+
+
+def select_expression(
+	response_text: str,
+	messages: Sequence[BaseMessage],
+	recommended_books: Sequence[dict],
+) -> str:
+	"""処理結果から暫定的な表情を決定する。"""
+	# TODO: 最終回答を軽量モデルで分類し、会話内容に応じた表情を選択する。
+	# Candidate: gemini-2.5-flash-lite
+	if response_text in FALLBACK_MESSAGES:
+		return "sorry"
+
+	search_messages = [
+		message
+		for message in messages
+		if isinstance(message, ToolMessage) and message.name == "search_books"
+	]
+	if any(
+		"見つかりませんでした" in str(message.content)
+		or "エラーが発生しました" in str(message.content)
+		for message in search_messages
+	):
+		return "sorry"
+
+	if recommended_books:
+		return "happy"
+	if search_messages:
+		return "thinking"
+	return "neutral"
+
 # LangChainのデバッグログを有効化（環境変数で制御）
 if os.getenv("LANGCHAIN_DEBUG", "false").lower() == "true":
 	import langchain
@@ -80,19 +124,31 @@ class AgentState(TypedDict):
 	recommended_books: List[dict]  # 推薦された書籍
 
 
-# グローバルステート（ツール間で共有）
-_global_state = {
-	"search_results": {},
-	"recommended_books": []
-}
-
 # LLM Initialization
 
-def get_llm(backend: str = None, temperature: float = 0.3, max_tokens: int = 1024, system_prompt: Optional[str] = None):
+LLM_ROLES = ("chat", "summary", "light")
+
+DEFAULT_GEMINI_MODELS = {
+	"chat": "gemini-3.5-flash-lite",
+	"summary": "gemini-4-hydrogen",
+	"light": "gemini-2.5-flash-lite",
+}
+MODEL_ENV = {"chat": "GEMINI_CHAT_MODEL", "summary": "GEMINI_SUMMARY_MODEL", "light": "GEMINI_LIGHT_MODEL"}
+
+
+def get_gemini_model(role: str) -> str:
+	"""役割に対応する Gemini のモデル名を返す。環境変数があればそれを優先する。"""
+	if role not in LLM_ROLES:
+		raise ValueError(f"Unknown LLM role: {role}")
+	return os.getenv(MODEL_ENV[role]) or DEFAULT_GEMINI_MODELS[role]
+
+
+def get_llm(role: str = "chat", backend: Optional[str] = None, temperature: float = 0.3, max_tokens: int = 1024, system_prompt: Optional[str] = None):
 	"""
 	LLMインスタンスを取得
 	
 	Args:
+		role: 用途（'chat' / 'summary' / 'light'）。Gemini のモデル選択に使う
 		backend: LLMバックエンド（'gemini' または 'ollama'）
 		temperature: 温度パラメータ
 		max_tokens: 最大トークン数
@@ -105,21 +161,20 @@ def get_llm(backend: str = None, temperature: float = 0.3, max_tokens: int = 102
 		backend = os.getenv("LLM_BACKEND", "gemini")
 	
 	if backend == "gemini":
-		# Geminiの場合、system_instructionとして渡す
+		model_name = get_gemini_model(role)
 		kwargs = {
-			"model": "gemini-2.5-flash",
+			"model": model_name,
 			"temperature": temperature,
 			"max_tokens": max_tokens,
-			# 2.5 Flash の動的思考が出力枠を使い切り、最終テキストが
-			# 空になることを防ぐ。雑談・書籍推薦では思考を必要としない。
-			"thinking_budget": 0,
-			"google_api_key": os.getenv("GEMINI_API_KEY")
+			"google_api_key": os.getenv("GEMINI_API_KEY"),
+			# SDK 内のリトライが多いと、429 のとき端末が長く固まる
+			"max_retries": int(os.getenv("GEMINI_API_MAX_RETRIES", "1")),
+			"timeout": float(os.getenv("GEMINI_API_TIMEOUT", "30")),
 		}
-		if system_prompt:
-			# LangChainのChatGoogleGenerativeAIはsystem_instructionをサポート
-			# ただし、メッセージとして渡す必要がある場合もあるため、
-			# ここでは含めずに、メッセージリストに追加する方式を採用
-			pass
+		if model_name.startswith("gemini-2.5-"):
+			# 2.5 系の動的思考が出力枠を使い切り、最終テキストが
+			# 空になることを防ぐ。それ以外のモデルには思考関連の引数を渡さない。
+			kwargs["thinking_budget"] = 0
 		return ChatGoogleGenerativeAI(**kwargs)
 	else:  # ollama
 		return ChatOllama(
@@ -128,118 +183,6 @@ def get_llm(backend: str = None, temperature: float = 0.3, max_tokens: int = 102
 			temperature=temperature,
 			num_predict=max_tokens
 		)
-
-
-# Tools Definition
-
-@tool
-def search_books(keywords: list[str], count: int = 30) -> str:
-	"""
-	楽天Books APIを使って書籍を検索
-	
-	検索結果は番号付きリストで返されます。
-	推薦する本を選ぶ際は、この番号を使用してください。
-	
-	Args:
-		keywords: 検索キーワードのリスト（例: ["SF", "初心者", "おすすめ"]）
-		count: 取得する書籍数（デフォルト: 10, 10冊以上を指定すること）
-		
-	Returns:
-		番号付き書籍リスト
-	"""
-	try:
-		logger.info(f"[DEBUG] search_books called with keywords: {keywords}, count: {count}")
-		
-		# キーワードのバリデーション
-		if not keywords or not isinstance(keywords, list):
-			logger.error(f"[ERROR] Invalid keywords: {keywords}")
-			return "検索キーワードが指定されていません。"
-		
-		# rakuten_search_booksは list[dict] を返す
-		books = rakuten_search_books(keywords, count=max(count, 10), orflag=0) # AND検索
-		
-		if not books:
-			books = rakuten_search_books(keywords, count=max(count * 2, 20), orflag=1) # OR検索
-			if not books:
-				logger.error("No books found for keywords: %s", keywords)
-				return "申し訳ございません。該当する書籍が見つかりませんでした。"
-			
-		# グローバルステートに保存（番号 → 書籍データ）
-		_global_state["search_results"] = {i+1: book for i, book in enumerate(books)}
-		
-		# LLMには番号付きリストとして返す
-		book_list = []
-		for i, book in enumerate(books, 1):
-			title = book.get("title", "不明")
-			# authorsはリスト形式なので、最初の著者を取得
-			authors = book.get("authors", [])
-			author = authors[0] if authors else "不明"
-			book_list.append(f"{i}. 『{title}』 - {author}")
-		
-		logger.info(f"[DEBUG] Found {len(books)} books")
-		logger.info(f"[DEBUG] Found {len(books)} books")
-		return f"検索結果（{len(books)}冊）:\n" + "\n".join(book_list) + "\n\nこれらの結果から、ユーザーに合った本を選び、必ず `recommend_books` を呼び出してください。テキストで検索結果を要約しないでください。もし推薦する本がない場合は、空のリスト `[]` を引数にして `recommend_books` を呼び出してください。"
-		
-	except Exception as e:
-		logger.error(f"[ERROR] search_books error: {e}", exc_info=True)
-		return f"検索中にエラーが発生しました: {str(e)}"
-
-
-@tool
-def update_expression(expression_type: str) -> str:
-    """
-    表情の更新
-
-	司書アバターの表情（感情）を更新します。
-    Args:
-        expression_type: 'neutral'（通常）', happy'（良い本が見つかった時）, 'thinking'（検索中）, 'sorry'（見つからない時）
-    Returns:
-		表情の変更の有無のメッセージ
-	"""
-    # このツール自体はメッセージを返すだけで、
-    # 実際のState更新はLangGraphのノード内、またはToolNodeの結果を反映して行います。
-    return f"表情を{expression_type}に変更しました。"
-
-@tool
-def recommend_books(selections: list[dict]) -> str:
-	"""
-	検索結果から推薦する本を選択
-	
-	Args:
-		selections: 推薦する本のリスト
-			各要素は {"number": 番号, "reason": "推薦理由"} の形式
-			例: [{"number": 1, "reason": "初心者向けで分かりやすい"}, {"number": 3, "reason": "実践的な内容"}]
-		
-	Returns:
-		推薦完了メッセージ
-	"""
-	try:
-		recommended = []
-		search_results = _global_state.get("search_results", {})
-		
-		for selection in selections:
-			num = selection.get("number")
-			reason = selection.get("reason", "")
-			
-			if num in search_results:
-				book = search_results[num].copy()
-				book["recommendation_reason"] = reason
-				recommended.append(book)
-		
-		_global_state["recommended_books"] = recommended
-		
-		if recommended:
-			# LLMに返すメッセージを作成（番号を振り直して提示）
-			msg_lines = [f"{len(recommended)}冊の本を推薦リストに追加しました。以下の番号と情報を使って、ユーザーに推薦してください。"]
-			for i, book in enumerate(recommended, 1):
-				msg_lines.append(f"{i}. 『{book['title']}』 (理由: {book['recommendation_reason']})")
-			
-			return "\n".join(msg_lines)
-		else:
-			return "推薦する本が選択されませんでした。ユーザーに「条件に合う本が見つかりませんでした」と報告してください。"
-			
-	except Exception as e:
-		return f"推薦処理中にエラーが発生しました: {str(e)}"
 
 
 # Prompt Management
@@ -304,14 +247,12 @@ def create_agent_workflow(llm, tools):
 			logger.error("[ERROR] agent_node: Empty messages list!")
 			raise ValueError("Messages list is empty in agent_node")
 
-		# 表情ツールは UI の状態更新だけを担う。これを実行した直後にもツールを
-		# 必須にすると、Gemini が空の tool call を繰り返して発話を返さないことがある。
-		# この場合のみツールなしで最終発話を生成する。
-		if isinstance(messages[-1], ToolMessage) and messages[-1].name == "update_expression":
-			logger.info("[DEBUG] Generating final response after update_expression without tools")
-			response = llm.invoke(messages)
-		else:
+		try:
 			response = llm_with_tools.invoke(messages)
+		except Exception as exc:
+			llm_usage.record_error("chat", exc)
+			raise
+		llm_usage.record_success("chat", response)
 		return {"messages": [response]}
 
 	def force_tool_node(state: AgentState):
@@ -366,6 +307,90 @@ def create_agent_workflow(llm, tools):
 	workflow.add_edge("force_tool", "agent")
 	
 	return workflow.compile()
+
+
+# Trace
+
+TRACE_CONTENT_LIMIT = 2000
+
+
+def _record_trace_step(node_name, new_messages, attempt, started, ended) -> None:
+	"""ノード1回分の処理をトレースに記録する。失敗しても会話は止めない。"""
+	try:
+		turn = current_turn.get()
+		if turn is None:
+			return
+		step = TraceStep(
+			index=len(turn.steps),
+			node=node_name,
+			attempt=attempt,
+			started_at=started.isoformat(),
+			ended_at=ended.isoformat(),
+			duration_ms=int((ended - started).total_seconds() * 1000),
+		)
+		for msg in new_messages:
+			if isinstance(msg, AIMessage):
+				text = extract_user_visible_text(msg.content)
+				step.ai_text = text if step.ai_text is None else step.ai_text + text
+				step.tool_calls.extend(
+					{"name": call.get("name"), "args": call.get("args")}
+					for call in (msg.tool_calls or [])
+				)
+				usage = getattr(msg, "usage_metadata", None)
+				if usage:
+					step.usage = dict(usage)
+			elif isinstance(msg, ToolMessage):
+				step.tool_results.append({
+					"name": msg.name,
+					"content": str(msg.content)[:TRACE_CONTENT_LIMIT],
+				})
+		turn.steps.append(step)
+	except Exception:
+		logger.exception("Failed to record trace step")
+
+
+def _record_trace_error(exc: BaseException) -> None:
+	"""llm_chat 全体で捕まえた例外をトレースに記録する。"""
+	try:
+		turn = current_turn.get()
+		if turn is None:
+			return
+		turn.error = {
+			"type": type(exc).__name__,
+			"message": str(exc),
+			"traceback": traceback.format_exc(),
+		}
+	except Exception:
+		logger.exception("Failed to record trace error")
+
+
+_graph_mermaid_cache: Optional[str] = None
+
+
+def get_graph_mermaid() -> str:
+	"""create_agent_workflow の構造を mermaid の文字列で返す(LLM は呼ばない)。"""
+	global _graph_mermaid_cache
+	if _graph_mermaid_cache is None:
+		class _DummyLLM:
+			def bind_tools(self, tools):
+				return self
+
+			def invoke(self, messages):
+				raise RuntimeError("dummy LLM is never invoked")
+
+		@tool
+		def search_books(keywords: list[str], count: int = 30) -> str:
+			"""ダミー"""
+			return ""
+
+		@tool
+		def recommend_books(selections: list[dict]) -> str:
+			"""ダミー"""
+			return ""
+
+		graph = create_agent_workflow(_DummyLLM(), [search_books, recommend_books])
+		_graph_mermaid_cache = graph.get_graph().draw_mermaid()
+	return _graph_mermaid_cache
 
 
 # Chat Functions
@@ -453,19 +478,6 @@ def llm_chat(
 			return f"検索中にエラーが発生しました: {str(e)}"
 
 	@tool
-	def update_expression(expression_type: str) -> str:
-		"""
-		表情の更新
-	
-		司書アバターの表情（感情）を更新します。
-		Args:
-			expression_type: 'neutral'（通常）', happy'（良い本が見つかった時）, 'thinking'（検索中）, 'sorry'（見つからない時）
-		Returns:
-			表情の変更の有無のメッセージ
-		"""
-		return f"表情を{expression_type}に変更しました。"
-
-	@tool
 	def recommend_books(selections: list[dict]) -> str:
 		"""
 		検索結果から推薦する本を選択
@@ -514,10 +526,10 @@ def llm_chat(
 	system_prompt = create_system_prompt(base_prompt, ai_insight)
 	
 	# LLM初期化
-	llm = get_llm(backend=model, temperature=temperature, max_tokens=max_tokens)
+	llm = get_llm(role="chat", backend=model, temperature=temperature, max_tokens=max_tokens)
 	
 	# ツール定義
-	tools = [search_books, recommend_books, update_expression]
+	tools = [search_books, recommend_books]
 	
 	# ワークフロー作成
 	app = create_agent_workflow(llm, tools)
@@ -558,11 +570,24 @@ def llm_chat(
 			# 初期ステートに search_results は空で渡すが、
 			# 実際のデータ管理はツール内のクロージャ変数が担うため、
 			# StateGraph上の search_results は実質ダミーまたはログ用となる
-			result = app.invoke({
+			# stream_mode="updates" の各 update は {ノード名: {"messages": [...]}}。
+			# add_messages は新しいメッセージを末尾に足すだけなので、順に足せば invoke の結果と同じ並びになる。
+			result_messages = list(messages)
+			step_started = datetime.now()
+			for update in app.stream({
 				"messages": messages,
 				"search_results": {},
 				"recommended_books": []
-			})
+			}, stream_mode="updates"):
+				step_ended = datetime.now()
+				for node_name, node_output in update.items():
+					new_messages = (node_output or {}).get("messages") or []
+					if not isinstance(new_messages, (list, tuple)):
+						new_messages = [new_messages]
+					result_messages.extend(new_messages)
+					_record_trace_step(node_name, new_messages, retry_count, step_started, step_ended)
+				step_started = step_ended
+			result = {"messages": result_messages}
 			
 			# デバッグ: 結果の詳細をログ出力
 			logger.info(f"[DEBUG] LangGraph result keys: {list(result.keys())}")
@@ -581,7 +606,7 @@ def llm_chat(
 
 				if contains_internal_response(response_text):
 					logger.error("[ERROR] Model returned internal tool or thought text")
-					response_text = "申し訳ございません。応答の生成中にエラーが発生しました。もう一度お試しください。"
+					response_text = MESSAGE_INTERNAL_FORMAT
 					break
 				
 				# 空の応答でなければ成功
@@ -601,61 +626,42 @@ def llm_chat(
 						logger.warning(f"[WARNING] Empty response from LLM (attempt {retry_count}/{LLM_MAX_RETRIES}), retrying...")
 					else:
 						logger.error(f"[ERROR] Empty response from LLM after {LLM_MAX_RETRIES} attempts")
-						response_text = (
-							"LLMから空の応答が返されました"
-							f"（{LLM_MAX_RETRIES}回試行）。"
-						)
+						response_text = MESSAGE_EMPTY_RESPONSE
 			else:
 				retry_count += 1
 				if retry_count < LLM_MAX_RETRIES:
 					logger.warning(f"[WARNING] No AI message found (attempt {retry_count}/{LLM_MAX_RETRIES}), retrying...")
 				else:
-					response_text = (
-						"LLM応答にAIMessageが含まれていません"
-						f"（{LLM_MAX_RETRIES}回試行）。"
-					)
+					response_text = MESSAGE_EMPTY_RESPONSE
 					logger.error("No AI message found in result after retries: %s", result)
 		
-		# ツール呼び出しから表情を取得（なければ neutral）
-		current_expression = "neutral"
-		for msg in result["messages"]:
-			if hasattr(msg, "tool_calls") and msg.tool_calls:
-				for tool_call in msg.tool_calls:
-					if tool_call["name"] == "update_expression":
-						current_expression = tool_call["args"]["expression_type"]
-						logger.info(f"[DEBUG] AI decided to change expression to: {current_expression}")
-						
-		if current_expression == "none":
-			current_expression = "neutral"
-			logger.info("[DEBUG] No expression change detected, defaulting to neutral.")
-
 		# 正式なツール呼び出しはこのターン内で完結させ、表示用テキストだけを履歴に保存する。
-		ai_message = AIMessage(content=response_text)
-		updated_history = history + [current_message, ai_message]
+		# 失敗時の定型文は履歴に残さない（以降の会話の文脈を汚さないため）。
+		if response_text in FALLBACK_MESSAGES:
+			updated_history = list(history)
+		else:
+			updated_history = history + [current_message, AIMessage(content=response_text)]
 		
 		# 推薦された書籍を取得 (クロージャ変数から)
 		recommended_books = list(recommended_books_state)
+		current_expression = select_expression(
+			response_text,
+			result["messages"],
+			recommended_books,
+		)
+		logger.info(f"[DEBUG] Selected expression from processing result: {current_expression}")
 		
 		return response_text, updated_history, recommended_books, current_expression
 		
-	except Exception as e:
-		# logger.exception は traceback を含めてサーバーログへ出力する。
+	except Exception as exc:
+		_record_trace_error(exc)
+		if is_rate_limit_error(exc):
+			# 上限超過は想定内の事象なので traceback は出さない。
+			logger.warning("[WARNING] Gemini rate limit (429) in llm_chat")
+			return MESSAGE_BUSY, list(history), [], "sorry"
+		# 例外の詳細（APIキーやURLを含みうる）はサーバーログのみに出力する。
 		logger.exception("Error in llm_chat")
-		detail = re.sub(r"\s+", " ", str(e)).strip()[:500]
-		error_message = (
-			f"LLM処理中に例外が発生しました: {type(e).__name__}"
-			f"{': ' + detail if detail else ''}"
-		)
-		
-		# エラー時も履歴オブジェクトを返す
-		ai_message = AIMessage(content=error_message)
-		if 'current_message' in locals():
-			updated_history = history + [current_message, ai_message]
-		else:
-			updated_history = history + [AIMessage(content=error_message)]
-			
-		# 開発中の原因特定のため、例外の型とメッセージをクライアントにも返す。
-		return error_message, updated_history, [], "neutral"
+		return MESSAGE_EXCEPTION, list(history), [], "sorry"
 
 
 def llm_summary(
@@ -664,66 +670,54 @@ def llm_summary(
 	ai_insight: Optional[str] = None,
 	model: Optional[str] = None,
 	temperature: float = 0.3,
-	max_tokens: int = 512
-) -> str:
+	max_tokens: int = 2048,
+	role: str = "summary"
+) -> Optional[str]:
 	"""
-	LangChainを使った要約生成（履歴なし）
-	
-	Args:
-		prompt_file: プロンプトファイルのパス
-		message: ユーザーメッセージ
-		ai_insight: ユーザー情報
-		model: 使用するLLMバックエンド
-		temperature: 温度パラメータ
-		max_tokens: 最大トークン数
-		
+	ツールを使わない単発の生成（要約・AI Insights・キーワード抽出用）。
+	書籍推薦用の指示は付けない。
+
 	Returns:
-		要約テキスト
+		生成テキスト。失敗時や空応答時は None（呼び出し側で既存データを保持すること）。
 	"""
-	# プロンプト読み込み
-	base_prompt = load_prompt_text(prompt_file)
-	system_prompt = create_system_prompt(base_prompt, ai_insight)
-	
-	# LLM初期化
-	llm = get_llm(backend=model, temperature=temperature, max_tokens=max_tokens)
-	
-	# メッセージ作成
+	system_prompt = load_prompt_text(prompt_file)
+	if ai_insight and ai_insight.strip():
+		system_prompt += f"\n\n## ユーザー情報\n以下は、これまでの会話から学習したユーザーの傾向です。\n\n{ai_insight}\n"
+
+	llm = get_llm(role=role, backend=model, temperature=temperature, max_tokens=max_tokens)
 	messages = [
 		SystemMessage(content=system_prompt),
 		HumanMessage(content=message)
 	]
-	
-	# LLM実行
+
 	try:
 		response = llm.invoke(messages)
-		return response.content
-	except Exception as e:
-		print(f"Error in llm_summary: {e}")
-		return f"エラーが発生しました: {str(e)}"
+	except Exception as exc:
+		llm_usage.record_error(role, exc)
+		if is_rate_limit_error(exc):
+			logger.warning("[WARNING] Gemini rate limit (429) in llm_summary")
+		else:
+			logger.exception("Error in llm_summary")
+		return None
+	llm_usage.record_success(role, response)
+
+	text = extract_user_visible_text(response.content)
+	if not text or contains_internal_response(text):
+		logger.warning("[WARNING] llm_summary returned empty or internal text")
+		return None
+	return text
 
 
 # Main (for testing)
 
 if __name__ == "__main__":
-	# テスト用
-	test_message = "Pythonの機械学習に関する本を教えてください"
-	
-	# プロンプトファイルのパスを設定（適宜変更）
-	from backend import PROMPT_LIBRARIAN
-	
-	print("Testing LangGraph LLM chat...")
-	# historyはBaseMessageのリスト
-	response, history, recommended_books = llm_chat(
-		prompt_file=str(PROMPT_LIBRARIAN),
-		message=test_message,
+	from backend import PROMPT_DEFAULT
+
+	response, history, recommended_books, expression = llm_chat(
+		prompt_file=str(PROMPT_DEFAULT),
+		message="Pythonの機械学習に関する本を教えてください",
 		history=[]
 	)
-	
-	print(f"\nResponse:\n{response}")
-	print(f"\nHistory length: {len(history)}")
-	print(f"\nRecommended books: {len(recommended_books)}")
-	
-	if recommended_books:
-		print("\n推薦された書籍:")
-		for book in recommended_books:
-			print(f"  - {book.get('title')} ({book.get('recommendation_reason')})")
+	print(f"Response:\n{response}\nExpression: {expression}")
+	for book in recommended_books:
+		print(f"  - {book.get('title')} ({book.get('recommendation_reason')})")

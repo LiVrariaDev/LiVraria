@@ -31,6 +31,16 @@ video=HDMI-A-1:1024x600M@60D video=HDMI-A-2:1920x1080M@60D
 
 タッチパネルは USB HID デバイス（`27c0:0818`、`Paperlike HD-FT`）として自動認識されている。専用のキャリブレーション、座標変換、udev ルールは確認できなかったため、再構築時はまずこの状態で動作を確認する。
 
+## 起動スクリプト
+
+`raspi/.env.example` を `raspi/.env` にコピーし、`SERVER_URL` と `PRIMARY_WIDTH`（メイン画面の横幅。実機は 1024）を設定する。
+
+`raspi/StartApp.sh` は、メイン画面とサブ画面（`/?view=secondary`）の2つのウィンドウを同じ Chromium プロファイルで開き、wmctrl でメインを左画面、サブを右画面（x=`PRIMARY_WIDTH`）に配置してフルスクリーンにする。2つのウィンドウは BroadcastChannel で通信するため、同じプロファイルで起動する必要がある。必要なパッケージは `chromium` と `wmctrl`。
+
+サブ画面を再読み込みしても、メイン画面から現在の状態（ログイン有無、最後の発話）を受け取って元に戻る。
+
+Labwc（Wayland）上では XWayland（`--ozone-platform=x11`）で動かす前提である。実機での確認はまだ行っていない。
+
 ## 自動ログイン
 
 `/etc/systemd/system/getty@tty1.service.d/autologin.conf` で tty1 の getty に `livraria` ユーザーの自動ログインを設定している。

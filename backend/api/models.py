@@ -2,7 +2,7 @@
 
 from enum import Enum
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional
 
 # Enum
@@ -18,17 +18,33 @@ class UserStatus(str, Enum):
 
 # Request/Response Models
 class ChatRequest(BaseModel):
-	message: str
-	session_id: str = None
+	message: str = Field(min_length=1, max_length=2000)
+	session_id: Optional[str] = None
 
 class NfcIdRequest(BaseModel):
-	nfc_id: str
+	nfc_id: str = Field(min_length=1, max_length=64)
+
+class PersonalUpdate(BaseModel):
+	"""クライアントから変更可能なプロフィール項目（未指定の項目は変更しない）。"""
+	model_config = ConfigDict(extra="forbid")
+	name: Optional[str] = Field(None, max_length=50)
+	gender: Optional[str] = Field(None, max_length=20)
+	age: Optional[int] = Field(None, ge=0, le=150)
+	live_pref: Optional[str] = Field(None, max_length=10)
+	live_city: Optional[str] = Field(None, max_length=50)
+
+class UserUpdate(BaseModel):
+	"""PUT /users/{user_id} のリクエスト。status や ai_insights などは変更させない。"""
+	model_config = ConfigDict(extra="forbid")
+	personal: PersonalUpdate
 
 class ChatResponse(BaseModel):
 	response: str
 	session_id: str
 	recommended_books: List[dict] = Field(default_factory=list, description="推薦された書籍リスト")
 	expression: str = Field("none", description="司書の表情ステータス")
+	trace_id: Optional[str] = Field(None, description="このターンのトレース ID")
+	failed: bool = Field(False, description="応答が失敗時の定型文なら True")
 
 # Data Models
 # Message Class : 廃止, LangChainの方へ合わせる
@@ -62,9 +78,9 @@ class User(BaseModel):
 	old_session: List[str] = Field(default_factory=list, description="Old chat session IDs")
 	recommend_log: List[RecommendationLogEntry] = Field(default_factory=list, description="Recommendation log")
 	lastlogin: datetime = Field(default_factory=datetime.now, description="Last login time")
+	learning_enabled: bool = Field(True, description="False なら要約と AI Insights の更新を行わない(共有デモアカウント用)")
 
-	class Config:
-		populate_by_name = True
+	model_config = ConfigDict(populate_by_name=True)
 
 class Conversation(BaseModel):
 	session_id: str = Field(alias="_id", description="Session ID")
@@ -74,6 +90,5 @@ class Conversation(BaseModel):
 	summary: Optional[str] = Field(None, description="AI-generated summary at session end")
 	last_accessed: datetime = Field(default_factory=datetime.now, description="Last accessed time")
 
-	class Config:
-		populate_by_name = True
+	model_config = ConfigDict(populate_by_name=True)
 

@@ -15,8 +15,23 @@ import tempfile
 from smartcard.System import readers
 from smartcard.util import toHexString
 
+# 端末のブラウザ（同じ Raspberry Pi 上）からのみ使う前提。
+# 外部から読み上げやカード読み取りを操作されないよう、待ち受けとオリジンを絞る。
+NFC_HOST = os.getenv("NFC_HOST", "127.0.0.1")
+NFC_PORT = int(os.getenv("NFC_PORT", "8000"))
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "NFC_ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,https://localhost:5173,https://127.0.0.1:5173",
+    ).split(",")
+    if origin.strip()
+]
+MAX_SPEAK_CHARS = 1000
+MAX_NFC_TIMEOUT = 60
+
 app = Flask(__name__)
-CORS(app)  # すべてのオリジンからのアクセスを許可
+CORS(app, origins=ALLOWED_ORIGINS)
 
 # NFCカード読み取り状態を保持
 nfc_state = {
@@ -32,6 +47,10 @@ OPENJTALK_VOICE = os.getenv(
     "OPENJTALK_VOICE", "/usr/share/hts-voice/Voice/mei/mei_normal.htsvoice"
 )
 ALSA_DEVICE = os.getenv("ALSA_DEVICE", "plughw:3,0")
+
+# 読み上げの排他制御: 新しい読み上げが来たら再生中の音声を止める
+speak_lock = threading.Lock()
+current_playback = None
 
 
 def is_tts_available():
@@ -56,7 +75,8 @@ def remove_file_after_playback(process, path):
 
 
 def synthesize_and_play(text):
-    """OpenJTalk で合成し、指定した ALSA デバイスで非同期再生する。"""
+    """OpenJTalk で合成し、指定した ALSA デバイスで非同期再生する（再生中の音声は止める）。"""
+    global current_playback
     text_file = None
     wav_fd = None
     wav_path = None
@@ -86,11 +106,14 @@ def synthesize_and_play(text):
         if result.returncode != 0:
             raise RuntimeError(result.stderr.strip() or "OpenJTalk failed")
 
+        if current_playback is not None and current_playback.poll() is None:
+            current_playback.terminate()
         process = subprocess.Popen(
             ["aplay", "-D", ALSA_DEVICE, wav_path],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
+        current_playback = process
         cleanup_thread = threading.Thread(
             target=remove_file_after_playback, args=(process, wav_path), daemon=True
         )
@@ -168,10 +191,6 @@ def background_read_nfc(timeout):
     """バックグラウンドでNFCカード読み取りを実行"""
     global nfc_state
     
-    with nfc_lock:
-        nfc_state["status"] = "reading"
-        nfc_state["idm"] = None
-    
     result = read_card_once(timeout)
     
     with nfc_lock:
@@ -201,11 +220,13 @@ def speak():
 
     if not isinstance(text, str) or not text.strip():
         return jsonify({"status": "error", "message": "Text is empty"}), 400
+    text = text[:MAX_SPEAK_CHARS]
     if not is_tts_available():
         return jsonify({"status": "error", "message": "OpenJTalk is unavailable"}), 503
 
     try:
-        synthesize_and_play(text)
+        with speak_lock:
+            synthesize_and_play(text)
         return jsonify({"status": "ok", "message": "Speech playback started"})
     except (OSError, subprocess.SubprocessError, RuntimeError) as error:
         print(f"[TTS] Error: {error}")
@@ -230,15 +251,18 @@ def start_nfc():
     """
     global nfc_state
     
-    data = request.get_json() or {}
-    timeout = data.get("timeout", 20)
+    data = request.get_json(silent=True) or {}
+    try:
+        timeout = min(max(float(data.get("timeout", 20)), 1), MAX_NFC_TIMEOUT)
+    except (TypeError, ValueError):
+        return jsonify({"status": "error", "message": "Invalid timeout"}), 400
     
     with nfc_lock:
         if nfc_state["status"] == "reading":
             return jsonify({"status": "error", "message": "Already reading"}), 400
         
-        # 状態をリセット
-        nfc_state["status"] = "idle"
+        # ロック内で reading にしておき、同時リクエストで二重に読み取りスレッドを起動しない
+        nfc_state["status"] = "reading"
         nfc_state["idm"] = None
     
     # バックグラウンドスレッドで読み取り開始
@@ -294,7 +318,7 @@ def read_nfc():
 
 
 if __name__ == "__main__":
-    print("🚀 NFC API Server starting on http://localhost:8000")
+    print(f"🚀 NFC API Server starting on http://{NFC_HOST}:{NFC_PORT}")
     print("📡 Endpoints:")
     print("   GET  /health       - Health check")
     print("   POST /speak        - Text-to-speech synthesis and playback")
@@ -302,4 +326,5 @@ if __name__ == "__main__":
     print("   GET  /check-nfc    - Check NFC reading status")
     print("   GET  /read-nfc     - Get latest NFC reading result")
     
-    app.run(host="0.0.0.0", port=8000, debug=False)
+    print(f"   Allowed origins: {', '.join(ALLOWED_ORIGINS)}")
+    app.run(host=NFC_HOST, port=NFC_PORT, debug=False, threaded=True)

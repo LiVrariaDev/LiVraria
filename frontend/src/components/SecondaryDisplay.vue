@@ -34,7 +34,7 @@
     <div class="absolute inset-0 z-40 flex flex-col items-center justify-end pb-8 pointer-events-none">
       <div class="w-full max-w-[90vw] px-[2vw] min-h-[15vh] flex flex-col justify-end">
          <transition-group name="subtitle" tag="div" class="flex flex-col space-y-[0.8vh] items-center">
-            <div v-for="line in visibleLines" :key="line.id" 
+            <div v-for="line in visibleLines" :key="line.id" data-testid="subtitle-line"
                  class="bg-black/60 backdrop-blur-sm text-white px-[1.2vw] py-[0.8vh] rounded-[0.8vw] text-[2.5vw] font-medium tracking-wide shadow-lg border border-white/10"
                  style="text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">
               {{ line.text }}
@@ -54,6 +54,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue';
+import { createDisplayReceiver } from '../services/displayChannel';
 
 // --- 動画ファイルの定義 ---
 const VIDEOS = {
@@ -93,11 +94,21 @@ const playbackQueue = ref([]);
 const isLooping = ref(true); 
 const currentEmotion = ref('neutral'); 
 
-const channel = new BroadcastChannel('livraria_channel');
+const IDLE_MESSAGE = 'いらっしゃいませ\nカードをかざしてください';
+// 字幕の世代。新しいメッセージが来たら進め、古い processTextLines を打ち切る
+let subtitleGeneration = 0;
+let receiver = null;
+
+const clearSubtitles = () => {
+    subtitleGeneration++;
+    visibleLines.value = [];
+};
 
 // --- テキスト処理ロジック ---
 const processTextLines = async (text) => {
     if (!text) return;
+
+    const gen = ++subtitleGeneration;
     
     // 絵文字を除去
     const plainText = text.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '');
@@ -138,33 +149,39 @@ const processTextLines = async (text) => {
         // 長すぎると待たされるので、最大でも1.5秒くらい待つ
         const waitTime = Math.min(lineText.length * 80, 1500); 
         await new Promise(resolve => setTimeout(resolve, waitTime));
+        if (gen !== subtitleGeneration) return;
     }
 };
 
 // --- 通信受信 ---
-channel.onmessage = (event) => {
-  const { type, text, state } = event.data;
-  if (type !== 'chat') return;
-  
-  console.log(`[Secondary] Received state: ${state}, Text: ${text}, CurrentEmotion: ${currentEmotion.value}`);
+const showLoggedOut = () => {
+  clearSubtitles();
+  returnToIdle();
+  processTextLines(IDLE_MESSAGE);
+};
 
-  if (state === 'thinking') {
-    visibleLines.value = [];
-    startThinkingSequence();
-  } 
-  else if (state === 'idle') {
-    returnToIdle();
-  } 
-  else {
-    if (text) processTextLines(text);
-    // 修正: none が来たら強制的に neutral にする (二重防御)
-    let safeState = state;
-    if (!safeState || safeState === 'none') {
-        console.warn(`[Secondary] Invalid state '${safeState}' detected. Forcing to 'neutral'.`);
-        safeState = 'neutral';
-    }
-    playEmotionAction(safeState);
+const handleSpeak = (text, emotion) => {
+  if (text) processTextLines(text);
+  else clearSubtitles();
+  playEmotionAction(emotion);
+};
 
+const handleSession = (state) => {
+  if (state === 'logged_out') showLoggedOut();
+  // logged_in: 挨拶は MainApp が speak で送る
+};
+
+const handleThinking = () => {
+  clearSubtitles();
+  startThinkingSequence();
+};
+
+const handleSyncState = (payload) => {
+  if (!payload.loggedIn) {
+    showLoggedOut();
+  } else if (payload.lastSpeak?.text) {
+    // 動画は待機のまま、字幕だけ復元する
+    processTextLines(payload.lastSpeak.text);
   }
 };
 
@@ -351,10 +368,20 @@ onMounted(async () => {
   await nextTick();
   player.play().catch(e => console.log("Init play error", e));
   videoB.value.src = "";
+
+  receiver = createDisplayReceiver({
+    onSession: handleSession,
+    onThinking: handleThinking,
+    onSpeak: handleSpeak,
+    onIdle: returnToIdle,
+    onSyncState: handleSyncState,
+  });
+  receiver.requestSync();
 });
 
 onUnmounted(() => {
-  channel.close();
+  subtitleGeneration++;
+  if (receiver) receiver.close();
 });
 
 const handleVideoError = (e) => {
