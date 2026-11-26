@@ -651,3 +651,14 @@ def test_debug_graph_returns_both_versions(monkeypatch):
 	assert "understand" in data["graphs"]["v2"] and "select" in data["graphs"]["v2"]
 	assert "agent" in data["graphs"]["v1"]
 
+
+
+# ---------------------------------------------------------------------------
+# 8. プロンプトの決まりごと
+# ---------------------------------------------------------------------------
+
+def test_understand_prompt_keeps_feelings_out_of_interests():
+	prompt = graph_v2.load_v2_prompt("understand")
+	assert "題材を表す名詞だけ" in prompt
+	assert "「〜な本」" in prompt and "interests に入れない。mood に書く" in prompt
+
