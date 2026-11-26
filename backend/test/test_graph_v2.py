@@ -225,6 +225,22 @@ def test_search_falls_back_to_or_search_and_skips_failures(monkeypatch):
 	assert calls == [(("壊れる",), 0), (("猫", "宇宙"), 0), (("猫", "宇宙"), 1)]
 
 
+def test_search_skips_or_retry_when_other_queries_found_enough(monkeypatch, rakuten):
+	rakuten.results["猫"] = [book(i) for i in range(1, graph_v2.ENOUGH_CANDIDATES + 1)]
+	# 「猫 宇宙」は AND で0件。ほかの組で十分集まったので OR ではやり直さない
+	candidates = graph_v2.collect_candidates([["猫", "宇宙"], ["猫"]])
+	assert len(candidates) == graph_v2.ENOUGH_CANDIDATES
+	assert rakuten.calls == [(("猫", "宇宙"), 0), (("猫",), 0)]
+
+
+def test_search_retries_with_or_when_not_enough(monkeypatch, rakuten):
+	rakuten.results["猫"] = [book(1), book(2)]
+	candidates = graph_v2.collect_candidates([["猫", "宇宙"], ["猫"]])
+	# AND を全組やってから、0件だった組だけ OR でやり直す
+	assert rakuten.calls == [(("猫", "宇宙"), 0), (("猫",), 0), (("猫", "宇宙"), 1)]
+	assert len(candidates) == 2
+
+
 def test_ask_book_answers_from_last_picks(monkeypatch, rakuten):
 	last = [dict(book(7, caption="北欧の森で暮らす猫の一年を描いた物語。"), recommendation_reason="静かな話", recommendation_slot="ど真ん中")]
 	fakes = FakeLLMs(UnderstandOutput=[understood("ask_book", interests=["猫"])], text=["北欧の森で暮らす猫のお話ですよ。"])
@@ -634,3 +650,4 @@ def test_debug_graph_returns_both_versions(monkeypatch):
 	assert data["mermaid"] == data["graphs"]["v2"]
 	assert "understand" in data["graphs"]["v2"] and "select" in data["graphs"]["v2"]
 	assert "agent" in data["graphs"]["v1"]
+

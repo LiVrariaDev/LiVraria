@@ -1,10 +1,41 @@
 """search_books が LLM に返す候補リスト（内容紹介・ジャンル・レビュー）と、楽天検索のレビュー取得の検証。"""
 
+import threading
+import time
+
+import pytest
+import requests
 from langchain_core.messages import AIMessage, ToolMessage
 
 import backend.api.llm as llm
 import backend.search.rakuten_books as rakuten_books
 from backend import PROMPT_DEFAULT
+
+
+class _Clock:
+	"""rakuten_books の時刻と sleep の差し替え。sleep した分だけ時刻を進め、待った秒数を記録する。"""
+
+	def __init__(self):
+		self.now = 1000.0
+		self.sleeps = []
+
+	def monotonic(self):
+		return self.now
+
+	def sleep(self, seconds):
+		self.sleeps.append(round(seconds, 3))
+		self.now += seconds
+
+
+@pytest.fixture(autouse=True)
+def clock(monkeypatch):
+	"""楽天の呼び出し間隔を、実際には待たずに検証する。"""
+	fake = _Clock()
+	monkeypatch.setattr(rakuten_books, "_monotonic", fake.monotonic)
+	monkeypatch.setattr(rakuten_books, "_sleep", fake.sleep)
+	rakuten_books.reset_rate_limit()
+	yield fake
+	rakuten_books.reset_rate_limit()
 
 
 # 1. rakuten_search_books がレビュー平均と件数を返す
@@ -151,3 +182,98 @@ def test_llm_chat_search_candidates_include_details(monkeypatch):
 	assert text == "この本がおすすめです。"
 	assert recommended[0]["title"] == "本その1"
 	assert recommended[0]["reviewCount"] == 20
+
+
+# 5. 楽天 API の呼び出し間隔と 429 のやり直し
+
+class _HttpResponse:
+	def __init__(self, status_code=200, headers=None, data=None):
+		self.status_code = status_code
+		self.headers = headers or {}
+		self._data = data or {"Items": []}
+
+	def raise_for_status(self):
+		if self.status_code >= 400:
+			raise requests.HTTPError(f"status {self.status_code}")
+
+	def json(self):
+		return self._data
+
+
+def test_rakuten_calls_are_spaced_by_one_second(monkeypatch, clock):
+	calls = []
+
+	def fake_get(url, headers=None, params=None, timeout=None):
+		calls.append(clock.now)
+		clock.now += 0.3  # 通信に 0.3 秒かかる
+		return _HttpResponse()
+
+	monkeypatch.setattr(rakuten_books.requests, "get", fake_get)
+	rakuten_books.rakuten_search_books(["a"])
+	rakuten_books.rakuten_search_books(["b"])
+	clock.now += 5  # 十分に時間が空けば待たない
+	rakuten_books.rakuten_search_books(["c"])
+
+	assert clock.sleeps == [1.0]  # 前の呼び出しの終わりから1秒
+	assert calls[1] - (calls[0] + 0.3) == pytest.approx(1.0)
+	assert len(calls) == 3
+
+
+def test_rakuten_retries_once_after_429(monkeypatch, clock):
+	responses = [_HttpResponse(429), _HttpResponse(200, data={"Items": [{"title": "本"}]})]
+	monkeypatch.setattr(rakuten_books.requests, "get", lambda *a, **k: responses.pop(0))
+
+	books = rakuten_books.rakuten_search_books(["猫"])
+
+	assert [b["title"] for b in books] == ["本"]
+	assert clock.sleeps == [rakuten_books.RAKUTEN_RETRY_WAIT]  # 429 のあとの待ちだけ（間隔の待ちはそれに含まれる）
+
+
+def test_rakuten_retry_wait_uses_retry_after(monkeypatch, clock):
+	responses = [_HttpResponse(429, headers={"Retry-After": "3"}), _HttpResponse(200)]
+	monkeypatch.setattr(rakuten_books.requests, "get", lambda *a, **k: responses.pop(0))
+	rakuten_books.rakuten_search_books(["猫"])
+	assert clock.sleeps == [3.0]
+
+	responses[:] = [_HttpResponse(429, headers={"Retry-After": "600"}), _HttpResponse(200)]
+	clock.now += 10
+	rakuten_books.rakuten_search_books(["猫"])
+	assert clock.sleeps[-1] == rakuten_books.RAKUTEN_RETRY_WAIT_MAX  # 長すぎる指定は上限で切る
+
+
+def test_rakuten_gives_up_after_second_429(monkeypatch, clock):
+	calls = []
+
+	def fake_get(*args, **kwargs):
+		calls.append(1)
+		return _HttpResponse(429)
+
+	monkeypatch.setattr(rakuten_books.requests, "get", fake_get)
+	with pytest.raises(requests.HTTPError):
+		rakuten_books.rakuten_search_books(["猫"])
+	assert len(calls) == 2  # やり直しは1回だけ
+
+
+def test_rakuten_lock_serializes_threads(monkeypatch):
+	"""複数のスレッドから呼んでも、楽天への通信は同時に1本だけ。"""
+	monkeypatch.setattr(rakuten_books, "_sleep", lambda seconds: None)
+	active = []
+	peak = []
+	lock = threading.Lock()
+
+	def fake_get(*args, **kwargs):
+		with lock:
+			active.append(1)
+			peak.append(len(active))
+		time.sleep(0.02)
+		with lock:
+			active.pop()
+		return _HttpResponse()
+
+	monkeypatch.setattr(rakuten_books.requests, "get", fake_get)
+	threads = [threading.Thread(target=rakuten_books.rakuten_search_books, args=([str(i)],)) for i in range(5)]
+	for t in threads:
+		t.start()
+	for t in threads:
+		t.join()
+	assert len(peak) == 5 and max(peak) == 1

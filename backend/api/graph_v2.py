@@ -44,6 +44,7 @@ MAX_QUERIES = 4
 MAX_WORDS_PER_QUERY = 2
 SEARCH_COUNT_PER_QUERY = 10
 CANDIDATE_LIMIT = 20
+ENOUGH_CANDIDATES = 10      # 全組の AND 検索でこれだけ集まれば、0件だった組の OR 検索のやり直しを省く
 CAPTION_MIN_CHARS = 30      # これより短い内容紹介は「内容紹介なし」として優先度を下げる
 MAX_PICKS = 3
 CRD_HINT_LIMIT = 3
@@ -565,24 +566,45 @@ def fallback_queries(profile: ReadingProfile, crd_hints: List[dict]) -> List[Lis
 
 
 def collect_candidates(queries: List[List[str]], exclude_keys: Optional[set] = None) -> List[dict]:
-	"""各組で楽天を検索し、重複を除いた候補を返す。内容紹介のない本は後ろに回す。"""
+	"""各組で楽天を検索し、重複を除いた候補を返す。内容紹介のない本は後ろに回す。
+
+	まず全組を AND 検索し、0件だった組だけを OR 検索でやり直す。ただし、ほかの組で候補が
+	ENOUGH_CANDIDATES 件以上集まっていれば、やり直しを省く（楽天の呼び出しは1秒以上空けるため、
+	呼び出しが減るほど応答が速くなる）。検索で例外になった組はやり直さない。
+	"""
 	exclude_keys = exclude_keys or set()
 	seen = set(exclude_keys)
 	collected: List[dict] = []
-	for keywords in queries:
+
+	def search(keywords: List[str], orflag: int) -> Optional[list]:
 		try:
-			books = llm_module.rakuten_search_books(keywords, count=SEARCH_COUNT_PER_QUERY, orflag=0)
-			if not books:
-				books = llm_module.rakuten_search_books(keywords, count=SEARCH_COUNT_PER_QUERY, orflag=1)
+			return llm_module.rakuten_search_books(keywords, count=SEARCH_COUNT_PER_QUERY, orflag=orflag) or []
 		except Exception as exc:
-			logger.warning("[WARNING] v2 rakuten search failed for %s: %s", keywords, exc)
-			continue
-		for book in books or []:
+			logger.warning("[WARNING] v2 rakuten search failed for %s (orflag=%d): %s", keywords, orflag, exc)
+			return None
+
+	def add(keywords: List[str], books: list) -> None:
+		for book in books:
 			key = _book_key(book)
 			if key in seen:
 				continue
 			seen.add(key)
 			collected.append({**book, "source": "rakuten:" + " ".join(keywords)})
+
+	empty_queries = []
+	for keywords in queries:
+		books = search(keywords, 0)
+		if books is None:
+			continue
+		if books:
+			add(keywords, books)
+		else:
+			empty_queries.append(keywords)
+	for keywords in empty_queries:
+		if len(collected) >= ENOUGH_CANDIDATES:
+			logger.info("[INFO] v2 skipped OR search for %s (%d candidates already)", keywords, len(collected))
+			continue
+		add(keywords, search(keywords, 1) or [])
 
 	# 内容紹介のある本を先に（同じ中では検索順を保つ）
 	collected.sort(key=lambda b: 0 if _caption_length(b) >= CAPTION_MIN_CHARS else 1)

@@ -1,14 +1,69 @@
 from backend import PROJECT_ROOT
+import logging
 import os
 import requests
 import random
 import json
+import threading
+import time
 from pathlib import Path
 
 import pprint
 
+logger = logging.getLogger("uvicorn.error")
+
 # 外部APIが応答しない場合に端末を待たせ続けないためのタイムアウト（秒）
 HTTP_TIMEOUT = 10
+
+# 楽天 API の呼び出し間隔の制御（プロセス全体で共通）
+RAKUTEN_MIN_INTERVAL = 1.0   # 前の呼び出しから空ける秒数
+RAKUTEN_RETRY_WAIT = 2.0     # 429 のときにやり直すまで待つ秒数（Retry-After があればそれを使う）
+RAKUTEN_RETRY_WAIT_MAX = 5.0
+_rakuten_lock = threading.Lock()
+_rakuten_last_call = None    # 前の呼び出しが終わった時刻（time.monotonic）
+# テストで差し替えるために参照を持つ
+_sleep = time.sleep
+_monotonic = time.monotonic
+
+
+def _retry_wait(response) -> float:
+    try:
+        value = float((getattr(response, "headers", None) or {}).get("Retry-After", ""))
+    except (TypeError, ValueError):
+        return RAKUTEN_RETRY_WAIT
+    return min(max(value, RAKUTEN_MIN_INTERVAL), RAKUTEN_RETRY_WAIT_MAX)
+
+
+def rakuten_get(url: str, headers: dict, params: dict):
+    """楽天 API を呼ぶ。プロセス全体で1本ずつにし、前の呼び出しから RAKUTEN_MIN_INTERVAL 秒以上空ける。
+
+    429 が返ったら少し待って1回だけやり直す。2回目も 429 ならそのレスポンスを返す
+    （呼び出し側の raise_for_status で例外になる）。
+    """
+    global _rakuten_last_call
+    with _rakuten_lock:
+        for attempt in range(2):
+            if _rakuten_last_call is not None:
+                wait = _rakuten_last_call + RAKUTEN_MIN_INTERVAL - _monotonic()
+                if wait > 0:
+                    _sleep(wait)
+            try:
+                response = requests.get(url, headers=headers, params=params, timeout=HTTP_TIMEOUT)
+            finally:
+                _rakuten_last_call = _monotonic()
+            if getattr(response, "status_code", None) == 429 and attempt == 0:
+                wait = _retry_wait(response)
+                logger.warning("[WARNING] Rakuten API returned 429, retrying in %.1fs", wait)
+                _sleep(wait)
+                continue
+            return response
+
+
+def reset_rate_limit() -> None:
+    """テスト用: 前の呼び出しの時刻を忘れる。"""
+    global _rakuten_last_call
+    with _rakuten_lock:
+        _rakuten_last_call = None
 
 RAKUTEN_BOOKTOTAL_ENDPOINT = "https://openapi.rakuten.co.jp/services/api/BooksTotal/Search/20170404"
 RAKUTEN_BOOK_ENDPOINT = "https://openapi.rakuten.co.jp/services/api/BooksBook/Search/20170404"
@@ -66,7 +121,7 @@ def rakuten_search_books(keywords: list[str], count: int = 10, genre_id: str = "
         "page": 1,
     }
 
-    response = requests.get(RAKUTEN_BOOKTOTAL_ENDPOINT, headers=headers, params=params, timeout=HTTP_TIMEOUT)
+    response = rakuten_get(RAKUTEN_BOOKTOTAL_ENDPOINT, headers, params)
     response.raise_for_status()
     json_data = response.json().get("Items", [])
     
@@ -118,7 +173,7 @@ def rakuten_search_info(isbn: str) -> dict:
         "page": 1,
     }
 
-    response = requests.get(RAKUTEN_BOOK_ENDPOINT, headers=headers, params=params, timeout=HTTP_TIMEOUT)
+    response = rakuten_get(RAKUTEN_BOOK_ENDPOINT, headers, params)
     response.raise_for_status()
     items = response.json().get("Items", [])
     
@@ -168,7 +223,7 @@ def rakuten_search_books_random(keywords: list[str], count: int = 30) -> list[di
     }
 
     try:
-        response = requests.get(RAKUTEN_BOOK_ENDPOINT, headers=headers, params=params, timeout=HTTP_TIMEOUT)
+        response = rakuten_get(RAKUTEN_BOOK_ENDPOINT, headers, params)
         response.raise_for_status()
         json_data = response.json().get("Items", [])
         
