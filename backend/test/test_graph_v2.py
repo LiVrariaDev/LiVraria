@@ -72,8 +72,9 @@ class FakeLLMs:
 		return [(role, kind) for role, kind, _ in self.calls]
 
 
-def understood(intent, **profile):
-	return graph_v2.UnderstandOutput(profile=graph_v2.ReadingProfile(**profile), intent=intent)
+def understood(intent, queries=(), **profile):
+	return graph_v2.UnderstandOutput(profile=graph_v2.ReadingProfile(**profile), intent=intent,
+	                                 queries=[graph_v2.SearchQuery(keywords=list(q)) for q in queries])
 
 
 def plan_of(*queries):
@@ -146,7 +147,10 @@ PICKED = [{"title": "本1"}]
 	("ready", EMPTY, [], "interview"),                      # 手がかりがなければ聞き取りに戻る
 	("ready", graph_v2.ReadingProfile(mood="疲れている"), [], "search"),
 	("refine", FULL, PICKED, "search"),
-	("lookup_title", graph_v2.ReadingProfile(mentioned_books=["青い鳥の話"]), [], "search"),
+	("lookup_title", graph_v2.ReadingProfile(mentioned_books=["青い鳥の話"]), [], "crd"),  # レファ協 → plan を通る
+	("ready", graph_v2.ReadingProfile(interests=["戦国"], purpose="調べ物"), [], "crd"),
+	("refine", graph_v2.ReadingProfile(interests=["戦国"], purpose="調べ物"), PICKED, "crd"),
+	("ready", graph_v2.ReadingProfile(interests=["戦国"], purpose="学び"), [], "search"),
 	("lookup_title", graph_v2.ReadingProfile(mood="懐かしい"), [], "interview"),
 	("ask_book", FULL, PICKED, "answer"),
 	("ask_book", FULL, [], "interview"),                    # 紹介した本がなければ答えられない
@@ -174,8 +178,7 @@ def test_search_turn(monkeypatch, rakuten):
 	rakuten.results["猫 小説"] = [book(1), book(2)]
 	rakuten.results["猫"] = [book(2), book(3)]  # 本2は重複
 	fakes = FakeLLMs(
-		UnderstandOutput=[understood("ready", interests=["猫"], purpose="楽しみ")],
-		PlanOutput=[plan_of(["猫", "小説"], ["猫"])],
+		UnderstandOutput=[understood("ready", [["猫", "小説"], ["猫"]], interests=["猫"], purpose="楽しみ")],
 		SelectOutput=[select_of([
 			{"id": 1, "slot": "ど真ん中", "reason": "猫好きにぴったり"},
 			{"id": 3, "slot": "意外な1冊", "reason": "猫の視点で読める"},
@@ -185,7 +188,9 @@ def test_search_turn(monkeypatch, rakuten):
 
 	text, history, books, expression = run(fakes, monkeypatch, "猫の小説を探して", state=state)
 
-	assert fakes.kinds() == [("light", "UnderstandOutput"), ("light", "PlanOutput"), ("chat", "SelectOutput")]  # 3回
+	# レファ協を引かないときは plan を通らず、understand のキーワードで検索する（LLM は2回）
+	assert fakes.kinds() == [("light", "UnderstandOutput"), ("chat", "SelectOutput")]
+	assert rakuten.calls == [(("猫", "小説"), 0), (("猫",), 0)]
 	assert text == "ぴったりの1冊と、少し視点を変えた1冊です。"
 	assert expression == "happy"
 	assert [b["title"] for b in books] == ["本1", "本3"]
@@ -197,7 +202,7 @@ def test_search_turn(monkeypatch, rakuten):
 	assert state["last_picks"] == books
 
 	# 候補リストは重複を除き、内容紹介・ジャンル・レビューを載せている
-	select_prompt = fakes.calls[2][2][-1].content
+	select_prompt = fakes.calls[1][2][-1].content
 	assert select_prompt.count("『本2』") == 1
 	assert "レビュー: 4.0（3件）" in select_prompt and "内容: " in select_prompt
 
@@ -259,8 +264,7 @@ def test_ask_book_answers_from_last_picks(monkeypatch, rakuten):
 def test_refine_excludes_previous_picks(monkeypatch, rakuten):
 	rakuten.results["猫"] = [book(1), book(2)]
 	fakes = FakeLLMs(
-		UnderstandOutput=[understood("refine", interests=["猫"])],
-		PlanOutput=[plan_of(["猫"])],
+		UnderstandOutput=[understood("refine", [["猫"]], interests=["猫"])],
 		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "別の猫の本"}])],
 	)
 	state = {"profile": {"interests": ["猫"]}, "last_picks": [book(1)]}
@@ -309,8 +313,7 @@ def test_lookup_title_without_mentioned_books_skips_crd(monkeypatch, rakuten):
 def test_select_drops_unknown_and_duplicate_ids(monkeypatch, rakuten):
 	rakuten.results["猫"] = [book(1), book(2)]
 	fakes = FakeLLMs(
-		UnderstandOutput=[understood("ready", interests=["猫"])],
-		PlanOutput=[plan_of(["猫"])],
+		UnderstandOutput=[understood("ready", [["猫"]], interests=["猫"])],
 		SelectOutput=[select_of([
 			{"id": 99, "slot": "ど真ん中", "reason": "存在しない"},
 			{"id": 2, "slot": "ど真ん中", "reason": "あり"},
@@ -328,8 +331,7 @@ def test_select_drops_unknown_and_duplicate_ids(monkeypatch, rakuten):
 def test_select_all_unknown_ids_returns_no_picks_message(monkeypatch, rakuten):
 	rakuten.results["猫"] = [book(1)]
 	fakes = FakeLLMs(
-		UnderstandOutput=[understood("ready", interests=["猫"])],
-		PlanOutput=[plan_of(["猫"])],
+		UnderstandOutput=[understood("ready", [["猫"]], interests=["猫"])],
 		SelectOutput=[select_of([{"id": 42, "slot": "ど真ん中", "reason": "幻の本"}], response="『幻の本』がおすすめです。")],
 	)
 	state = {}
@@ -351,8 +353,7 @@ def test_validate_picks_limits_to_three():
 def test_select_empty_response_uses_template(monkeypatch, rakuten):
 	rakuten.results["猫"] = [book(1), book(2)]
 	fakes = FakeLLMs(
-		UnderstandOutput=[understood("ready", interests=["猫"])],
-		PlanOutput=[plan_of(["猫"])],
+		UnderstandOutput=[understood("ready", [["猫"]], interests=["猫"])],
 		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "a"}, {"id": 2, "slot": "意外な1冊", "reason": "b"}], response="")],
 	)
 	text, _h, books, _e = run(fakes, monkeypatch, "猫の本", state={})
@@ -363,8 +364,7 @@ def test_select_empty_response_uses_template(monkeypatch, rakuten):
 def test_select_parse_failure_retries_then_falls_back(monkeypatch, rakuten):
 	rakuten.results["猫"] = [book(1)]
 	fakes = FakeLLMs(
-		UnderstandOutput=[understood("ready", interests=["猫"])],
-		PlanOutput=[plan_of(["猫"])],
+		UnderstandOutput=[understood("ready", [["猫"]], interests=["猫"])],
 		SelectOutput=[None, None],
 	)
 	history = [HumanMessage("前"), AIMessage("前の返事")]
@@ -378,7 +378,7 @@ def test_select_parse_failure_retries_then_falls_back(monkeypatch, rakuten):
 
 
 def test_no_candidates_skips_select_llm(monkeypatch, rakuten):
-	fakes = FakeLLMs(UnderstandOutput=[understood("ready", interests=["存在しない話題"])], PlanOutput=[plan_of(["存在しない話題"])])
+	fakes = FakeLLMs(UnderstandOutput=[understood("ready", [["存在しない話題"]], interests=["存在しない話題"])])
 	text, _h, books, expression = run(fakes, monkeypatch, "探して", state={})
 	assert text == graph_v2.MESSAGE_NO_CANDIDATES
 	assert books == [] and expression == "sorry"
@@ -405,7 +405,7 @@ def test_crd_problems_still_reach_select(monkeypatch, rakuten, make_get):
 	monkeypatch.setattr(crd.requests, "get", make_get())
 	rakuten.results["猫"] = [book(1)]
 	fakes = FakeLLMs(
-		UnderstandOutput=[understood("ready", interests=["猫"])],
+		UnderstandOutput=[understood("ready", interests=["猫"], purpose="調べ物")],
 		PlanOutput=[plan_of(["猫"])],
 		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "a"}])],
 	)
@@ -419,13 +419,13 @@ def test_crd_hints_are_passed_to_plan_only(monkeypatch, rakuten):
 	monkeypatch.setattr(graph_v2.crd, "search_crd_hints", lambda words, limit=5, field="question": seen.append((words, field)) or hints)
 	rakuten.results["猫"] = [book(1)]
 	fakes = FakeLLMs(
-		UnderstandOutput=[understood("ready", interests=["猫", "冬"])],
+		UnderstandOutput=[understood("ready", interests=["猫", "冬"], purpose="調べ物")],
 		PlanOutput=[plan_of(["猫"])],
 		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "a"}])],
 	)
 	text, _h, _b, _e = run(fakes, monkeypatch, "猫の本", state={})
 
-	assert seen == [(["猫", "冬"], "question")]  # 探せる・条件の変更は興味で質問文を検索する
+	assert seen == [(["猫", "冬"], "question")]  # 調べ物は興味で質問文を検索する
 	plan_system = fakes.calls[1][2][0].content
 	assert "日本の小説" in plan_system and "913" in plan_system and "件名で検索" in plan_system
 	select_messages = "".join(m.content for m in fakes.calls[2][2])
@@ -435,13 +435,42 @@ def test_crd_hints_are_passed_to_plan_only(monkeypatch, rakuten):
 def test_plan_failure_uses_profile_keywords(monkeypatch, rakuten):
 	rakuten.results["猫 宇宙"] = [book(1)]
 	fakes = FakeLLMs(
-		UnderstandOutput=[understood("ready", interests=["猫", "宇宙"])],
+		UnderstandOutput=[understood("ready", interests=["猫", "宇宙"], purpose="調べ物")],
 		PlanOutput=[ValueError("broken")],
 		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "a"}])],
 	)
 	_text, _h, books, _e = run(fakes, monkeypatch, "探して", state={})
 	assert rakuten.calls[0] == (("猫", "宇宙"), 0)
 	assert books[0]["title"] == "本1"
+
+
+def test_ready_without_research_skips_crd_and_plan(monkeypatch, rakuten):
+	monkeypatch.setattr(graph_v2.crd, "search_crd_hints", lambda *a, **k: pytest.fail("crd should not be called"))
+	rakuten.results["戦国"] = [book(1)]
+	fakes = FakeLLMs(
+		UnderstandOutput=[understood("ready", [["戦国"]], interests=["戦国"], purpose="学び")],
+		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "a"}])],
+	)
+	_text, _h, books, _e = run(fakes, monkeypatch, "戦国時代の本", state={})
+	assert books[0]["title"] == "本1"
+	assert ("light", "PlanOutput") not in fakes.kinds()
+
+
+def test_understand_without_queries_uses_profile_keywords(monkeypatch, rakuten):
+	rakuten.results["猫 宇宙"] = [book(1)]
+	fakes = FakeLLMs(
+		UnderstandOutput=[understood("ready", [], interests=["猫", "宇宙"])],
+		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "a"}])],
+	)
+	_text, _h, books, _e = run(fakes, monkeypatch, "探して", state={})
+	assert rakuten.calls[0] == (("猫", "宇宙"), 0)
+	assert books[0]["title"] == "本1"
+	assert ("light", "PlanOutput") not in fakes.kinds()
+
+
+def test_understand_prompt_has_keyword_rules():
+	prompt = graph_v2.load_v2_prompt("understand")
+	assert "queries" in prompt and "避けたいもの（avoid）に当たる語は使わない" in prompt
 
 
 def test_clean_queries():
@@ -527,10 +556,9 @@ def test_profile_persists_across_turns_and_restart(monkeypatch, rakuten):
 	fakes = FakeLLMs(
 		UnderstandOutput=[
 			understood("need_more", interests=["猫"]),
-			understood("ready", interests=["猫"], reader="子ども"),
+			understood("ready", [["猫"]], interests=["猫"], reader="子ども"),
 		],
 		text=["猫が好きなんですね。"],
-		PlanOutput=[plan_of(["猫"])],
 		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "a"}])],
 	)
 	monkeypatch.setattr(llm, "get_llm", fakes.get_llm)
@@ -615,7 +643,7 @@ def test_trace_records_path_profile_and_crd_hints(monkeypatch, rakuten):
 	monkeypatch.setattr(graph_v2.crd, "search_crd_hints", lambda words, limit=5, field="question": hints)
 	rakuten.results["猫"] = [book(1)]
 	fakes = FakeLLMs(
-		UnderstandOutput=[understood("ready", interests=["猫"])],
+		UnderstandOutput=[understood("ready", interests=["猫"], purpose="調べ物")],
 		PlanOutput=[plan_of(["猫"])],
 		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "a"}])],
 	)
@@ -627,7 +655,7 @@ def test_trace_records_path_profile_and_crd_hints(monkeypatch, rakuten):
 		trace_store.reset_trace_store()
 
 	assert turn["graph"] == "v2"
-	assert turn["intent"] == "ready" and turn["route"] == "search"
+	assert turn["intent"] == "ready" and turn["route"] == "crd"
 	assert turn["path"] == ["understand", "route", "crd", "plan", "search", "select"]
 	assert [s["node"] for s in turn["steps"]] == turn["path"]
 	assert turn["profile"]["interests"] == ["猫"]

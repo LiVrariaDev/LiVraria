@@ -3,11 +3,14 @@
 LIVRARIA_GRAPH=v2 のときに llm_chat から呼ばれる（既定は v1）。設計は SilverBullet の
 Notes/LiVraria/Graph-Redesign を参照。
 
-    START → understand → route ┬→ interview ─────────────────────→ END
-                               ├→ crd → plan → search → select ─→ END
-                               └→ answer ────────────────────────→ END
+    START → understand → route ┬→ interview ──────────────────────→ END
+                               ├→ search → select ────────────────→ END
+                               ├→ crd → plan → search → select ───→ END
+                               └→ answer ─────────────────────────→ END
 
 - understand / plan / select は構造化出力（pydantic）。interview / answer は文章
+- understand が検索キーワードも作る。レファ協を引くとき（うろ覚えのタイトル、調べ物）だけ、
+  手がかりを見て plan がキーワードを作り直す
 - route / crd / search はコードだけで動く（挙動を説明でき、再現できる）
 - 失敗したときのやり直しはノード単位で行う。グラフ全体はやり直さない
 - 429 はノードでは握りつぶさず llm_chat_v2 まで上げ、混雑の定型文を返す
@@ -35,7 +38,7 @@ logger = logging.getLogger("uvicorn.error")
 PROMPTS_V2_DIR = Path(PROMPTS_DIR, "v2")
 
 # 各 LLM ノードの出力枠。思考で出力枠を使い切らないよう、文章を返すノードは余裕を持たせる
-MAX_TOKENS = {"understand": 1024, "plan": 512, "select": 2048, "interview": 1024, "answer": 1024}
+MAX_TOKENS = {"understand": 1536, "plan": 512, "select": 2048, "interview": 1024, "answer": 1024}
 EMPTY_RETRIES = 1           # 文章を返すノードが空応答だったときのやり直し回数
 SELECT_RETRIES = 1          # 選書の構造化出力が読み取れなかったときのやり直し回数
 HISTORY_TURNS_FOR_LLM = 12  # LLM に渡す直近の履歴のメッセージ数
@@ -75,13 +78,14 @@ class ReadingProfile(BaseModel):
 	mentioned_books: List[str] = Field(default_factory=list, description="会話に出た本")
 
 
+class SearchQuery(BaseModel):
+	keywords: List[str] = Field(description="1〜2語の名詞")
+
+
 class UnderstandOutput(BaseModel):
 	profile: ReadingProfile = Field(description="更新後の読書プロフィール（すべての項目）")
 	intent: Literal["chit_chat", "need_more", "ready", "ask_book", "refine", "lookup_title"] = Field(description="今回の発言の意図")
-
-
-class SearchQuery(BaseModel):
-	keywords: List[str] = Field(description="1〜2語の名詞")
+	queries: List[SearchQuery] = Field(default_factory=list, description="検索キーワードの組（2〜4組）。探さない意図なら空")
 
 
 class PlanOutput(BaseModel):
@@ -187,12 +191,22 @@ def has_search_material(profile: ReadingProfile, intent: str) -> bool:
 	return bool(profile.interests or profile.mentioned_books or profile.mood)
 
 
+def needs_crd(intent: str, profile: ReadingProfile) -> bool:
+	"""レファ協を引いてから検索方針を立てるか。うろ覚えのタイトル探しと、目的が調べ物のときだけ。"""
+	if intent == "lookup_title":
+		return True
+	return intent in ("ready", "refine") and profile.purpose == "調べ物"
+
+
 def decide_route(intent: str, profile: ReadingProfile, last_picks: List[dict]) -> str:
-	"""意図とプロフィールの埋まり具合から次のノードを決める（"interview" / "search" / "answer"）。"""
+	"""意図とプロフィールの埋まり具合から次のノードを決める（"interview" / "search" / "crd" / "answer"）。
+
+	"search" は understand のキーワードでそのまま検索する。"crd" はレファ協 → plan を通ってから検索する。
+	"""
 	if intent == "ask_book":
 		return "answer" if last_picks else "interview"
 	if intent in SEARCH_INTENTS and has_search_material(profile, intent):
-		return "search"
+		return "crd" if needs_crd(intent, profile) else "search"
 	return "interview"
 
 
@@ -391,7 +405,10 @@ def _text_with_retry(node: str, role: str, messages: List[BaseMessage], options:
 
 def _make_nodes(options: _Options):
 	def understand(state: V2State) -> dict:
-		"""① 発言から読書プロフィールを更新し、意図を判定する。軽量モデル → 会話用モデルの順に試す。"""
+		"""① 発言から読書プロフィールを更新し、意図を判定し、検索キーワードを作る。軽量モデル → 会話用モデルの順に試す。
+
+		キーワードが空なら、プロフィールから作る（plan の失敗時と同じ）。
+		"""
 		previous = normalize_profile(state.get("profile"))
 		last_picks = state.get("last_picks") or []
 		prompt = load_v2_prompt("understand")
@@ -416,11 +433,16 @@ def _make_nodes(options: _Options):
 				intent = parsed.intent
 				if intent in ("ask_book", "refine") and not last_picks:
 					intent = "ready" if intent == "refine" else "need_more"
-				return {"profile": normalize_profile(parsed.profile).model_dump(), "intent": intent,
+				profile = normalize_profile(parsed.profile)
+				queries = clean_queries([q.keywords for q in parsed.queries])
+				if not queries and intent in SEARCH_INTENTS:
+					queries = fallback_queries(profile, [])
+				return {"profile": profile.model_dump(), "intent": intent, "queries": queries,
 				        "path": [*state.get("path", []), "understand"]}
 
 		# どちらでも読み取れなければ、プロフィールは前のまま、聞き取りに回す
-		return {"profile": previous.model_dump(), "intent": "need_more", "path": [*state.get("path", []), "understand"]}
+		return {"profile": previous.model_dump(), "intent": "need_more", "queries": [],
+		        "path": [*state.get("path", []), "understand"]}
 
 	def route(state: V2State) -> dict:
 		"""② 振り分け（コード）。"""
@@ -440,7 +462,7 @@ def _make_nodes(options: _Options):
 		        "path": [*state.get("path", []), "interview"]}
 
 	def crd_node(state: V2State) -> dict:
-		"""④a レファ協の事例から手がかりを取り出す（ready / refine / lookup_title のとき）。失敗しても先へ進む。
+		"""④a レファ協の事例から手がかりを取り出す（うろ覚えのタイトル、調べ物のとき）。失敗しても先へ進む。
 
 		ready / refine は興味（なければ気分）で質問文を検索する。lookup_title は会話に出た本の言葉で
 		事例全体（anywhere）を検索する（書名は回答や回答プロセスに書かれていることが多いため）。
@@ -664,7 +686,7 @@ def select_expression_v2(response_text: str, state: dict) -> str:
 # ---------------------------------------------------------------------------
 
 def _after_route(state: V2State) -> str:
-	return {"search": "crd", "answer": "answer"}.get(state.get("route"), "interview")
+	return {"search": "search", "crd": "crd", "answer": "answer"}.get(state.get("route"), "interview")
 
 
 def create_graph_v2(options: Optional[_Options] = None):
@@ -674,7 +696,7 @@ def create_graph_v2(options: Optional[_Options] = None):
 		workflow.add_node(name, fn)
 	workflow.set_entry_point("understand")
 	workflow.add_edge("understand", "route")
-	workflow.add_conditional_edges("route", _after_route, {"interview": "interview", "crd": "crd", "answer": "answer"})
+	workflow.add_conditional_edges("route", _after_route, {"interview": "interview", "search": "search", "crd": "crd", "answer": "answer"})
 	workflow.add_edge("crd", "plan")
 	workflow.add_edge("plan", "search")
 	workflow.add_edge("search", "select")
