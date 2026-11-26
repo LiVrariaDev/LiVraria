@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -36,6 +37,7 @@ def test_scenario_files_are_valid():
 
 
 def test_runner_records_turns_and_writes_summary(monkeypatch, tmp_path):
+	monkeypatch.setenv("LIVRARIA_GRAPH", "v1")
 	runner = _load_runner()
 	seen = []
 
@@ -47,15 +49,12 @@ def test_runner_records_turns_and_writes_summary(monkeypatch, tmp_path):
 		return f"返事:{message}", history + [HumanMessage(message), AIMessage("x")], books, "happy"
 
 	monkeypatch.setattr(llm, "llm_chat", fake_llm_chat)
-	monkeypatch.delenv("LIVRARIA_GRAPH", raising=False)
 	scenario = {"id": "s1", "title": "テスト", "user_context": "ctx", "turns": ["a", "b|c"], "checks": ["観点"]}
 
-	try:
-		results = {g: [runner.run_scenario(scenario, g)] for g in ("v1", "v2")}
-	finally:
-		monkeypatch.delenv("LIVRARIA_GRAPH", raising=False)
+	results = {g: [runner.run_scenario(scenario, g)] for g in ("v2", "v1")}
 
-	assert [s[0] for s in seen] == ["v1", "v1", "v2", "v2"]
+	assert [s[0] for s in seen] == ["v2", "v2", "v1", "v1"]
+	assert os.environ["LIVRARIA_GRAPH"] == "v1"  # run_scenario は元の値に戻す
 	assert seen[0][2] == "ctx"
 	turn = results["v2"][0]["turns"][1]
 	assert turn["response"] == "返事:b|c" and turn["route"] == "interview"

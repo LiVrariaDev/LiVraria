@@ -51,12 +51,24 @@ def _book_summary(book: dict) -> dict:
 
 
 def run_scenario(scenario: dict, graph: str, sleep: float = 0.0) -> dict:
-	"""1つのシナリオを指定の版で最後まで流す。"""
+	"""1つのシナリオを指定の版で最後まで流す。LIVRARIA_GRAPH は終わったら元の値に戻す。"""
+	previous_graph = os.environ.get("LIVRARIA_GRAPH")
+	os.environ["LIVRARIA_GRAPH"] = graph
+	try:
+		return _run_turns(scenario, graph, sleep)
+	finally:
+		# 呼び出し元の設定を残さないよう、元の値に戻す
+		if previous_graph is None:
+			os.environ.pop("LIVRARIA_GRAPH", None)
+		else:
+			os.environ["LIVRARIA_GRAPH"] = previous_graph
+
+
+def _run_turns(scenario: dict, graph: str, sleep: float) -> dict:
 	from backend import PROMPT_DEFAULT
 	from backend.api import llm, llm_usage
 	from backend.api.trace_store import TurnTrace, current_turn
 
-	os.environ["LIVRARIA_GRAPH"] = graph
 	history = []
 	state = {"profile": {}, "last_picks": []}
 	turns = []
