@@ -153,7 +153,6 @@ def get_llm(role: str = "chat", backend: Optional[str] = None, temperature: floa
 		backend: LLMバックエンド（'gemini' または 'ollama'）
 		temperature: 温度パラメータ
 		max_tokens: 最大トークン数
-		conversation_state: 会話グラフ v2 が読み書きする状態 {"profile", "last_picks"}（v1 では使わない）
 		system_prompt: システムプロンプト（オプション）
 		
 	Returns:
@@ -475,6 +474,7 @@ def llm_chat(
 		model: 使用するLLMバックエンド
 		temperature: 温度パラメータ
 		max_tokens: 最大トークン数
+		conversation_state: 会話グラフ v2 が読み書きする状態 {"profile", "last_picks"}（v1 では使わない）
 		
 	Returns:
 		(応答テキスト, 更新された履歴(List[BaseMessage]), 推薦された書籍リスト)
