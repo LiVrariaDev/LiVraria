@@ -48,8 +48,8 @@ def install_log_filter(logger_name: str = "uvicorn.error") -> None:
 @dataclass
 class TraceStep:
 	index: int
-	node: str                  # "agent" / "tools" / "force_tool"
-	attempt: int               # llm_chat のリトライ回数(0 から)
+	node: str                  # v1: "agent" / "tools" / "force_tool"、v2: "understand" / "route" / ... / "select"
+	attempt: int               # v1: llm_chat のリトライ回数、v2: ノード内のやり直し回数(0 から)
 	started_at: str
 	ended_at: str
 	duration_ms: int
@@ -74,6 +74,13 @@ class TurnTrace:
 	failed: bool = False
 	error: Optional[dict] = None
 	steps: list = field(default_factory=list)
+	graph: Optional[str] = None       # "v1" / "v2"
+	# 以下は会話グラフ v2 のときだけ記録する
+	intent: Optional[str] = None
+	route: Optional[str] = None
+	path: list = field(default_factory=list)       # 通ったノード
+	profile: Optional[dict] = None                 # このターンの後の読書プロフィール
+	crd_hints: list = field(default_factory=list)  # レファ協の事例から取り出した手がかり
 
 
 def _now() -> str:
@@ -139,6 +146,7 @@ class TraceStore:
 				"user_message": t.user_message,
 				"response_text": t.response_text,
 				"failed": t.failed,
+				"graph": t.graph,
 				"nodes": [step.node for step in t.steps],
 			}
 			for t in turns

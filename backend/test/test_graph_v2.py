@@ -564,3 +564,57 @@ def test_v1_runs_when_graph_is_not_v2(monkeypatch, value):
 def test_v2_selected_by_env(monkeypatch):
 	monkeypatch.setenv("LIVRARIA_GRAPH", " V2 ")
 	assert llm.get_graph_version() == "v2"
+
+
+# ---------------------------------------------------------------------------
+# 7. トレース（通過経路、プロフィール、crd_hints）
+# ---------------------------------------------------------------------------
+
+def test_trace_records_path_profile_and_crd_hints(monkeypatch, rakuten):
+	for path in DATA_DIR.iterdir():
+		if path.is_file():
+			path.unlink()
+	monkeypatch.setenv("LIVRARIA_DEBUG", "true")
+	trace_store.reset_trace_store()
+	store = DataStore()
+	monkeypatch.setattr(server_module.server, "data_store", store)
+	store.create_user("alice", Personal(name="alice", gender="other", age=20))
+	hints = [{"question": "猫の小説", "keywords": ["猫"], "ndc": ["913"], "process": "件名で検索"}]
+	monkeypatch.setattr(graph_v2.crd, "search_crd_hints", lambda words, limit=5: hints)
+	rakuten.results["猫"] = [book(1)]
+	fakes = FakeLLMs(
+		UnderstandOutput=[understood("ready", interests=["猫"])],
+		PlanOutput=[plan_of(["猫"])],
+		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "a"}])],
+	)
+	monkeypatch.setattr(llm, "get_llm", fakes.get_llm)
+	try:
+		response = server_module.server.chat_prompt("猫の本", None, str(PROMPT_DEFAULT), "alice")
+		turn = trace_store.get_trace_store().get_turn(response.trace_id)
+	finally:
+		trace_store.reset_trace_store()
+
+	assert turn["graph"] == "v2"
+	assert turn["intent"] == "ready" and turn["route"] == "search"
+	assert turn["path"] == ["understand", "route", "crd", "plan", "search", "select"]
+	assert [s["node"] for s in turn["steps"]] == turn["path"]
+	assert turn["profile"]["interests"] == ["猫"]
+	assert turn["crd_hints"] == hints
+	search_step = next(s for s in turn["steps"] if s["node"] == "search")
+	assert "『本1』" in search_step["tool_results"][0]["content"]
+
+
+def test_debug_graph_returns_both_versions(monkeypatch):
+	from fastapi.testclient import TestClient
+	from fastapi import FastAPI
+	from backend.api.server import register_debug_routes
+
+	monkeypatch.setenv("LIVRARIA_DEBUG", "true")
+	monkeypatch.setenv("LIVRARIA_ADMIN_KEY", "k")
+	app = FastAPI()
+	register_debug_routes(app)
+	data = TestClient(app).get("/debug/graph", headers={"X-Admin-Key": "k"}).json()
+	assert data["version"] == "v2"
+	assert data["mermaid"] == data["graphs"]["v2"]
+	assert "understand" in data["graphs"]["v2"] and "select" in data["graphs"]["v2"]
+	assert "agent" in data["graphs"]["v1"]

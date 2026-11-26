@@ -307,6 +307,21 @@ def _trace_step(node: str, started: datetime, *, attempt: int = 0, ai_text: Opti
 		logger.exception("Failed to record v2 trace step")
 
 
+def _record_turn_summary(result: dict) -> None:
+	"""意図、振り分け、通ったノード、プロフィール、レファ協の手がかりをターンのトレースに記録する。"""
+	try:
+		turn = current_turn.get()
+		if turn is None:
+			return
+		turn.intent = result.get("intent")
+		turn.route = result.get("route")
+		turn.path = list(result.get("path") or [])
+		turn.profile = result.get("profile")
+		turn.crd_hints = list(result.get("crd_hints") or [])
+	except Exception:
+		logger.exception("Failed to record v2 turn summary")
+
+
 # ---------------------------------------------------------------------------
 # LLM 呼び出し
 # ---------------------------------------------------------------------------
@@ -682,6 +697,7 @@ def llm_chat_v2(
 		logger.exception("Error in llm_chat_v2")
 		return llm_module.MESSAGE_EXCEPTION, history, [], "sorry"
 
+	_record_turn_summary(result)
 	response_text = result.get("response_text") or llm_module.MESSAGE_EMPTY_RESPONSE
 	picks = list(result.get("picks") or [])
 	expression = select_expression_v2(response_text, {**result, "picks": picks})

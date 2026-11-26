@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from backend.api import llm_usage
 from backend.api.auth import verify_admin_key
-from backend.api.llm import LLM_ROLES, get_gemini_model, get_graph_mermaid
+from backend.api.graph_v2 import get_graph_v2_mermaid
+from backend.api.llm import LLM_ROLES, get_gemini_model, get_graph_mermaid, get_graph_version
 from backend.api.trace_store import get_trace_store
 
 router = APIRouter(prefix="/debug", tags=["debug"], dependencies=[Depends(verify_admin_key)])
@@ -12,7 +13,10 @@ router = APIRouter(prefix="/debug", tags=["debug"], dependencies=[Depends(verify
 
 @router.get("/graph")
 async def debug_graph():
-	return {"mermaid": get_graph_mermaid()}
+	"""今の LIVRARIA_GRAPH の版のグラフ（mermaid）と、両方の版のグラフ。"""
+	graphs = {"v1": get_graph_mermaid(), "v2": get_graph_v2_mermaid()}
+	version = get_graph_version()
+	return {"mermaid": graphs[version], "version": version, "graphs": graphs}
 
 
 @router.get("/usage")

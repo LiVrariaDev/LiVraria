@@ -19,7 +19,7 @@ from langchain_core.messages import messages_to_dict
 
 from .models import ChatRequest, ChatResponse, Personal, ChatStatus, UserStatus, NfcIdRequest, UserUpdate
 from .datastore import DataStore
-from .llm import llm_chat, FALLBACK_MESSAGES
+from .llm import llm_chat, get_graph_version, FALLBACK_MESSAGES
 from .trace_store import current_trace_id, current_turn, get_trace_store, install_log_filter
 from .auth import get_current_user_id, verify_device_key, device_key_configured
 from . import LLM_BACKEND
@@ -350,6 +350,7 @@ class Server:
 
 			if store is not None:
 				turn = store.start_turn(trace_id, session_id, user_id, message)
+				turn.graph = get_graph_version()
 				turn_token = current_turn.set(turn)
 
 			# 会話グラフ v2 が読み書きする状態（読書プロフィールなど）。v1 では変更されない

@@ -78,7 +78,7 @@
                   class="px-3 py-2 cursor-pointer border-b border-slate-100 hover:bg-slate-50"
                   :class="t.trace_id === selectedTraceId ? 'bg-blue-50' : ''">
                 <div class="text-xs font-mono" :class="t.failed ? 'text-red-600' : 'text-slate-500'">
-                  {{ t.trace_id.slice(0, 8) }} {{ t.started_at }}<span v-if="t.failed"> FAILED</span>
+                  {{ t.trace_id.slice(0, 8) }} {{ t.started_at }}<span v-if="t.graph"> [{{ t.graph }}]</span><span v-if="t.failed"> FAILED</span>
                 </div>
                 <div class="truncate">U: {{ t.user_message }}</div>
                 <div class="truncate" :class="t.failed ? 'text-red-600' : 'text-slate-600'">AI: {{ t.response_text || '-' }}</div>
@@ -91,7 +91,10 @@
         <!-- 右: グラフとステップ詳細 -->
         <div class="flex-1 space-y-4 min-w-0">
           <div class="bg-white border border-slate-200 rounded-lg p-3">
-            <div class="font-semibold mb-2">グラフ</div>
+            <div class="font-semibold mb-2">
+              グラフ <span class="font-normal text-slate-500 font-mono">{{ shownGraphVersion }}</span>
+              <span v-if="graphVersion" class="font-normal text-slate-400">（LIVRARIA_GRAPH={{ graphVersion }}）</span>
+            </div>
             <div v-if="graphError" class="text-red-600">{{ graphError }}</div>
             <div ref="graphEl" class="overflow-x-auto" data-testid="graph"></div>
           </div>
@@ -102,6 +105,29 @@
               <div class="text-xs font-mono text-slate-500">{{ turn.trace_id }}</div>
               <div><span class="text-slate-500">ユーザー:</span> {{ turn.user_message }}</div>
               <div><span class="text-slate-500">応答:</span> {{ turn.response_text || '-' }}</div>
+              <!-- 会話グラフ v2 のターンの要約 -->
+              <div v-if="turn.graph === 'v2'" class="bg-amber-50 border border-amber-200 rounded p-2 space-y-1" data-testid="v2-summary">
+                <div>
+                  <span class="text-slate-500">意図:</span> <span class="font-mono">{{ turn.intent || '-' }}</span>
+                  <span class="text-slate-500 ml-3">振り分け:</span> <span class="font-mono">{{ turn.route || '-' }}</span>
+                </div>
+                <div><span class="text-slate-500">経路:</span> <span class="font-mono">{{ (turn.path || []).join(' → ') || '-' }}</span></div>
+                <div class="text-xs">
+                  <span class="font-semibold">読書プロフィール</span>
+                  <pre class="whitespace-pre-wrap bg-white rounded p-1">{{ JSON.stringify(turn.profile || {}, null, 2) }}</pre>
+                </div>
+                <div class="text-xs">
+                  <span class="font-semibold">レファ協の手がかり（内部用）</span>
+                  <ul v-if="turn.crd_hints && turn.crd_hints.length" class="bg-white rounded p-1 space-y-1">
+                    <li v-for="(h, i) in turn.crd_hints" :key="'h' + i">
+                      <div>{{ h.question || '-' }}</div>
+                      <div class="text-slate-500">キーワード: {{ (h.keywords || []).join('、') || '-' }} / NDC: {{ (h.ndc || []).join('、') || '-' }}</div>
+                      <div v-if="h.process" class="text-slate-500">探し方: {{ h.process }}</div>
+                    </li>
+                  </ul>
+                  <div v-else class="text-slate-400">なし</div>
+                </div>
+              </div>
               <div v-if="turn.error" class="bg-red-50 border border-red-300 rounded p-2 text-red-700">
                 <div class="font-semibold">ターンのエラー: {{ turn.error.type }}: {{ turn.error.message }}</div>
                 <div class="text-xs text-red-500">
@@ -148,8 +174,11 @@ import mermaid from 'mermaid';
 import { debugApi } from '../services/debugApi';
 
 const STORAGE_KEY = 'livraria_admin_key';
-// get_graph_mermaid() の出力に現れるノード id（色付け対象）
-const GRAPH_NODES = ['agent', 'tools', 'force_tool'];
+// /debug/graph の mermaid に現れるノード id（色付け対象）
+const GRAPH_NODES = {
+  v1: ['agent', 'tools', 'force_tool'],
+  v2: ['understand', 'route', 'interview', 'crd', 'plan', 'search', 'select', 'answer'],
+};
 
 const readStoredKey = () => {
   try { return sessionStorage.getItem(STORAGE_KEY) || ''; } catch { return ''; }
@@ -169,6 +198,8 @@ const turn = ref(null);
 const selectedSessionId = ref(null);
 const selectedTraceId = ref(null);
 const mermaidText = ref('');
+const graphs = ref({});
+const graphVersion = ref('');
 const graphEl = ref(null);
 
 let renderCount = 0;
@@ -213,6 +244,8 @@ const clearKey = () => {
   selectedSessionId.value = null;
   selectedTraceId.value = null;
   mermaidText.value = '';
+  graphs.value = {};
+  graphVersion.value = '';
   errorMessage.value = '';
 };
 
@@ -222,7 +255,16 @@ const loadTurns = async () => {
   if (selectedSessionId.value == null) { turns.value = []; return; }
   turns.value = (await debugApi.getTurns(adminKey.value, selectedSessionId.value)).turns;
 };
-const loadGraph = async () => { mermaidText.value = (await debugApi.getGraph(adminKey.value)).mermaid; };
+const loadGraph = async () => {
+  const data = await debugApi.getGraph(adminKey.value);
+  mermaidText.value = data.mermaid;
+  graphs.value = data.graphs || {};
+  graphVersion.value = data.version || '';
+};
+
+// 選んだターンの版のグラフを表示する（ターンを選ぶ前は今の LIVRARIA_GRAPH の版）
+const shownGraphVersion = computed(() => turn.value?.graph || graphVersion.value || 'v1');
+const shownMermaid = computed(() => graphs.value[shownGraphVersion.value] || mermaidText.value);
 
 const reloadAll = async () => {
   errorMessage.value = '';
@@ -261,12 +303,12 @@ const searchTrace = async () => {
 // 選んだターンの nodes に含まれるノードだけを色付けして描き直す
 const visitedIds = computed(() => {
   const nodes = turn.value?.steps?.map((s) => s.node) || [];
-  return GRAPH_NODES.filter((id) => nodes.includes(id));
+  return (GRAPH_NODES[shownGraphVersion.value] || GRAPH_NODES.v1).filter((id) => nodes.includes(id));
 });
 
 const renderGraph = async () => {
-  if (!mermaidText.value || !graphEl.value) return;
-  let text = mermaidText.value;
+  if (!shownMermaid.value || !graphEl.value) return;
+  let text = shownMermaid.value;
   if (visitedIds.value.length) {
     text += `\n\tclassDef visited fill:#fde68a,stroke:#d97706;\n\tclass ${visitedIds.value.join(',')} visited;\n`;
   }
@@ -279,7 +321,7 @@ const renderGraph = async () => {
   }
 };
 
-watch([mermaidText, visitedIds], () => nextTick(renderGraph));
+watch([shownMermaid, visitedIds], () => nextTick(renderGraph));
 
 onMounted(() => {
   mermaid.initialize({ startOnLoad: false });
