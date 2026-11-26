@@ -35,9 +35,5 @@
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
-  },
-  "dependencies": {
-    "@tailwindcss/vite": "^4.2.4",
-    "tailwindcss": "^4.2.4"
   }
 }
