@@ -74,4 +74,4 @@ jobs:
         # 実 API・実データを使わない単体テストのみ（他の test_*.py は起動中のサーバーが必要）
         run: |
           pip install pytest httpx
-          python -m pytest -q backend/test/test_datastore.py backend/test/test_llm_response_sanitization.py backend/test/test_llm_failures.py backend/test/test_server_api.py backend/test/test_cinii.py backend/test/test_llm_roles.py backend/test/test_debug_trace.py backend/test/test_search_candidates.py
+          python -m pytest -q backend/test/test_datastore.py backend/test/test_llm_response_sanitization.py backend/test/test_llm_failures.py backend/test/test_server_api.py backend/test/test_cinii.py backend/test/test_llm_roles.py backend/test/test_debug_trace.py backend/test/test_search_candidates.py backend/test/test_crd.py
