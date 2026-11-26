@@ -638,6 +638,54 @@ def test_crd_hints_are_passed_to_plan_only(monkeypatch, rakuten):
 	assert "件名で検索" not in select_messages  # 事例は利用者向けの文を作るノードには渡さない
 
 
+def test_research_retries_crd_with_anywhere_when_question_has_no_hits(monkeypatch, rakuten):
+	hints = [{"question": "戦国の城", "keywords": ["城郭"], "ndc": ["521"], "process": "城郭の事典を案内"}]
+	seen = []
+
+	def fake_crd(words, limit=5, field="question"):
+		seen.append((words, field))
+		return hints if field == "anywhere" else []
+
+	monkeypatch.setattr(graph_v2.crd, "search_crd_hints", fake_crd)
+	rakuten.results["城郭"] = [book(1)]
+	fakes = FakeLLMs(
+		UnderstandOutput=[understood("ready", interests=["戦国", "城"], purpose="調べ物")],
+		PlanOutput=[plan_of(["城郭"])],
+		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "a"}])],
+	)
+	_text, _h, books, _e = run(fakes, monkeypatch, "戦国時代の城について調べたい", state={})
+	assert seen == [(["戦国", "城"], "question"), (["戦国", "城"], "anywhere")]
+	assert "城郭の事典を案内" in fakes.main_calls()[1][2][0].content
+	assert books[0]["title"] == "本1"
+
+
+def test_research_with_question_hits_does_not_retry(monkeypatch, rakuten):
+	seen = []
+	hint = {"question": "q", "keywords": ["k"], "ndc": [], "process": ""}
+	monkeypatch.setattr(graph_v2.crd, "search_crd_hints",
+	                    lambda words, limit=5, field="question": seen.append(field) or [hint])
+	rakuten.results["戦国"] = [book(1)]
+	fakes = FakeLLMs(
+		UnderstandOutput=[understood("ready", interests=["戦国"], purpose="調べ物")],
+		PlanOutput=[plan_of(["戦国"])],
+		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "a"}])],
+	)
+	run(fakes, monkeypatch, "戦国について調べたい", state={})
+	assert seen == ["question"]
+
+
+@pytest.mark.parametrize("purpose", ["楽しみ", "学び", "贈り物", "不明"])
+def test_crd_is_not_used_unless_research(monkeypatch, rakuten, purpose):
+	monkeypatch.setattr(graph_v2.crd, "search_crd_hints", lambda *a, **k: pytest.fail("crd should not be called"))
+	rakuten.results["猫"] = [book(1)]
+	fakes = FakeLLMs(
+		UnderstandOutput=[understood("ready", [["猫"]], interests=["猫"], purpose=purpose)],
+		SelectOutput=[select_of([{"id": 1, "slot": "ど真ん中", "reason": "a"}])],
+	)
+	_text, _h, books, _e = run(fakes, monkeypatch, "猫の本", state={})
+	assert books[0]["title"] == "本1"
+
+
 def test_plan_failure_uses_profile_keywords(monkeypatch, rakuten):
 	rakuten.results["猫 宇宙"] = [book(1)]
 	fakes = FakeLLMs(
